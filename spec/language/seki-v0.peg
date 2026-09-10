@@ -1,0 +1,118 @@
+# Seki v0 candidate surface grammar
+# Status: informative bootstrap draft; incomplete where the surface spec says open
+# Start symbol: Module
+
+Module          <- Trivia ModuleDecl (Trivia UseDecl)* (Trivia TopDecl)* Trivia EOF
+ModuleDecl      <- 'module' Sp ModulePath Sp '@' Sp Nat Sep
+                   'profile:' Sp ValueIdent Dot
+UseDecl         <- 'use' Sp ModulePath Sp '@' Sp Nat Sep
+                   'digest:' Sp DigestLiteral Dot
+
+ModulePath      <- ValueIdent (PathSep ValueIdent)*
+PathSep         <- '::'
+
+TopDecl         <- TypeAlias / NominalDecl / RecordDecl / VariantDecl
+                 / FunctionDecl / KernelDecl
+TypeAlias       <- 'export' Sp 'type' Sp TypeIdent Sp ':=' Sp TypeRef Dot
+NominalDecl     <- 'export' Sp 'nominal' Sp TypeIdent Sp ':=' Sp TypeRef Dot
+RecordDecl      <- 'export' Sp 'record' Sp TypeIdent Sp RecordBody Dot
+RecordBody      <- LBrace Trivia FieldDecl (Trivia Comma Trivia FieldDecl)* Trivia RBrace
+FieldDecl       <- ValueIdent Trivia Colon Trivia TypeRef
+VariantDecl     <- 'export' Sp 'variant' Sp TypeIdent Sp VariantBody Dot
+VariantBody     <- LBrack Trivia VariantCase (Trivia VariantCase)* Trivia RBrack
+VariantCase     <- TypeIdent VariantPayload? Trivia '@' Trivia Nat Dot
+VariantPayload  <- LParen Trivia FieldDecl (Trivia Comma Trivia FieldDecl)* Trivia RParen
+
+FunctionDecl    <- 'fn' Sp FunctionHead Sep FunctionTail
+                   (Sep Bounds)? Trivia Body Dot
+KernelDecl      <- 'export' Sp 'kernel' Sp FunctionHead Sep FunctionTail
+                   Sep Bounds Trivia Body Dot
+FunctionHead    <- ValueIdent (Sp ParamBinding)*
+ParamBinding    <- ValueIdent Colon Trivia TypeRef
+FunctionTail    <- Arrow Trivia TypeRef Sep
+                   'arithmetic:' Sp ArithmeticPolicy
+ArithmeticPolicy <- 'checked' / 'wrapping' / 'saturating'
+Bounds          <- 'bounded' Sp 'steps:' Sp Nat Sp 'stack:' Sp Nat Sp
+                   'workspace:' Sp Nat
+
+TypeRef         <- PrimitiveType / AppliedType / TypeIdent
+PrimitiveType   <- 'Unit' / 'Bool' / 'U8' / 'U16' / 'U32' / 'U64'
+                 / 'I8' / 'I16' / 'I32' / 'I64'
+AppliedType     <- TypeIdent LBrack Trivia TypeArg
+                   (Trivia Comma Trivia TypeArg)* Trivia RBrack
+TypeArg         <- TypeRef / TypeIdent / Nat
+
+Body            <- LBrack Trivia BodySeq Trivia RBrack
+BodySeq         <- (BodyStmt Trivia Dot Trivia)* FinalExpr
+BodyStmt        <- Binding / RequireStmt
+Binding         <- ValueIdent Trivia ':=' Trivia Expr
+RequireStmt     <- 'require' Sp Expr Sp 'else:' Sp Expr
+FinalExpr       <- AcceptExpr / Expr
+AcceptExpr      <- 'accept' Sp Expr
+
+Expr            <- KeywordExpr
+KeywordExpr     <- OrExpr (Sp KeywordPart)+ / OrExpr
+KeywordPart     <- ValueIdent Colon Trivia OrExpr
+OrExpr          <- AndExpr (Trivia '||' Trivia AndExpr)*
+AndExpr         <- EqualityExpr (Trivia '&&' Trivia EqualityExpr)*
+EqualityExpr    <- CompareExpr (Trivia ('==' / '!=') Trivia CompareExpr)?
+CompareExpr     <- AddExpr (Trivia ('<=' / '>=' / '<' / '>') Trivia AddExpr)?
+AddExpr         <- MulExpr (Trivia ('+' / '-') Trivia MulExpr)*
+MulExpr         <- UnaryExpr (Trivia ('*' / '/') Trivia UnaryExpr)*
+UnaryExpr       <- Primary (Sp UnarySelector)*
+UnarySelector   <- ValueIdent !Colon
+
+Primary         <- BoolLit / UnitLit / IntLit / DigestLiteral / RecordLiteral
+                 / VariantRef / MatchExpr / Block / ParenExpr
+                 / ValueIdent / TypeIdent
+ParenExpr       <- LParen Trivia Expr Trivia RParen
+Block           <- LBrack Trivia BlockParams? BodySeq Trivia RBrack
+BlockParams     <- BlockParam (Sp BlockParam)* Trivia Bar Trivia
+BlockParam      <- Colon ValueIdent
+RecordLiteral   <- TypeIdent Trivia LBrace Trivia RecordField
+                   (Trivia Comma Trivia RecordField)* Trivia RBrace
+RecordField     <- ValueIdent Trivia Colon Trivia Expr
+VariantRef      <- TypeIdent PathSep TypeIdent
+MatchExpr       <- 'match' Sp Expr Trivia LBrack Trivia MatchArm+
+                   Trivia RBrack
+MatchArm        <- TypeIdent MatchBinding? Colon Trivia Block Dot
+MatchBinding    <- Sp ValueIdent
+
+DigestLiteral   <- 'sha256:' StringLiteral
+BoolLit         <- 'true' !IdentRest / 'false' !IdentRest
+UnitLit         <- 'unit' !IdentRest
+IntLit          <- '0' !Digit / [1-9] Digit*
+Nat             <- IntLit
+
+TypeIdent       <- [A-Z] IdentRest*
+ValueIdent      <- !Keyword [a-z] IdentRest*
+IdentRest       <- [A-Za-z0-9_]
+Keyword         <- ('module' / 'profile' / 'use' / 'digest' / 'export'
+                 / 'type' / 'nominal' / 'record' / 'variant' / 'fn'
+                 / 'kernel' / 'arithmetic' / 'bounded' / 'steps' / 'stack'
+                 / 'workspace' / 'require' / 'else' / 'accept' / 'match'
+                 / 'true' / 'false' / 'unit') !IdentRest
+
+StringLiteral   <- '"' HexDigit+ '"'
+HexDigit        <- [0-9A-Fa-f]
+Digit           <- [0-9]
+
+Arrow           <- '->'
+Dot             <- Trivia '.'
+Comma           <- ','
+Colon           <- ':'
+Bar             <- '|'
+LParen          <- '('
+RParen          <- ')'
+LBrack          <- '['
+RBrack          <- ']'
+LBrace          <- '{'
+RBrace          <- '}'
+
+Trivia          <- (Sp / NL / Comment)*
+Sep             <- (Space / NL / Comment)+
+Sp              <- (Space / Comment)+
+Space           <- [ \t]
+NL              <- '\r\n' / '\n' / '\r'
+Comment         <- ';;' (!NL .)* (NL / EOF)
+EOF             <- !.
