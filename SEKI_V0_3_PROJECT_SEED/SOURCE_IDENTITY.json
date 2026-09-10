@@ -1,0 +1,13 @@
+{
+  "schema": "io.frogfish.seki/project-seed-source@1",
+  "language_identity": "io.frogfish.seki/language@0",
+  "revision": "0.3",
+  "accepted_specification_commit": "65692f383d31b2d50d694f68133be578528b0710",
+  "seed_assembly_source_commit": "ae5e147a34db742e64496e180f55d7f7818085dd",
+  "kiku_f0_review": "accepted",
+  "independent_consumer_f0_review": "pending",
+  "global_f0": "open",
+  "implementation_authority": false,
+  "proof_authority": false,
+  "product_authority": false
+}

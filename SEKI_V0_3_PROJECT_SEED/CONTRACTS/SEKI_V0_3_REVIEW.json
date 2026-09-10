@@ -1,0 +1,111 @@
+{
+  "schema": "io.frogfish.seki/spec-review@0.3",
+  "identity": "io.frogfish.seki/language@0",
+  "name": {
+    "latin": "Seki",
+    "native": "関"
+  },
+  "revision": "0.3",
+  "status": "revision-ready-for-f0-review",
+  "f0_closed": false,
+  "authority_granted": false,
+  "semantic_authority_root": "canonical-serialized-typed-core-ast",
+  "toolchain_foundations": {
+    "lean": "4.30.0",
+    "rocq": "9.2.0",
+    "compcert": "3.18",
+    "exact_source_or_archive_identity_required": true
+  },
+  "cross_foundation_profile": {
+    "identity": "io.frogfish.seki/proof-carrying-invocation@0",
+    "certificate": "io.frogfish.seki/semantic-derivation-certificate@1",
+    "certificate_short_name": "SSDC-1",
+    "scope": "one-concrete-authority-bearing-invocation",
+    "same_certificate_checked_by": [
+      "qualified-lean-checker",
+      "qualified-rocq-checker"
+    ],
+    "required_bindings": [
+      "typed-core",
+      "semantic-profile",
+      "input",
+      "result",
+      "publication-decision",
+      "lean-checker-identity",
+      "rocq-checker-identity"
+    ],
+    "acceptance_objects": [
+      "LeanCertificateAcceptance",
+      "RocqCertificateAcceptance",
+      "JointCertificateReceipt"
+    ],
+    "joint_receipt_is_publication_premise": true,
+    "boolean_acceptances_are_sufficient": false,
+    "universal_common_certificate_existence_claimed": false,
+    "universal_lean_rocq_equality_claimed": false,
+    "future_universal_profile_requires_common_witness_theorem": true,
+    "independent_constructor_completeness_is_sufficient": false
+  },
+  "formal_c_foundation": {
+    "semantics": "CompCert-3.18-Clight",
+    "rocq_to_clight_refinement_scope": "universal-over-admitted-modules-and-inputs",
+    "lean_to_rocq_refinement_scope": "jointly-certified-invocation-only",
+    "generated_c_to_normative_lean_scope": "jointly-certified-invocation-only",
+    "joint_receipt_absent_lean_equivalence_claimed": false,
+    "joint_receipt_absent_authority_publication_count": 0,
+    "exact_emitted_bytes_must_parse_to_proved_ast": true,
+    "behavioral_obligations": [
+      "termination-with-exact-result",
+      "no-stuck-or-undefined-behavior",
+      "bounded-memory-footprint",
+      "modeled-external-calls-only",
+      "deterministic-rejection-precedence",
+      "declared-step-stack-workspace-bounds",
+      "zero-authority-output-on-rejection"
+    ]
+  },
+  "publication_protocol": {
+    "states": [
+      "Idle",
+      "Candidate",
+      "Committed"
+    ],
+    "certificate_validation_precedes_committable_candidate": true,
+    "missing_or_mismatched_certificate_publication_count": 0,
+    "successful_publication_count": 1,
+    "commit_token": "unconstructible-through-exported-interface-under-declared-premises",
+    "single_use_enforcement": "generated-private-state-or-separately-refined-private-registry"
+  },
+  "accepted_from_v0_2": [
+    "section-17/clight-behavioral-refinement",
+    "section-20/profile-c-api-confinement",
+    "section-20/token-linearity"
+  ],
+  "confirmation_paths": [
+    "section-17/proof-carrying-invocation",
+    "section-17/joint-certificate-receipt",
+    "section-20/certificate-gated-publication",
+    "section-23/v0-claim-ceiling",
+    "section-23/F4/refinement-scope"
+  ],
+  "qualification_stages": [
+    "F0",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8"
+  ],
+  "claim_ceiling": [
+    "no-implementation-authority",
+    "no-proof-authority",
+    "no-product-authority",
+    "no-native-binary-proof",
+    "no-universal-lean-rocq-equivalence",
+    "no-f0-acceptance"
+  ],
+  "disposition": "seki_v0_3_revision_ready_for_f0_review"
+}

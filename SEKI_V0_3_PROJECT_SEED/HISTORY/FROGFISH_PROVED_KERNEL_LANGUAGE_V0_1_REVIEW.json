@@ -1,0 +1,102 @@
+{
+  "schema": "io.frogfish.fpkl/spec-review@0.1",
+  "identity": "FROGFISH-PROVED-KERNEL-LANGUAGE-V0",
+  "revision": "0.1",
+  "status": "revision-ready-for-f0-review",
+  "f0_closed": false,
+  "authority_granted": false,
+  "semantic_authority_root": {
+    "kind": "canonical-serialized-typed-core-ast",
+    "surface_source_is_authoritative": false,
+    "admission": "verified-bounded-typed-core-checker",
+    "canonicalization": {
+      "field_order": "sorted-by-nominal-label",
+      "duplicate_labels": "reject",
+      "required_property": "injective-for-admitted-values"
+    }
+  },
+  "formal_c_foundation": {
+    "semantics": "CompCert-Clight",
+    "generated_source": "Clight-compatible-restricted-C11",
+    "exact_emitted_bytes_must_parse_to_proved_ast": true,
+    "verified_printer_parser_round_trip_required": true,
+    "arbitrary_iso_c11_correctness_claimed": false
+  },
+  "proof_foundations": {
+    "typed_core_and_kernel": "Lean",
+    "formal_c_semantics": "Rocq-CompCert",
+    "shared_root": "canonical-serialized-typed-core-ast",
+    "cross_foundation_bridge_required": true,
+    "theorem_name_matching_is_authority": false,
+    "finite_test_vectors_are_authority": false
+  },
+  "profile_c": {
+    "ordinary_host_c_may_extract_authority_semantics": false,
+    "authority_views": "generated-fpkl-or-separately-proved-adapter",
+    "arena_mapping_groups_required": 11,
+    "opaque_handle_authentication_alone_is_sufficient": false
+  },
+  "publication_protocol": {
+    "states": [
+      "Idle",
+      "Candidate",
+      "Committed"
+    ],
+    "typed_objects": [
+      "CandidateAuthority",
+      "CommitToken",
+      "PublishedAuthority",
+      "Receipt"
+    ],
+    "commit_token": "opaque-input-bound-single-use",
+    "cancellation_checkpoints": [
+      "before-decode",
+      "after-decode-before-evaluation",
+      "after-candidate-before-commit"
+    ],
+    "failure_publication_count": 0,
+    "successful_publication_count": 1,
+    "receipt_grants_new_authority": false
+  },
+  "bounded_execution": {
+    "logical_step_bound_proved": true,
+    "live_value_bound_proved": true,
+    "workspace_bound_proved": true,
+    "stack_bound_proved": true,
+    "deterministic_rejection_precedence": true,
+    "bounded_graph_traversal_is_proved_library": true
+  },
+  "kiku": {
+    "first_inventory": "KikuResourceProtocolInventoryV1",
+    "initial_role": "consumer-of-proved-libraries",
+    "future_emission_requires_translation_refinement": true,
+    "checked_unit_requires_reopenable_authority_closure": true
+  },
+  "qualification_stages": [
+    "F0",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8"
+  ],
+  "confirmation_paths": [
+    "section-6/typed-core-authority-root",
+    "section-17/compcert-clight-refinement",
+    "section-19/profile-c-semantic-confinement",
+    "section-20/publication-state-machine",
+    "section-23/qualification-ladder",
+    "section-26/kiku-integration"
+  ],
+  "claim_ceiling": [
+    "no-implementation-authority",
+    "no-proof-authority",
+    "no-product-authority",
+    "no-native-binary-proof",
+    "no-f0-acceptance"
+  ],
+  "disposition": "fpkl_v0_1_revision_ready_for_f0_review"
+}

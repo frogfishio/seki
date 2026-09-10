@@ -1,0 +1,31 @@
+{
+  "schema": "io.frogfish.seki/f0-consumer-acceptance@1",
+  "language_identity": "io.frogfish.seki/language@0",
+  "revision": "0.3",
+  "consumer": "Kiku",
+  "decision": "accepted_seki_v0_3_for_f0",
+  "accepted_gnosis_commit": "65692f383d31b2d50d694f68133be578528b0710",
+  "accepted_paths": [
+    "section-17/proof-carrying-invocation",
+    "section-17/joint-certificate-receipt",
+    "section-17/clight-behavioral-refinement",
+    "section-20/certificate-gated-publication",
+    "section-20/profile-c-api-confinement",
+    "section-20/token-linearity",
+    "section-23/v0-claim-ceiling",
+    "section-23/F4/refinement-scope"
+  ],
+  "claims_granted": [],
+  "claims_withheld": [
+    "implementation-authority",
+    "proof-authority",
+    "product-authority",
+    "native-binary-authority",
+    "arena-vertical-authority",
+    "production-authority"
+  ],
+  "kiku_f0_review_closed": true,
+  "independent_consumer_f0_review": "pending",
+  "global_f0_closed": false,
+  "next_gate": "one-materially-distinct-consumer-acceptance"
+}

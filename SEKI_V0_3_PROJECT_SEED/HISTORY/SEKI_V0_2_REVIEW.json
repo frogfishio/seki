@@ -1,0 +1,133 @@
+{
+  "schema": "io.frogfish.seki/spec-review@0.2",
+  "identity": "io.frogfish.seki/language@0",
+  "name": {
+    "latin": "Seki",
+    "native": "関"
+  },
+  "historical_identity": "FROGFISH-PROVED-KERNEL-LANGUAGE-V0",
+  "historical_abbreviation": "FPKL",
+  "revision": "0.2",
+  "status": "revision-ready-for-f0-review",
+  "f0_closed": false,
+  "authority_granted": false,
+  "semantic_authority_root": {
+    "kind": "canonical-serialized-typed-core-ast",
+    "surface_source_is_authoritative": false,
+    "admission": "verified-bounded-typed-core-checker",
+    "canonicalization": {
+      "field_order": "sorted-by-nominal-label",
+      "duplicate_labels": "reject",
+      "required_property": "injective-for-admitted-values"
+    }
+  },
+  "toolchain_foundations": {
+    "lean": "4.30.0",
+    "rocq": "9.2.0",
+    "compcert": "3.18",
+    "exact_source_or_archive_identity_required": true
+  },
+  "cross_foundation_bridge": {
+    "identity": "io.frogfish.seki/semantic-derivation-certificate@1",
+    "short_name": "SSDC-1",
+    "kind": "common-proof-neutral-bounded-derivation-certificate",
+    "lean_checker": "independent-verified-sound-and-complete",
+    "rocq_checker": "independent-verified-sound-and-complete",
+    "same_bytes_alone_grant_authority": false,
+    "matching_names_grant_authority": false,
+    "finite_vectors_grant_authority": false,
+    "bridge_conclusion": "lean-evaluation-equals-rocq-evaluation-via-common-certified-result"
+  },
+  "formal_c_foundation": {
+    "semantics": "CompCert-3.18-Clight",
+    "generated_source": "Clight-compatible-restricted-C11",
+    "exact_emitted_bytes_must_parse_to_proved_ast": true,
+    "verified_printer_parser_round_trip_required": true,
+    "behavioral_obligations": [
+      "termination-with-exact-result",
+      "no-stuck-or-undefined-behavior",
+      "bounded-memory-footprint",
+      "modeled-external-calls-only",
+      "deterministic-rejection-precedence",
+      "declared-step-stack-workspace-bounds",
+      "zero-authority-output-on-rejection"
+    ],
+    "arbitrary_iso_c11_correctness_claimed": false
+  },
+  "profile_c": {
+    "ordinary_host_c_may_extract_authority_semantics": false,
+    "authority_views": "generated-seki-or-separately-proved-adapter",
+    "arena_mapping_groups_required": 11,
+    "opaque_handle_authentication_alone_is_sufficient": false,
+    "confinement": {
+      "initial_profile": "api-level",
+      "host_memory_integrity_is_trusted": true,
+      "absence_of_host_undefined_behavior_is_trusted": true,
+      "exported_well_defined_interface_only": true,
+      "arbitrary_same_address_space_corruption_resisted": false
+    }
+  },
+  "publication_protocol": {
+    "states": [
+      "Idle",
+      "Candidate",
+      "Committed"
+    ],
+    "typed_objects": [
+      "CandidateAuthority",
+      "CommitToken",
+      "PublishedAuthority",
+      "Receipt"
+    ],
+    "commit_token": "unconstructible-through-exported-interface-under-declared-premises",
+    "single_use_enforcement": "generated-private-state-or-separately-refined-private-registry",
+    "c_type_opacity_alone_is_sufficient": false,
+    "cancellation_checkpoints": [
+      "before-decode",
+      "after-decode-before-evaluation",
+      "after-candidate-before-commit"
+    ],
+    "failure_publication_count": 0,
+    "successful_publication_count": 1,
+    "receipt_grants_new_authority": false
+  },
+  "bounded_execution": {
+    "logical_step_bound_proved": true,
+    "live_value_bound_proved": true,
+    "workspace_bound_proved": true,
+    "stack_bound_proved": true,
+    "deterministic_rejection_precedence": true,
+    "bounded_graph_traversal_is_proved_library": true
+  },
+  "kiku": {
+    "first_inventory": "KikuResourceProtocolInventoryV1",
+    "initial_role": "consumer-of-proved-libraries",
+    "future_emission_requires_translation_refinement": true,
+    "checked_unit_requires_reopenable_authority_closure": true
+  },
+  "qualification_stages": [
+    "F0",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8"
+  ],
+  "confirmation_paths": [
+    "section-17/ssdc-1-cross-foundation-bridge",
+    "section-17/clight-behavioral-refinement",
+    "section-20/profile-c-api-confinement",
+    "section-20/token-linearity"
+  ],
+  "claim_ceiling": [
+    "no-implementation-authority",
+    "no-proof-authority",
+    "no-product-authority",
+    "no-native-binary-proof",
+    "no-f0-acceptance"
+  ],
+  "disposition": "seki_v0_2_revision_ready_for_f0_review"
+}
