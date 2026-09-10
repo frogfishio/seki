@@ -1,0 +1,16 @@
+{
+  "schema": "io.frogfish.seki/project-status@1",
+  "language_identity": "io.frogfish.seki/language@0",
+  "charter_revision": "0.3",
+  "license": "GPL-3.0-or-later",
+  "generated_artifact_policy": "customer-controlled",
+  "runtime_exception": "legal-text-pending",
+  "global_f0": "open",
+  "independent_consumer_review": "pending",
+  "f1_implementation_authorized": false,
+  "implementation_authority": false,
+  "proof_authority": false,
+  "native_binary_authority": false,
+  "product_authority": false,
+  "production_authority": false
+}

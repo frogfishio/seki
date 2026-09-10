@@ -1,0 +1,10 @@
+.DS_Store
+.lake/
+build/
+dist/
+out/
+*.olean
+*.vo
+*.vos
+*.vok
+

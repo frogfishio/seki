@@ -1,20 +1,59 @@
-# Seki programming language
-関
+# Seki / 関
 
-## What does it mean
+Seki is a deliberately small, total language for critical decision kernels.
+It is designed to provide a verified compiler that emits portable C together
+with machine-checkable evidence that the generated program preserves the
+kernel's formal semantics, making it suitable for proof-carrying systems.
 
-Rune: 関 (Simplified: 关 | Traditional: 關)
-Japanese: せき (Seki)
-•	Barrier gate / Checkpoint: Historical border pass (sekisho) where traveler credentials were inspected.
-•	Hurdle / Bottleneck: A critical boundary or standard that must be passed (kanmon).
-•	Connection / Bearing: Relevance or relationship (kankei).
-Chinese: guān
-•	Mountain pass / Frontier gate: A fortified border barrier or checkpoint (e.g., Shanhaiguan).
-•	To close / Shut / Turn off: Everyday verb to bar an entrance, shut a door, or power down devices (guān mén).
-•	Critical juncture / Linchpin: A decisive pivot or crucial turning point (guānjiàn).
-•	Connection: Relation or involvement (guānxì).
+Seki is not a general-purpose programming language. It is intended for small,
+bounded validators, authority decisions, normalizers, and protocol transitions
+embedded in larger systems.
 
-## Functionals
+## Project lineage and ownership
 
-Extnesion: .seki
-Compiler: sekic
+Gnosis and Kiku jointly specified Seki from a shared need for small decision
+kernels whose generated C implementations can be connected to formal
+semantics. They are Seki's founding customers and continue to provide feedback.
+
+Seki is now an independent project. Gnosis and Kiku have no special authority
+over its language or implementation beyond their ordinary role as customers.
+Their concepts may appear in design history, examples, and integration
+libraries, but they do not define Seki's language core.
+
+The current repository contains the v0.3 project seed and design charter. It
+does not yet contain a verified compiler or grant implementation, proof,
+native-binary, product, or production authority. Start with
+[`SEKI_V0_3_PROJECT_SEED/START_HERE.md`](SEKI_V0_3_PROJECT_SEED/START_HERE.md).
+
+Current bootstrap records:
+
+- [`PROJECT_STATUS.json`](PROJECT_STATUS.json) — machine-enforced claim ceiling
+- [`docs/architecture/TYPED_CORE_BOUNDARY.md`](docs/architecture/TYPED_CORE_BOUNDARY.md)
+  — first semantic slice and serialization freeze criteria
+- [`docs/f0/INDEPENDENT_USE_CASE_REQUEST.md`](docs/f0/INDEPENDENT_USE_CASE_REQUEST.md)
+  — materially different use-case review
+- [`docs/governance/PROJECT_CHARTER.md`](docs/governance/PROJECT_CHARTER.md)
+  — independence and customer relationship
+
+## Name
+
+`関` is read *seki* in Japanese and *guān* in Chinese. Its meanings include a
+barrier or checkpoint, a mountain pass, a critical juncture, and a connection
+or relationship. Those senses reflect Seki's role: a small semantic boundary
+at which a consequential decision must be checked.
+
+## Planned tooling
+
+- Source extension: `.seki`
+- Compiler: `sekic`
+
+## License
+
+Seki is free software licensed under
+[`GPL-3.0-or-later`](LICENSE). Third-party foundations retain their own
+licenses. Running `sekic` does not change the ownership or licensing of a
+customer's module or generated artifacts. Customers may distribute generated
+C, proofs, manifests, and certificates under terms of their choice. Any
+Seki-owned runtime or template material included in an output will carry an
+explicit GCC-style runtime exception; that legal text must be adopted before
+such material is distributed.

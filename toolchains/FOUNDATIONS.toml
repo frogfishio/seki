@@ -1,0 +1,19 @@
+# Versions are frozen by the v0.3 charter. Exact source identities, checksums,
+# acquisition methods, and license decisions remain bootstrap work.
+
+[lean]
+version = "4.30.0"
+source_identity = "unbound"
+license_review = "pending"
+
+[rocq]
+version = "9.2.0"
+source_identity = "unbound"
+license_review = "pending"
+
+[compcert]
+version = "3.18"
+source_identity = "unbound"
+license_review = "pending"
+redistribution_review = "required"
+

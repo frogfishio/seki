@@ -1,0 +1,19 @@
+Seki / 関
+Copyright (C) 2026 Seki contributors
+
+This project is licensed under the GNU General Public License, version 3 or
+(at your option) any later version. See LICENSE.
+
+Running the Seki compiler does not change the ownership or licensing of a
+customer's input module or generated artifacts. Any Seki-owned runtime or
+template material copied into an output requires the separate output exception
+described in docs/licensing/OUTPUT_POLICY.md.
+
+The files under SEKI_V0_3_PROJECT_SEED preserve the accepted design seed and
+its provenance. Gnosis and Kiku jointly specified that seed as founding
+customers. They do not govern this independent project and receive no special
+authority over its language or implementation.
+
+Lean, Rocq, and CompCert are separate third-party projects. They are not
+included or licensed by this repository. Their exact sources and licenses must
+be qualified before use in a release.
