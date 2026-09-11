@@ -232,9 +232,12 @@ CBOR subset against:
 - schema evolution and profile binding; and
 - inspectability and test tooling.
 
-Record the decision in an ADR. Then deliver canonical encoder/decoder rules,
-positive vectors, noncanonical equivalents that must reject, truncated/oversized
-vectors, module/lock encodings, and digest vectors.
+Record the decision in an ADR. The bootstrap comparison provisionally selects a
+purpose-built positional binary for authority bytes and restricted canonical JSON
+for the untrusted lockfile. The byte freeze still requires canonical
+encoder/decoder rules, a complete field/tag ledger, positive vectors,
+noncanonical equivalents that must reject, truncated/oversized vectors, and
+module and digest vectors.
 
 #### F1-C: Lean admission
 
@@ -544,7 +547,8 @@ The next tasks, in dependency order, are:
    rejection-precedence model.
 5. **B0-08/B0-09:** bind Lean and Rocq exact sources and licenses.
 6. **B0-10:** resolve the CompCert acquisition/use profile.
-7. Compare canonical encoding candidates against the typed-core draft.
+7. Implement independent experimental SCB-0 encoders and produce positive,
+   hostile, rejection-precedence, and digest vectors.
 8. Assemble the F0 review packet and request the exact scoped response.
 
 Tasks 3–7 are bootstrap/specification work and may proceed while F0 is open. No

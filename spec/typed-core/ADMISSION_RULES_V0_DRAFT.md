@@ -28,8 +28,8 @@ table entries have been canonically ordered.
 
 | Order | Layer | Representative rejection |
 | --- | --- | --- |
-| 0 | Envelope | oversized, truncated, malformed encoding |
-| 1 | Canonical form | noncanonical integer/length, duplicate key, wrong key order |
+| 0 | Envelope | oversized, truncated, malformed encoding, trailing bytes |
+| 1 | Canonical form | unknown discriminant, invalid Boolean/option tag, duplicate key, wrong table order |
 | 2 | Identity | wrong schema, language, module, or semantic profile |
 | 3 | Shape | unknown/missing field, wrong value kind, profile count exceeded |
 | 4 | Imports | bad digest, duplicate identity, missing/extra module, profile mismatch, non-direct reference, cycle |
@@ -43,9 +43,10 @@ table entries have been canonically ordered.
 | 12 | Backend/profile | construct unavailable in selected qualified projection |
 | 13 | Witness closure | missing, mismatched, or incomplete derivation witness |
 
-The concrete stable `AdmissionReason` tags will be assigned with the encoding
-schema. Implementations may collect additional diagnostics, but the authoritative
-primary rejection is determined only by this table and canonical path order.
+Provisional stable `AdmissionReason` pairs are assigned in
+`../encoding/ADMISSION_REASON_TAGS_V0_DRAFT.md`. Implementations may collect
+additional diagnostics, but the authoritative primary rejection is determined
+by layer, canonical path, then the reason order specified there.
 
 ## 3. Structural paths
 
@@ -67,13 +68,19 @@ Each layer requires at least one positive boundary vector and negative vectors f
 - maximum and maximum-plus-one lengths/counts/nesting;
 - maximum and maximum-plus-one bundle modules, total bytes, import edges, and
   dependency depth;
-- duplicate, missing, unknown, reordered, and wrong-kind fields;
+- duplicate or reordered table keys and set members, truncated positional fields,
+  and wrong-kind tagged cases;
 - invalid UTF-8 wherever text is admitted;
-- noncanonical integer, length, tag, and identifier encodings;
+- unknown discriminants, invalid Boolean/option tags, and invalid identifier
+  encodings;
+- declared byte/sequence lengths inconsistent with remaining input or profile
+  ceilings;
 - substituted module, import, domain, type, function, field, and variant references;
 - missing, extra, reordered, profile-mismatched, and digest-substituted dependency
   modules;
 - alias cycles, recursive records/variants, and call cycles;
+- missing, duplicate, out-of-range, dependency-violating, and non-minimal entries
+  in canonical type/function dependency orders;
 - local references at every binder-depth boundary;
 - nominally distinct but representation-equal values;
 - incomplete records and non-exhaustive or duplicate match arms;

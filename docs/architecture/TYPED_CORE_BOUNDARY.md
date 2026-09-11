@@ -40,15 +40,16 @@ imports exact versions through aliases; generated `seki.lock` records digests.
 
 ## Serialization freeze criteria
 
-The concrete wire encoding remains undecided. It may be frozen only after we
-can state and test:
+A purpose-built positional binary encoding is the accepted bootstrap direction.
+Its concrete bytes may be frozen only after we can state and test:
 
 1. injectivity over admitted typed-core values;
 2. one encoding for every admitted value;
 3. deterministic field order and integer representation;
-4. duplicate and unknown-field rejection;
+4. duplicate table-key, unknown-tag, and trailing-byte rejection;
 5. explicit Unicode and byte-string rules;
 6. version and semantic-profile binding; and
 7. a feasible path to verified Lean decoding and encoding.
 
-Surface syntax must not be frozen before this boundary.
+The generated JSON lockfile remains outside this boundary. Surface syntax must
+not be frozen before the authority-bearing binary boundary.

@@ -44,7 +44,8 @@ checked, and specified without them.
 
 ## Remaining work
 
-- Select canonical typed-core and lock encodings together in F1-B.
+- Complete the provisional SCB-0 field/tag ledger and canonical witness form
+  before a byte freeze; keep the JSON lock outside admission.
 - Specify stable module/lock rejection tags and hostile encoded vectors.
 - Define the initial local-workspace command and project-file format outside the
   trusted boundary.

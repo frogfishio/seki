@@ -40,8 +40,10 @@ LockFile ::= {
 ```
 
 Each digest covers the dependency's complete canonical typed-core module,
-including its own exact imports and derivations. The eventual concrete lockfile
-encoding is selected with the canonical typed-core encoding.
+including its own exact imports and derivations. The proposed concrete lockfile
+is restricted canonical JSON as specified in
+`../encoding/SEKI_LOCK_JSON_V0_DRAFT.md`. It is deliberately distinct from the
+SCB-0 authority format.
 
 The lockfile contains no semantic source path, registry URL, mirror, or search
 order. Development tooling receives module files or directories explicitly and

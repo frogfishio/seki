@@ -50,6 +50,6 @@ type proof is structural recursion over a closed node and type-constructor set.
 This preserves useful reuse without turning Seki into a general type-system or
 module-system project.
 
-Canonical-core lock digests become operational only after F1-B selects the wire
-encoding. Before then, lock generation is specification work and carries no
+Canonical-core lock digests become operational only after F1-B freezes SCB-0
+bytes. Before then, lock generation is specification work and carries no
 qualified reproducibility claim.

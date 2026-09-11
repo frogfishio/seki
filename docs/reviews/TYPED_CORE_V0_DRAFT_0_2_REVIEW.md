@@ -33,8 +33,8 @@
 
 These block a typed-core or language freeze, but not further bootstrap design:
 
-1. Select the canonical wire encoding and specify the one normal form for every
-   digest-bearing derivation witness.
+1. Complete the selected provisional SCB-0 schema and specify the one normal
+   form for every digest-bearing derivation witness.
 2. Mechanize and validate the drafted step, live-value, evaluator-control-depth,
    and workspace algebra against the eventual evaluator.
 3. Decide whether `countWhere` should be added to the now-closed v0 collection
@@ -43,7 +43,7 @@ These block a typed-core or language freeze, but not further bootstrap design:
 5. Freeze arithmetic conversion, shift, and result-propagation surface syntax.
 6. Complete direct-import/export validation and module claim-compatibility rules;
    source-level theorem imports are excluded from v0.
-7. Assign stable admission-reason tags only after the encoding schema is chosen.
+7. Assign stable admission-reason tags as part of the SCB-0 schema ledger.
 
 ## Review conclusion
 
@@ -51,5 +51,6 @@ No known contradiction remains among the module model, candidate-selection
 fixture, surface example, and admission ordering at this abstraction level. The
 F1-A04/F1-A06 follow-up is recorded separately and introduces tail-formed kernel
 control. The F1-A05/F1-A07 arithmetic and resource-algebra follow-up is also
-recorded separately. Encoding comparison may now use these drafts but must not
-freeze them while the controlled findings remain.
+recorded separately. Encoding comparison used these drafts. The SCB-0 schema and
+canonical-reconstruction follow-up is recorded separately; byte vectors and
+proofs remain required before freeze.

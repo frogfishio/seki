@@ -1,7 +1,7 @@
 # Seki resource-cost algebra v0 draft
 
 - Status: bootstrap semantic proposal; non-normative
-- Companion model: `SEKI_TYPED_CORE_V0_DRAFT.md` revision 0.2
+- Companion model: `SEKI_TYPED_CORE_V0_DRAFT.md` revision 0.3
 - Target work package: F1-A07
 
 ## 1. Purpose
@@ -177,6 +177,10 @@ Admission recomputes all four metrics from the canonical module and exact import
 It requires equality with `exact_derived_bounds`, then checks each component
 against the declared function/kernel and module ceilings. A larger producer claim
 is rejected just like a smaller one: there is one canonical result.
+
+The canonical AST is the bound-derivation tree and `exact_derived_bounds` is its
+proposed conclusion. Intermediate tuples are reconstructed rather than
+serialized, as specified by `DERIVATION_WITNESS_NORMAL_FORM_V0_DRAFT.md`.
 
 The later representation and C stages must map semantic slots, control frames,
 and abstract workspace to concrete objects without exceeding their separately

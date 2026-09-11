@@ -43,6 +43,12 @@ Current bootstrap records:
 - [`PROJECT_STATUS.json`](PROJECT_STATUS.json) — machine-enforced claim ceiling
 - [`docs/architecture/TYPED_CORE_BOUNDARY.md`](docs/architecture/TYPED_CORE_BOUNDARY.md)
   — first semantic slice and serialization freeze criteria
+- [`spec/encoding/SEKI_CANONICAL_BINARY_V0_DRAFT.md`](spec/encoding/SEKI_CANONICAL_BINARY_V0_DRAFT.md)
+  — provisional authority-bearing binary direction; bytes are not frozen
+- [`spec/encoding/SCB0_SCHEMA_LEDGER.md`](spec/encoding/SCB0_SCHEMA_LEDGER.md)
+  — provisional positional fields and discriminants
+- [`spec/typed-core/DERIVATION_WITNESS_NORMAL_FORM_V0_DRAFT.md`](spec/typed-core/DERIVATION_WITNESS_NORMAL_FORM_V0_DRAFT.md)
+  — canonical static derivations by deterministic reconstruction
 - [`docs/f0/INDEPENDENT_USE_CASE_REQUEST.md`](docs/f0/INDEPENDENT_USE_CASE_REQUEST.md)
   — materially different use-case review
 - [`docs/governance/PROJECT_CHARTER.md`](docs/governance/PROJECT_CHARTER.md)

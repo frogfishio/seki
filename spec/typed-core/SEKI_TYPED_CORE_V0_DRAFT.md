@@ -1,7 +1,8 @@
 # Seki canonical typed core v0 draft
 
-- Status: bootstrap semantic model; non-normative; encoding not selected
-- Draft revision: 0.2
+- Status: bootstrap semantic model; non-normative; encoding family selected,
+  bytes not frozen
+- Draft revision: 0.3
 - Language identity: `io.frogfish.seki/language@0`
 - Target work package: F1-A01/F1-A02 draft
 
@@ -25,7 +26,8 @@ The definitions use this specification notation:
 
 ```text
 Name ::= ASCII identifier bytes
-Nat  ::= mathematical natural number bounded by the selected profile
+Nat  ::= mathematical natural number in 0..4294967295 and bounded by the
+         selected profile
 Bool ::= false | true
 Bytes ::= finite sequence of octets
 MathematicalInteger ::= an integer value, independent of machine encoding
@@ -62,10 +64,10 @@ DigestId ::= {
 DigestAlgorithm ::= sha256
 ```
 
-V0 admits SHA-256 as the seed digest algorithm. Adding an algorithm requires a
-profile/version decision. Path spelling is case-sensitive ASCII. Empty components,
-`.`/`..`, alternate separators, Unicode normalization, and version ranges do not
-exist in typed core.
+V0 admits SHA-256 as the seed digest algorithm and requires exactly 32 digest
+octets. Adding an algorithm requires a profile/version decision. Path spelling is
+case-sensitive ASCII. Empty components, `.`/`..`, alternate separators, Unicode
+normalization, and version ranges do not exist in typed core.
 
 Every reference crossing a module boundary includes the exact `ModuleId` and
 module digest. Ambient resolution is impossible.
@@ -132,10 +134,24 @@ requirements and claims are closed, unique, canonically ordered sets. A claim no
 listed in `claim_ceiling` is withheld. Listing a claim requests or permits that
 kind of evidence; it does not establish the claim.
 
-`DerivationBundle` carries proposed type, totality, import, and bound witnesses.
-It participates in the canonical module digest as required by the governing
-seed. Its proof-object shape must therefore have one canonical normal form; that
-shape remains open. Every witness is reopened by the admission checker.
+V0 derivations use canonical reconstruction rather than a second producer-chosen
+proof tree. `DerivationBundle` is:
+
+```text
+DerivationBundle ::= {
+  schema_version: Nat,  ;; exactly 0 in v0
+  type_dependency_order: Vec[LocalTypeRef],
+  function_dependency_order: Vec[LocalFunctionRef]
+}
+```
+
+The two vectors are the unique lexicographically least topological orders over
+canonical local declaration indices. The typed AST, claimed expression types,
+exact imports, rejection indices, and exact callable bounds carry all other
+derivation conclusions. Admission reconstructs every omitted premise and rejects
+any mismatch. These fields participate in the canonical module digest as
+required by the governing seed. The complete normal form is specified in
+`DERIVATION_WITNESS_NORMAL_FORM_V0_DRAFT.md`.
 
 ## 5. Names and references
 
@@ -239,6 +255,7 @@ Type ::= Unit
 All natural parameters must fit the selected profile and participate in type
 identity. `Index[0]` is invalid. Empty byte strings, arrays, tuples, and bounded
 vectors remain profile decisions; they are not inferred from host behavior.
+`Digest(sha256, length)` requires `length = 32` in v0.
 `VariantPayload` is an internal type for the canonical field record carried by
 one declared variant case; it cannot be named in surface signatures. A case with
 no payload has no `VariantPayload` value. `Declared` cannot reference an alias;
@@ -790,16 +807,18 @@ DiagnosticSidecar ::= {
 The sidecar must bind the exact typed-core digest. It may improve errors but cannot
 change admission, evaluation, generated code, proofs, or publication.
 
-## 13. Encoding questions deliberately deferred
+## 13. Encoding direction and deferred assignments
 
-The abstract model does not decide:
+The accepted bootstrap direction is the purpose-built positional SCB-0 format in
+`../encoding/SEKI_CANONICAL_BINARY_V0_DRAFT.md`. Provisional envelope, schema,
+discriminant, digest, key-order, and admission-reason assignments now exist. They
+cannot freeze until:
 
-- binary, canonical JSON, or canonical CBOR representation;
-- integer and length prefix encodings;
-- whether canonical tables serialize as sorted pairs or schema-positioned arrays;
-- exact derivation witness representation;
-- schema evolution fields and extension rejection; or
-- diagnostic-sidecar wire format.
+- the reconstruction witness rules and resource recurrence are formalized;
+- every authority record is exercised by composed encoder/decoder vectors;
+- every admission reason has a hostile and competing-precedence vector;
+- two independent implementations agree on module, bundle, and digest bytes; and
+- the diagnostic-sidecar wire format is either specified separately or remains
+  explicitly noncanonical.
 
-The encoding decision must preserve every invariant above and minimize the size
-of the verified decoder.
+The generated JSON lockfile is not part of the authority encoding.
