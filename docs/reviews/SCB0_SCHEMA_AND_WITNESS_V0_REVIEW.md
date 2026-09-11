@@ -57,12 +57,11 @@ The candidate now has:
    and empty tables are handled identically by independent encoders.
 5. At least two implementations must agree on module, bundle, and digest bytes
    before any assignment freezes.
-6. The candidate-selection fixture must be lowered to the complete positional
-   schema to expose any missing field discovered only in composition.
+6. A decoder independent of both fixture emitters must reopen the complete
+   candidate-selection vector and reject targeted mutations.
 
 ## Conclusion
 
 No uncovered tagged sum or positional authority record is known in typed-core
 revision 0.3. The specification is ready for experimental vector construction,
 not for a canonical-byte or verified-decoder claim.
-

@@ -30,7 +30,7 @@ export variant Rejection [
 export kernel select input: Input
 -> Decision[Candidate, Rejection]
 arithmetic: checked
-bounded steps: 2048 liveBits: 4096 controlDepth: 64 workspaceBits: 4096
+bounded steps: 2048 liveBits: 32768 controlDepth: 64 workspaceBits: 4096
 rejects: Rejection::Missing, Rejection::Duplicate, Rejection::Stale,
   Rejection::Disabled
 publication: none [

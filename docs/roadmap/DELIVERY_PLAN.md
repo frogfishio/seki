@@ -547,8 +547,8 @@ The next tasks, in dependency order, are:
    rejection-precedence model.
 5. **B0-08/B0-09:** bind Lean and Rocq exact sources and licenses.
 6. **B0-10:** resolve the CompCert acquisition/use profile.
-7. Implement independent experimental SCB-0 encoders and produce positive,
-   hostile, rejection-precedence, and digest vectors.
+7. Implement an independent experimental SCB-0 decoder over the two positive
+   vectors, then add hostile, rejection-precedence, bundle, and mutation vectors.
 8. Assemble the F0 review packet and request the exact scoped response.
 
 Tasks 3–7 are bootstrap/specification work and may proceed while F0 is open. No

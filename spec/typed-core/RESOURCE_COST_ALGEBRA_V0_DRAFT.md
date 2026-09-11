@@ -84,6 +84,45 @@ point in this schedule, including initial parameters and the final result.
 Because the schedule is fixed, two admission checkers cannot choose different
 liveness optimizations.
 
+### 3.1 Mechanical live-value recurrence
+
+The exact calculation is the maximum over a finite symbolic event trace. A trace
+state contains the immutable environment slots and the temporary result slots
+currently retained by enclosing nodes. Its live weight is the sum of
+`value_bits` for those slots; workspace and control frames are counted by their
+separate metrics.
+
+Evaluation applies these events in order:
+
+1. Entering a callable installs its parameter slots in declared order.
+2. A literal allocates its result slot.
+3. `Local[i]` allocates a fresh copy of environment slot `i`.
+4. A strict parent evaluates children left to right and retains every child
+   result; it then allocates its own result before releasing the child results.
+5. `Project` therefore retains the complete record child while allocating the
+   projected field result.
+6. `Let` moves, rather than copies, its value result into environment position
+   zero for the body, then releases the binding when the body completes.
+7. `If`, short-circuit Boolean nodes, and `KernelRequire` release the consumed
+   condition before entering the selected continuation. The derivation explores
+   every permitted continuation and takes the maximum.
+8. `Match` retains its scrutinee throughout the selected arm. A payload arm also
+   allocates one fresh complete payload binder. Every arm is explored.
+9. `KernelAccept` or `KernelReject` retains its value/reason while allocating the
+   enclosing `Decision` result, then releases the child.
+10. A collection intrinsic retains its evaluated collection and other input
+    results. Each symbolic iteration allocates fresh block parameter slots,
+    evaluates the block under its captured immutable environment, consumes its
+    result, and releases the parameters before the next iteration.
+11. A call retains the caller environment, moves argument results into parameter
+    slots, evaluates the callee, and moves its result back without copying.
+
+Records, tuples, variant payloads, calls, and multi-input intrinsics use rule 4
+for their ordered input evaluation. Intrinsic state is excluded from the live
+sum and included in workspace. Since branches and loop capacities are finite,
+these events define one terminating exact recurrence without choosing concrete
+runtime values.
+
 ## 4. Logical steps
 
 A logical step is charged for each entered `Expr`, `KernelExpr`, callable body,

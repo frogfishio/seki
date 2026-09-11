@@ -12,6 +12,7 @@ verify-status:
 
 check-encoding-vectors:
 	./tools/encoding/check_minimal_vector.sh
+	./tools/encoding/check_candidate_vector.sh
 
 check-diff:
 	git diff --check

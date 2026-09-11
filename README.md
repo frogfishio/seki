@@ -49,6 +49,8 @@ Current bootstrap records:
   — provisional positional fields and discriminants
 - [`spec/typed-core/DERIVATION_WITNESS_NORMAL_FORM_V0_DRAFT.md`](spec/typed-core/DERIVATION_WITNESS_NORMAL_FORM_V0_DRAFT.md)
   — canonical static derivations by deterministic reconstruction
+- [`spec/typed-core/fixtures/CANDIDATE_SELECTION_LOWERING_V0.md`](spec/typed-core/fixtures/CANDIDATE_SELECTION_LOWERING_V0.md)
+  — first complete experimental lowering and SCB-0 composition vector
 - [`docs/f0/INDEPENDENT_USE_CASE_REQUEST.md`](docs/f0/INDEPENDENT_USE_CASE_REQUEST.md)
   — materially different use-case review
 - [`docs/governance/PROJECT_CHARTER.md`](docs/governance/PROJECT_CHARTER.md)

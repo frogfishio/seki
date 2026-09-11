@@ -33,10 +33,13 @@
   unfrozen.
 - Provisional SCB-0 field/discriminant ledger, canonical-reconstruction witness,
   typed key orders, envelope, `U32` ceiling, and SHA-256 domain rule drafted;
-  provisional admission tags, proofs, and vectors remain open.
+  provisional admission tags, proofs, and hostile vectors remain open.
 - First experimental SCB-0 vector emitted independently by C11 and JavaScript;
   the 149-byte minimal module agrees, and Node/OpenSSL independently agree on its
   domain-separated SHA-256 digest.
+- Candidate-selection lowered completely to provisional SCB-0. Independent C11
+  and JavaScript emitters agree on 1,025 bytes and its digest; composition exposed
+  and corrected an invalid live-value ceiling and missing profile defaults.
 - Conservative C11 engineering standard and `make check` entry point added.
 
 ## Active work
@@ -47,8 +50,8 @@ immediate execution queue in the delivery plan and record its owner here.
 ## Next unblocked tasks
 
 1. F0-01 — independent consumer decision and reviewer selection.
-2. F1-B vector work — lower the candidate-selection fixture and add hostile,
-   rejection-precedence, bundle, and mutation vectors.
+2. F1-B decoder work — independently reopen the candidate-selection bytes, then
+   add hostile, rejection-precedence, bundle, and mutation vectors.
 3. B0-08/B0-09 — exact Lean and Rocq source locks.
 4. B0-10 — CompCert acquisition and use profile.
 
