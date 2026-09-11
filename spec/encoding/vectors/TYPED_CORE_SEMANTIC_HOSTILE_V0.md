@@ -21,6 +21,12 @@
 | `All` changed to `MapBounded` without changing result bytes | `0800` |
 | `Fold` block has the wrong parameter count | `080e` |
 | `KernelIf` condition changed from `Bool` to `U32` | `0801` |
+| Byte literal length differs from its claimed `Bytes` type | `0800` |
+| Boolean `Not` receives a `U16` operand | `0801` |
+| Module resource ceiling is below a callable declaration | `0b06` |
+| Declared module import ceiling exceeds the profile | `0b07` |
+| Actual declaration count exceeds the module ceiling | `0b06` |
+| Canonical module bytes exceed the module ceiling | `0b06` |
 | `All` step claim omits static-capacity work | `0b01` |
 | Map workspace claim omits the partial output | `0b04` |
 | Projection owner does not match record | `0704` |
@@ -32,6 +38,6 @@
 | Declared callable ceiling below exact result | `0b05` |
 
 These cases begin after successful structural decoding so that each mutation
-isolates the semantic checker. Six cases now operate on canonical module bytes;
+isolates the semantic checker. Seven cases now operate on canonical module bytes;
 the remaining object-level cases must eventually gain byte-level
 counterparts. This file does not claim an admission-result vector freeze.

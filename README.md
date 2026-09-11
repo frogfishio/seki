@@ -63,6 +63,8 @@ Current bootstrap records:
   — capacity-expanded traversal and intrinsic-workspace fixture
 - [`docs/reviews/SEMANTIC_COVERAGE_AUDIT_V0.md`](docs/reviews/SEMANTIC_COVERAGE_AUDIT_V0.md)
   — checked tagged-form coverage and explicit rule-gap inventory
+- [`spec/typed-core/fixtures/COVERAGE_GAPS_LOWERING_V0.md`](spec/typed-core/fixtures/COVERAGE_GAPS_LOWERING_V0.md)
+  — compact closure fixture giving every tagged form positive evidence
 - [`docs/reviews/EXPERIMENTAL_TYPED_CORE_CHECKER_REVIEW.md`](docs/reviews/EXPERIMENTAL_TYPED_CORE_CHECKER_REVIEW.md)
   — first fixture-bounded type and exact-resource reconstruction pass
 - [`docs/f0/INDEPENDENT_USE_CASE_REQUEST.md`](docs/f0/INDEPENDENT_USE_CASE_REQUEST.md)

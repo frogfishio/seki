@@ -555,8 +555,9 @@ The next tasks, in dependency order, are:
    The construction/access slice is also complete experimentally. Continue with
    Capacity-expanding traversal and workspace recurrence are also complete
    experimentally. Kernel-control coverage and the checked node audit are now
-   complete. Close the eleven positive-form gaps, then cover module/profile and
-   bundle graph ceilings; add canonical byte-level hostile cases.
+   complete, and all 69 tags now have positive evidence. Initial module/profile
+   tuple checks are implemented. Continue with structural module observations,
+   bundle graph ceilings, and checked-natural arithmetic.
 9. Assemble the F0 review packet and request the exact scoped response.
 
 Tasks 3–8 are bootstrap/specification work and may proceed while F0 is open. No

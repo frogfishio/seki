@@ -654,6 +654,8 @@ export const decodeBundle = (bytes) => {
     [identityKey(module.identity), module]));
   const rootModule = byIdentity.get(identityKey(root));
   if (!rootModule) fail("0204", "bundle/root");
+  const importEdges = modules.reduce((sum, module) => sum + module.imports.length, 0);
+  if (importEdges > 64) fail("040b", "bundle/import_edges");
 
   for (const module of modules) {
     for (const [importId, importDigest] of module.imports) {
@@ -667,12 +669,15 @@ export const decodeBundle = (bytes) => {
 
   const visiting = new Set();
   const reachable = new Set();
-  const visit = (module) => {
+  const visit = (module, depth = 0) => {
     const key = identityKey(module.identity);
+    if (depth > 8) fail("040c", `${key}/imports`);
     if (visiting.has(key)) fail("0404", `${key}/imports`);
     if (reachable.has(key)) return;
     visiting.add(key);
-    for (const [importId] of module.imports) visit(byIdentity.get(identityKey(importId)));
+    for (const [importId] of module.imports) {
+      visit(byIdentity.get(identityKey(importId)), depth + 1);
+    }
     visiting.delete(key);
     reachable.add(key);
   };

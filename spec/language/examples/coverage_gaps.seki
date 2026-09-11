@@ -1,0 +1,21 @@
+module seki::fixtures::coverage_gaps @ 1
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: type_well_formed, totality, determinism, resource_bounds.
+
+export type ByteAlias := U8.
+
+export fn bytesLiteral -> Bytes[3]
+arithmetic: checked [ bytes[53 45 4b] ].
+
+export fn digestEcho value: Digest[sha256, 32] -> Digest[sha256, 32]
+arithmetic: checked [ value ].
+
+export fn i16Echo value: I16 -> I16 arithmetic: checked [ value ].
+export fn i8Echo value: I8 -> I8 arithmetic: checked [ value ].
+export fn not value: Bool -> Bool arithmetic: checked [ value not ].
+export fn notEqual left: U16 right: U16 -> Bool
+arithmetic: checked [ left != right ].
+export fn orElse left: Bool right: Bool -> Bool
+arithmetic: checked [ left orElse: [ right ] ].
+export fn u16Echo value: U16 -> U16 arithmetic: checked [ value ].

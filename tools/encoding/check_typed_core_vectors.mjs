@@ -15,6 +15,7 @@ const arithmeticBytes = emit("emit_arithmetic_control_scb0.mjs");
 const constructionBytes = emit("emit_construction_access_scb0.mjs");
 const traversalBytes = emit("emit_traversal_scb0.mjs");
 const kernelIfBytes = emit("emit_kernel_if_scb0.mjs");
+const coverageGapBytes = emit("emit_coverage_gaps_scb0.mjs");
 const payloadManifest = JSON.parse(fs.readFileSync(
   "spec/encoding/vectors/payload-records-v0.json", "utf8"));
 if (payloadBytes.length !== payloadManifest.length) throw new Error("payload vector length mismatch");
@@ -55,6 +56,14 @@ const kernelIfDigest = createHash("sha256")
   .update(Buffer.from(kernelIfManifest.digest_domain_terminator_hex, "hex"))
   .update(kernelIfBytes).digest("hex");
 if (kernelIfDigest !== kernelIfManifest.module_sha256) throw new Error("kernel-if vector digest mismatch");
+const coverageGapManifest = JSON.parse(fs.readFileSync(
+  "spec/encoding/vectors/coverage-gaps-v0.json", "utf8"));
+if (coverageGapBytes.length !== coverageGapManifest.length) throw new Error("coverage-gap vector length mismatch");
+const coverageGapDigest = createHash("sha256")
+  .update(coverageGapManifest.digest_domain_ascii, "ascii")
+  .update(Buffer.from(coverageGapManifest.digest_domain_terminator_hex, "hex"))
+  .update(coverageGapBytes).digest("hex");
+if (coverageGapDigest !== coverageGapManifest.module_sha256) throw new Error("coverage-gap vector digest mismatch");
 
 const freshCandidate = () => decodeModule(candidateBytes);
 const freshBundle = () => decodeBundle(bundleBytes);
@@ -83,6 +92,7 @@ expectAccepted("arithmetic-control-v0", decodeModule(arithmeticBytes));
 expectAccepted("construction-access-v0", decodeModule(constructionBytes));
 expectAccepted("traversal-v0", decodeModule(traversalBytes));
 expectAccepted("kernel-if-v0", decodeModule(kernelIfBytes));
+expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
 
 {
   const candidate = freshCandidate();
@@ -164,6 +174,40 @@ expectAccepted("kernel-if-v0", decodeModule(kernelIfBytes));
   expectRejected("kernel-if-condition-not-bool", kernelIf, "0801");
 }
 {
+  const changed = Buffer.from(coverageGapBytes);
+  const literal = Buffer.from("0b00000003030000000353454b", "hex");
+  const at = changed.indexOf(literal);
+  if (at < 0) throw new Error("bytes literal target absent");
+  changed.writeUInt32BE(2, at + 1);
+  expectRejected("bytes-literal-claim-length-mismatch-bytes", decodeModule(changed), "0800");
+}
+{
+  const coverage = decodeModule(coverageGapBytes);
+  const not = coverage.functions[4][1];
+  not.parameters[0] = [3]; not.body.term[1].claimedType = [3];
+  expectRejected("not-operand-not-bool", coverage, "0801");
+}
+{
+  const candidate = freshCandidate();
+  candidate.moduleBounds[7][0] = 1024;
+  expectRejected("module-resource-ceiling-below-callable", candidate, "0b06");
+}
+{
+  const candidate = freshCandidate();
+  candidate.moduleBounds[2] = 33;
+  expectRejected("module-import-ceiling-above-profile", candidate, "0b07");
+}
+{
+  const candidate = freshCandidate();
+  candidate.moduleBounds[3] = 4;
+  expectRejected("module-declaration-count-exceeded", candidate, "0b06");
+}
+{
+  const candidate = freshCandidate();
+  candidate.moduleBounds[1] = 1024;
+  expectRejected("module-byte-ceiling-exceeded", candidate, "0b06");
+}
+{
   const traversal = decodeModule(traversalBytes);
   traversal.functions[0][1].exact[0] = 10;
   expectRejected("all-must-charge-static-capacity", traversal, "0b01");
@@ -223,4 +267,4 @@ for (const [name, component, reason] of [
   expectRejected("callable-ceiling-below-exact", candidate, "0b05");
 }
 
-console.log("typed_core_semantics=verified positive=8 hostile=24 byte_hostile=6");
+console.log("typed_core_semantics=verified positive=9 hostile=30 byte_hostile=7");

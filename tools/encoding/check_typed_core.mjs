@@ -13,6 +13,8 @@ const callableKey = (module, index) =>
 const choiceBits = (count) => count <= 1 ? 0 : Math.ceil(Math.log2(count));
 const counterBits = (capacity) => choiceBits(capacity + 1);
 const tagBits = (tag) => tag === 0 ? 0 : Math.floor(Math.log2(tag)) + 1;
+const C11_BOUNDED_PROFILE = [1048576, 1048576, 32, 4096, 65536, 256, 32,
+  [16777216, 8388608, 256, 8388608]];
 
 export class TypedCoreChecker {
   constructor(decoded) {
@@ -711,6 +713,29 @@ export class TypedCoreChecker {
     });
   }
 
+  checkModuleCeilings(module) {
+    if (!same(module.profile, ["c11_bounded", 1])) fail("0b07", "module/profile");
+    const declared = module.moduleBounds;
+    for (let index = 0; index < 7; ++index) {
+      if (declared[index] > C11_BOUNDED_PROFILE[index]) {
+        fail("0b07", `module/bounds/${index}`);
+      }
+    }
+    declared[7].forEach((value, index) => {
+      if (value > C11_BOUNDED_PROFILE[7][index]) fail("0b07", `module/bounds/resources/${index}`);
+    });
+    const declarationCount = module.domains.length + module.types.length +
+      module.functions.length + module.kernels.length;
+    if (module.canonicalBytes.length > declared[1] || module.imports.length > declared[2] ||
+      declarationCount > declared[3]) fail("0b06", "module/bounds");
+    for (const [kind, entries] of [["functions", module.functions], ["kernels", module.kernels]]) {
+      entries.forEach(([, body], callableIndex) => body.declared.forEach((value, index) => {
+        if (value > declared[7][index]) fail("0b06",
+          `module/${kind}/${callableIndex}/declared/${index}`);
+      }));
+    }
+  }
+
   check() {
     const orderedModules = [];
     const visited = new Set();
@@ -726,6 +751,7 @@ export class TypedCoreChecker {
     for (const module of this.modules) visit(module);
     for (const module of orderedModules) {
       this.currentModule = module;
+      this.checkModuleCeilings(module);
       for (const index of module.derivations.functionOrder) {
         const body = module.functions[index][1];
         const parameters = body.parameters.map((type) => this.normalize(type, module));

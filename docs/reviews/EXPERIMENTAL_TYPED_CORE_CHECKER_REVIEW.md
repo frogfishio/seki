@@ -64,8 +64,14 @@ canonical module bytes.
 The kernel-conditional fixture completes positive coverage of the six
 kernel-control tags. Its hostile case rejects a non-Boolean `KernelIf` condition.
 The separate machine-checked coverage ledger now accounts for all 69 tagged
-types, declarations, pure terms, and kernel terms: 58 have positive fixture
-evidence and eleven remain explicit positive-evidence gaps.
+types, declarations, pure terms, and kernel terms with positive fixture evidence.
+The closure fixture supplies the former eleven gaps.
+
+The checker also enforces the first module/profile ceiling layer: module ceiling
+tuples cannot exceed `c11_bounded@1`; actual canonical bytes, imports, and
+declaration counts cannot exceed the module tuple; and callable declared resource
+tuples cannot exceed the module resource tuple. Four hostile cases distinguish
+module failure `0b06` from profile failure `0b07`.
 
 ## Boundary of the result
 
@@ -84,7 +90,7 @@ cost algebra is correct.
 ## Conclusion
 
 The current type identity and resource recurrence survive their first composed
-implementation tests. The next useful work is closing the eleven small positive
-fixture gaps, then module/profile and bundle graph ceilings, continuing to add
-byte-level hostile vectors before
+implementation tests. The next useful work is expression-node, nesting, and
+call-depth derivation plus bundle graph-ceiling vectors and checked-natural
+overflow, continuing to add byte-level hostile vectors before
 translating frozen rules into Lean.
