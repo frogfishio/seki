@@ -79,6 +79,22 @@ Candidate selection reconstructs 30 nodes at nesting seven; the import chain
 reconstructs callable depths one, two, and three. Three hostile cases cover the
 associated module and call-depth ceilings.
 
+All semantic bound naturals are now checked against the SCB-0 `U32` domain.
+Value-width multiplication and capacity-expanded traversal steps have explicit
+overflow hostiles; overflow reports `0b00` before exact-bound mismatch.
+
+Type formation now rechecks zero `Index` bounds, SHA-256 digest length, empty and
+recursive declarations, duplicate variant case names, forbidden public
+`VariantPayload`, and unexpanded declared alias references. Seven hostile cases
+cover the rules. V0 equality is explicitly defined for every well-formed member
+of its closed value-type sum and therefore checks exact normalized type identity.
+
+The `c11_bounded@1` policy rejects empty bytes, tuples, arrays, and bounded
+vectors with `0608`, and rejects any single semantic value wider than the
+profile live-value ceiling with `0607`. A nominal accepts every otherwise
+well-formed public v0 type, so the unused `invalid_nominal_representation` reason
+was removed rather than preserving an unreachable failure.
+
 ## Boundary of the result
 
 Most hostile cases deliberately mutate freshly decoded objects after structural
@@ -96,6 +112,6 @@ cost algebra is correct.
 ## Conclusion
 
 The current type identity and resource recurrence survive their first composed
-implementation tests. The next useful work is bundle graph-ceiling vectors and
-checked-natural overflow, continuing to add byte-level hostile vectors before
+implementation tests. The remaining broad rules are source-input ceiling meaning
+and publication declaration coupling, continuing to add byte-level hostile vectors before
 translating frozen rules into Lean.

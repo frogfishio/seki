@@ -45,6 +45,20 @@ These are admission maxima, not recommendations and not preallocation sizes.
 Every decoder checks the smaller declared module/callable bound before the
 profile maximum where applicable.
 
+Every admitted semantic value type has `value_bits(T) <= 8388608`. This applies
+even to a declaration not reached by a callable, preventing dead declarations
+from carrying values the profile can never evaluate.
+
+This profile rejects `Bytes[0]`, `Tuple[]`, `Array[T,0]`, and
+`BoundedVec[T,0]`. `Unit` is the single zero-payload value form. Avoiding
+additional empty storage shapes removes zero-length-array and empty-aggregate
+cases from later ISO C representation proofs. `Option[Unit]`, variants, and
+other useful zero-payload choices remain available.
+
+A nominal may wrap any otherwise well-formed public v0 value type. Its
+representation may not contain the internal `VariantPayload` form and aliases
+must already be expanded; no additional nominal representation whitelist exists.
+
 ## 3. Surface default
 
 If a v0 source module omits a module-level ceiling declaration, elaboration
@@ -60,5 +74,3 @@ values must not exceed the module or profile resource tuple.
 - Decide whether to rename this semantic profile before identity freeze.
 - Validate the ceilings against the first Gnosis and Kiku kernels.
 - Separate semantic input bits from future encoded input-byte and C-layout bounds.
-- Freeze the exact set of empty collection/type forms admitted by the profile.
-

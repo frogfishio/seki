@@ -557,8 +557,9 @@ The next tasks, in dependency order, are:
    experimentally. Kernel-control coverage and the checked node audit are now
    complete, and all 69 tags now have positive evidence. Initial module/profile
    tuple and structural module checks are implemented, and bundle graph ceilings
-   have constructive vectors. Continue with checked-natural arithmetic and type
-   well-formedness.
+   have constructive vectors, checked `U32` bound arithmetic is implemented, and
+   fixed type-formation/equality and empty-form profile rules are checked. Resolve
+   the source-input ceiling boundary before implementing publication coupling.
 9. Assemble the F0 review packet and request the exact scoped response.
 
 Tasks 3–8 are bootstrap/specification work and may proceed while F0 is open. No

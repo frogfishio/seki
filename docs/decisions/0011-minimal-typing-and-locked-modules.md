@@ -11,8 +11,8 @@ package manager.
 
 The type system has no user-defined generics, polymorphic functions, overloads,
 subtyping, traits, implicit conversions, or constraint solving. `Option[T]`,
-`Result[T,E]`, arrays, bounded vectors, decisions, and bounded combinators are
-closed built-in schema families, not a general generic facility. Every typed-core
+`Result[T,E]`, arrays, decisions, and bounded array combinators are closed
+built-in schema families, not a general generic facility. Every typed-core
 instance is concrete and monomorphic.
 
 Human-authored source imports an exact module identity/version under an explicit

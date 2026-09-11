@@ -71,6 +71,15 @@
   nesting, and reopened callable depth; three additional hostile cases pass.
 - Constructive exact-digest bundle graphs now cover the 64-edge and depth-eight
   profile ceilings with `040b` and `040c`.
+- Checked `U32` bound arithmetic rejects semantic-width and traversal-step
+  overflow with `0b00` before stored-bound comparison.
+- Fixed type-formation checks cover zero indices, digest length, empty variants,
+  recursive declarations, duplicate case names, internal payload placement, and
+  alias expansion. V0 equality now explicitly admits every well-formed value
+  type by exact normalized identity.
+- The profile now rejects four redundant empty storage forms, caps every semantic
+  value by maximum live bits, and admits any otherwise well-formed public nominal
+  representation; five additional profile/type hostile cases pass.
 - Conservative C11 engineering standard and `make check` entry point added.
 
 ## Active work
@@ -81,8 +90,8 @@ immediate execution queue in the delivery plan and record its owner here.
 ## Next unblocked tasks
 
 1. F0-01 — independent consumer decision and reviewer selection.
-2. F1-C bootstrap design — add checked-natural arithmetic, then close
-   type-parameter well-formedness and equality-admitting classification.
+2. F1-A/F1-C bootstrap design — resolve the meaning and authority boundary of
+   `maximum_input_bytes`, then implement publication declaration coupling.
 3. B0-08/B0-09 — exact Lean and Rocq source locks.
 4. B0-10 — CompCert acquisition and use profile.
 

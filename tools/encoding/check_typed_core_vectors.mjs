@@ -112,7 +112,7 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
   const typeAt = changed.lastIndexOf(payloadType);
   if (typeAt < 0) throw new Error("payload claimed-type target absent");
   changed[typeAt + payloadType.length - 1] = 0;
-  expectRejected("payload-binder-type-mismatch-bytes", decodeModule(changed), "0800");
+  expectRejected("payload-binder-type-mismatch-bytes", decodeModule(changed), "0604");
 }
 {
   const payload = decodeModule(payloadBytes);
@@ -223,6 +223,74 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
   expectRejected("module-call-depth-exceeded", bundle, "0b08");
 }
 {
+  const construction = decodeModule(constructionBytes);
+  construction.functions[0][1].parameters[0] = [18, [5], 0xffffffff];
+  expectRejected("semantic-value-width-overflow", construction, "0b00");
+}
+{
+  const traversal = decodeModule(traversalBytes);
+  const all = traversal.functions[0][1];
+  const hugeUnitArray = [18, [0], 0xffffffff];
+  all.parameters[0] = hugeUnitArray;
+  all.body.term[1].claimedType = hugeUnitArray;
+  all.body.term[2].parameters[0] = [0];
+  all.body.term[2].body = { claimedType: [1], term: [1, true] };
+  expectRejected("traversal-step-multiplication-overflow", traversal, "0b00");
+}
+{
+  const construction = decodeModule(constructionBytes);
+  construction.functions[8][1].result = [14, 0];
+  expectRejected("zero-index-bound", construction, "0600");
+}
+{
+  const coverage = decodeModule(coverageGapBytes);
+  coverage.functions[1][1].parameters[0] = [13, 0, 31];
+  expectRejected("sha256-digest-wrong-length", coverage, "0601");
+}
+{
+  const kernelIf = decodeModule(kernelIfBytes);
+  kernelIf.types[0][1].body = [];
+  expectRejected("empty-variant", kernelIf, "0603");
+}
+{
+  const payload = decodeModule(payloadBytes);
+  payload.functions[0][1].parameters[0] = [21, [[0, 1], 1]];
+  expectRejected("variant-payload-in-public-signature", payload, "0604");
+}
+{
+  const coverage = decodeModule(coverageGapBytes);
+  coverage.functions[7][1].parameters[0] = [22, [0, 0]];
+  expectRejected("declared-reference-to-alias", coverage, "0606");
+}
+{
+  const payload = decodeModule(payloadBytes);
+  payload.types[1][1].body[1][1].name = "Empty";
+  expectRejected("duplicate-variant-case-name", payload, "0501");
+}
+{
+  const payload = decodeModule(payloadBytes);
+  const pair = payload.types[0][1];
+  const recursive = [22, [0, 0]];
+  pair.body[0][1] = recursive; pair.types[0] = recursive;
+  expectRejected("recursive-type", payload, "0602");
+}
+for (const [name, mutate] of [
+  ["empty-bytes-type", (module) => { module.functions[0][1].result = [11, 0]; }],
+  ["empty-tuple-type", (module) => { module.functions[4][1].result = [17, []]; }],
+  ["zero-length-array-type", (module) => { module.functions[0][1].parameters[0] = [18, [4], 0]; }],
+  ["zero-capacity-vector-type", (module) => { module.functions[7][1].parameters[0] = [19, [4], 0]; }]
+]) {
+  const module = name === "empty-bytes-type"
+    ? decodeModule(coverageGapBytes) : decodeModule(constructionBytes);
+  mutate(module);
+  expectRejected(name, module, "0608");
+}
+{
+  const construction = decodeModule(constructionBytes);
+  construction.functions[0][1].parameters[0] = [18, [5], 131073];
+  expectRejected("type-width-above-profile", construction, "0607");
+}
+{
   const traversal = decodeModule(traversalBytes);
   traversal.functions[0][1].exact[0] = 10;
   expectRejected("all-must-charge-static-capacity", traversal, "0b01");
@@ -282,4 +350,4 @@ for (const [name, component, reason] of [
   expectRejected("callable-ceiling-below-exact", candidate, "0b05");
 }
 
-console.log("typed_core_semantics=verified positive=9 hostile=33 byte_hostile=7");
+console.log("typed_core_semantics=verified positive=9 hostile=47 byte_hostile=7");

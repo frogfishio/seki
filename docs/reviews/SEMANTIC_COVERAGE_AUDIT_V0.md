@@ -23,14 +23,11 @@ silently.
 
 ## Rule-level gaps
 
-Tagged-node coverage does not establish admission completeness. Five larger
+Tagged-node coverage does not establish admission completeness. Two larger
 rule families remain open:
 
-1. type parameter and profile well-formedness;
-2. equality-admitting type classification;
-3. checked natural arithmetic during derivation;
-4. source-input byte ceiling binding;
-5. publication declaration coupling.
+1. source-input byte ceiling binding;
+2. publication declaration coupling.
 
 The ledger checker freezes the inventory shape and tag/name correspondence. It
 will fail when a schema tag is omitted, reordered, or silently renamed. It does
@@ -42,6 +39,11 @@ The small positive-form gaps are closed. Declared module/profile tuple checks no
 cover bytes, imports, declaration counts, callable resource ceilings, and profile
 maxima. Expression-node, nesting, and reopened callable-depth observations now
 have explicit recurrences and hostile cases. Bundle edge and dependency-depth
-ceilings now have constructive byte-level vectors. Checked-natural overflow is
-next so
-arithmetic failures have one deliberate precedence.
+ceilings now have constructive byte-level vectors. Checked `U32` natural
+arithmetic now rejects width and traversal-step overflow as `0b00` before stored
+tuple comparison. Fixed type-formation rules now reject zero `Index`, invalid
+SHA-256 length, empty variants, recursive declarations, duplicate case names, public
+`VariantPayload`, and unexpanded alias references. The remaining type-policy
+questions are now resolved: the profile rejects the four empty storage forms,
+bounds every single semantic value by its live-value ceiling, and permits any
+otherwise well-formed public type as a nominal representation.

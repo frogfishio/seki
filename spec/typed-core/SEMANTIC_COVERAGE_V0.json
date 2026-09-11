@@ -79,9 +79,6 @@
     [5, "Match", "candidate-selection-v0"]
   ],
   "rule_gaps": [
-    "type parameter/profile well-formedness",
-    "equality-admitting type classification",
-    "checked natural overflow during derivation",
     "source-input byte ceiling binding",
     "publication declaration coupling"
   ]

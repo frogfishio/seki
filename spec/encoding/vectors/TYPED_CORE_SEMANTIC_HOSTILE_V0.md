@@ -8,7 +8,7 @@
 | --- | --- |
 | False expression claimed type | `0800` |
 | Payload field label changed in canonical bytes | `0806` |
-| Payload binder claimed type changed in canonical bytes | `0800` |
+| Payload binder changed to a nullary case in canonical bytes | `0604` |
 | Required record field removed | `0805` |
 | Arithmetic policy changed without changing claimed result bytes | `0800` |
 | Pure `If` branches have different types | `0807` |
@@ -30,6 +30,17 @@
 | Local expression-node count exceeds the module ceiling | `0b06` |
 | Local syntax nesting exceeds the module ceiling | `0b06` |
 | Reopened callable chain exceeds module call depth | `0b08` |
+| Semantic array value width exceeds the `U32` natural domain | `0b00` |
+| Static-capacity traversal step product exceeds `U32` | `0b00` |
+| `Index` has zero bound | `0600` |
+| SHA-256 digest type has length other than 32 | `0601` |
+| Declared variant has no cases | `0603` |
+| `VariantPayload` appears in a public signature | `0604` |
+| `Declared` points to an alias instead of its expansion | `0606` |
+| Declared variant repeats a case name | `0501` |
+| Record contains itself recursively | `0602` |
+| Empty bytes, tuple, array, or bounded vector appears | `0608` |
+| One semantic value exceeds the profile live-value ceiling | `0607` |
 | `All` step claim omits static-capacity work | `0b01` |
 | Map workspace claim omits the partial output | `0b04` |
 | Projection owner does not match record | `0704` |

@@ -14,8 +14,10 @@ proof checking, artifact generation, and host orchestration require separate
 resource profiles.
 
 Every addition, multiplication, maximum, tag calculation, and capacity expansion
-uses checked natural-number arithmetic within the selected profile. Overflow
-rejects admission.
+uses checked natural-number arithmetic. SCB-0 v0 encodes every natural as `U32`,
+so an intermediate mathematical result greater than `4294967295` rejects with
+`bound_arithmetic_overflow` before stored-bound equality or profile-ceiling
+comparison.
 
 ## 2. Semantic value width
 

@@ -15,6 +15,18 @@ const counterBits = (capacity) => choiceBits(capacity + 1);
 const tagBits = (tag) => tag === 0 ? 0 : Math.floor(Math.log2(tag)) + 1;
 const C11_BOUNDED_PROFILE = [1048576, 1048576, 32, 4096, 65536, 256, 32,
   [16777216, 8388608, 256, 8388608]];
+const MAX_NAT = 0xffffffff;
+const checkedNat = (value, path = "bounds") => {
+  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_NAT) fail("0b00", path);
+  return value;
+};
+const checkedAdd = (left, right, path = "bounds") =>
+  checkedNat(checkedNat(left, path) + checkedNat(right, path), path);
+const checkedMul = (left, right, path = "bounds") => {
+  checkedNat(left, path); checkedNat(right, path);
+  if (left !== 0 && right > Math.floor(MAX_NAT / left)) fail("0b00", path);
+  return left * right;
+};
 
 export class TypedCoreChecker {
   constructor(decoded) {
@@ -85,20 +97,22 @@ export class TypedCoreChecker {
     if (tag === 1) return 1;
     if (tag >= 2 && tag <= 9) return [8, 16, 32, 64, 8, 16, 32, 64][tag - 2];
     if (tag === 10) return 2;
-    if (tag === 11 || tag === 12 || tag === 13) return 8 * type.at(-1);
+    if (tag === 11 || tag === 12 || tag === 13) return checkedMul(8, type.at(-1), path);
     if (tag === 14) return choiceBits(type[1]);
-    if (tag === 15) return 1 + this.width(type[1], path);
-    if (tag === 16 || tag === 20) return 1 + Math.max(
-      this.width(type[1], path), this.width(type[2], path));
-    if (tag === 17) return type[1].reduce((sum, item) => sum + this.width(item, path), 0);
-    if (tag === 18) return this.width(type[1], path) * type[2];
-    if (tag === 19) return counterBits(type[2]) + this.width(type[1], path) * type[2];
+    if (tag === 15) return checkedAdd(1, this.width(type[1], path), path);
+    if (tag === 16 || tag === 20) return checkedAdd(1, Math.max(
+      this.width(type[1], path), this.width(type[2], path)), path);
+    if (tag === 17) return type[1].reduce((sum, item) =>
+      checkedAdd(sum, this.width(item, path), path), 0);
+    if (tag === 18) return checkedMul(this.width(type[1], path), type[2], path);
+    if (tag === 19) return checkedAdd(counterBits(type[2]),
+      checkedMul(this.width(type[1], path), type[2], path), path);
     if (tag === 21) {
       const entry = this.declarations.get(type[1]);
       const variantCase = entry?.declaration.body.find(([stableTag]) => stableTag === type[2]);
       if (!variantCase) fail("0705", path);
       return (variantCase[1].payload ?? []).reduce((sum, [, item]) =>
-        sum + this.width(this.normalize(item, entry.module, path)), 0);
+        checkedAdd(sum, this.width(this.normalize(item, entry.module, path), path), path), 0);
     }
     if (tag === 22) {
       const entry = this.declarations.get(type[1]);
@@ -108,17 +122,71 @@ export class TypedCoreChecker {
         return this.width(this.normalize(declaration.body, entry.module, path), path);
       }
       if (declaration.tag === 2) return declaration.body.reduce((sum, [, item]) =>
-        sum + this.width(this.normalize(item, entry.module, path), path), 0);
+        checkedAdd(sum, this.width(this.normalize(item, entry.module, path), path), path), 0);
       const maximumTag = declaration.body.reduce((maximum, [stableTag]) =>
         Math.max(maximum, stableTag), 0);
       const payload = declaration.body.reduce((maximum, [, variantCase]) => {
         const bits = (variantCase.payload ?? []).reduce((sum, [, item]) =>
-          sum + this.width(this.normalize(item, entry.module, path), path), 0);
+          checkedAdd(sum, this.width(this.normalize(item, entry.module, path), path), path), 0);
         return Math.max(maximum, bits);
       }, 0);
-      return tagBits(maximumTag) + payload;
+      return checkedAdd(tagBits(maximumTag), payload, path);
     }
     fail("0100", path);
+  }
+
+  validateTypeFormation(type, module, path, allowVariantPayload = false) {
+    const tag = type[0];
+    if ((tag === 11 && type[1] === 0) || (tag === 17 && type[1].length === 0) ||
+      ((tag === 18 || tag === 19) && type[2] === 0)) fail("0608", path);
+    if (tag === 13 && type[2] !== 32) fail("0601", path);
+    if (tag === 14 && type[1] === 0) fail("0600", path);
+    if (tag === 21) {
+      if (!allowVariantPayload) fail("0604", path);
+      const ref = this.resolveReference(module, type[1][0], "types", path);
+      const variantCase = ref.value[1].body?.find(([stableTag]) => stableTag === type[1][1]);
+      if (!variantCase || variantCase[1].payload === null) fail("0604", path);
+    }
+    if (tag === 22) {
+      const ref = this.resolveReference(module, type[1], "types", path);
+      if (ref.value[1].tag === 0) fail("0606", path);
+    }
+    if (tag === 15 || tag === 18 || tag === 19) {
+      this.validateTypeFormation(type[1], module, `${path}/item`, allowVariantPayload);
+    } else if (tag === 16 || tag === 20) {
+      this.validateTypeFormation(type[1], module, `${path}/left`, allowVariantPayload);
+      this.validateTypeFormation(type[2], module, `${path}/right`, allowVariantPayload);
+    } else if (tag === 17) {
+      type[1].forEach((item, index) => this.validateTypeFormation(item, module,
+        `${path}/items/${index}`, allowVariantPayload));
+    }
+  }
+
+  localTypeReferences(type, result = new Set()) {
+    if (type[0] === 22 && type[1][0] === 0) result.add(type[1][1]);
+    if (type[0] === 15 || type[0] === 18 || type[0] === 19) {
+      this.localTypeReferences(type[1], result);
+    } else if (type[0] === 16 || type[0] === 20) {
+      this.localTypeReferences(type[1], result); this.localTypeReferences(type[2], result);
+    } else if (type[0] === 17) {
+      for (const item of type[1]) this.localTypeReferences(item, result);
+    }
+    return result;
+  }
+
+  validateDeclarationGraph(module) {
+    const visiting = new Set(); const complete = new Set();
+    const visit = (index) => {
+      if (visiting.has(index)) fail("0602", `module/types/${index}`);
+      if (complete.has(index)) return;
+      if (index >= module.types.length) fail("0700", `module/types/${index}`);
+      visiting.add(index);
+      for (const type of module.types[index][1].types) {
+        for (const dependency of this.localTypeReferences(type)) visit(dependency);
+      }
+      visiting.delete(index); complete.add(index);
+    };
+    module.types.forEach((_, index) => visit(index));
   }
 
   resolveFunction(module, reference, path) {
@@ -389,6 +457,8 @@ export class TypedCoreChecker {
   }
 
   finishExpression(expression, inferred, module, path, extra = {}) {
+    this.validateTypeFormation(expression.claimedType, module, `${path}/claimed_type`,
+      inferred[0] === 21 && expression.claimedType[0] === 21);
     const claimed = this.normalize(expression.claimedType, module, `${path}/claimed_type`);
     if (!same(claimed, inferred)) fail("0800", `${path}/claimed_type`);
     return { type: inferred, ...extra };
@@ -577,7 +647,8 @@ export class TypedCoreChecker {
       const block = this.analyzeExpr(term[2].body, module, [item, ...environment],
         blockBase, path);
       const intrinsicWorkspace = counterBits(capacity) + 2 + itemBits;
-      return { steps: 1 + collection.steps + capacity * (1 + block.steps),
+      return { steps: checkedAdd(checkedAdd(1, collection.steps, path),
+          checkedMul(capacity, checkedAdd(1, block.steps, path), path), path),
         live: Math.max(collection.live, block.live,
           base + collectionBits + resultBits),
         depth: Math.max(1 + collection.depth, 2 + block.depth),
@@ -625,7 +696,8 @@ export class TypedCoreChecker {
       else if (kind === "map") intrinsicWorkspace = counterBits(capacity) + this.width(result);
       else intrinsicWorkspace = counterBits(capacity) + this.width(result);
     }
-    steps += capacity * (1 + block.steps);
+    steps = checkedAdd(steps,
+      checkedMul(capacity, checkedAdd(1, block.steps, path), path), path);
     live = Math.max(live, block.live);
     depth = Math.max(depth, 2 + block.depth);
     workspace = Math.max(workspace, intrinsicWorkspace + block.workspace);
@@ -709,6 +781,7 @@ export class TypedCoreChecker {
     const reasons = ["0b01", "0b02", "0b03", "0b04"];
     const values = [actual.steps, actual.live, actual.depth, actual.workspace];
     values.forEach((value, index) => {
+      checkedNat(value, `${path}/derived/${index}`);
       if (value !== stored[index]) fail(reasons[index], `${path}/exact/${index}`);
       if (value > declared[index]) fail("0b05", `${path}/declared/${index}`);
     });
@@ -729,11 +802,37 @@ export class TypedCoreChecker {
       module.functions.length + module.kernels.length;
     if (module.canonicalBytes.length > declared[1] || module.imports.length > declared[2] ||
       declarationCount > declared[3]) fail("0b06", "module/bounds");
-    for (const [kind, entries] of [["functions", module.functions], ["kernels", module.kernels]]) {
-      entries.forEach(([, body], callableIndex) => body.declared.forEach((value, index) => {
-        if (value > declared[7][index]) fail("0b06",
-          `module/${kind}/${callableIndex}/declared/${index}`);
+    this.validateDeclarationGraph(module);
+    module.types.forEach(([, declaration], declarationIndex) =>
+      declaration.types.forEach((type, typeIndex) => {
+        const path = `module/types/${declarationIndex}/${typeIndex}`;
+        this.validateTypeFormation(type, module, path);
+        const bits = this.width(this.normalize(type, module, path), path);
+        if (bits > C11_BOUNDED_PROFILE[7][1]) fail("0607", path);
       }));
+    module.types.forEach(([, declaration], declarationIndex) => {
+      if (declaration.tag === 3) {
+        if (declaration.body.length === 0) fail("0603", `module/types/${declarationIndex}`);
+        const names = new Set();
+        for (const [, variantCase] of declaration.body) {
+          if (names.has(variantCase.name)) fail("0501", `module/types/${declarationIndex}`);
+          names.add(variantCase.name);
+        }
+      }
+    });
+    for (const [kind, entries] of [["functions", module.functions], ["kernels", module.kernels]]) {
+      entries.forEach(([, body], callableIndex) => {
+        [...body.parameters, body.result].forEach((type, typeIndex) => {
+          const path = `module/${kind}/${callableIndex}/types/${typeIndex}`;
+          this.validateTypeFormation(type, module, path);
+          const bits = this.width(this.normalize(type, module, path), path);
+          if (bits > C11_BOUNDED_PROFILE[7][1]) fail("0607", path);
+        });
+        body.declared.forEach((value, index) => {
+          if (value > declared[7][index]) fail("0b06",
+            `module/${kind}/${callableIndex}/declared/${index}`);
+        });
+      });
     }
     let expressionNodes = 0;
     let maximumNesting = 0;

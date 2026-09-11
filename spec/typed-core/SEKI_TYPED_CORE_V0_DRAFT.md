@@ -453,6 +453,13 @@ Equality operands must have the same equality-admitting type. Nominal declaratio
 and identity domains must match exactly. Functions, blocks, derivations, and
 opaque host values are not comparable.
 
+Every well-formed member of the closed v0 `Type` sum is equality-admitting,
+recursively through its fields and elements. Functions, blocks, derivations, and
+opaque host values are not members of `Type`; the qualification is retained to
+prevent a later schema version from making newly introduced value categories
+comparable by accident. Thus v0 equality admission reduces to exact normalized
+type identity after type formation succeeds.
+
 `AndThen` evaluates its right child only when the left child is true. `OrElse`
 evaluates its right child only when the left child is false. Conditions are exactly
 `Bool`.

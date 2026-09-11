@@ -113,9 +113,9 @@ path. Implementations may report additional findings separately.
 0602 recursive_type
 0603 empty_variant
 0604 forbidden_variant_payload_type
-0605 invalid_nominal_representation
 0606 unsupported_type
 0607 type_parameter_ceiling_exceeded
+0608 empty_type_form_unavailable
 ```
 
 ### Layer `07` — references
