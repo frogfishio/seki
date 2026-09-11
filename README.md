@@ -53,6 +53,10 @@ Current bootstrap records:
   — first complete experimental lowering and SCB-0 composition vector
 - [`spec/typed-core/fixtures/IMPORT_BUNDLE_LOWERING_V0.md`](spec/typed-core/fixtures/IMPORT_BUNDLE_LOWERING_V0.md)
   — two-module digest-bound import and export fixture
+- [`spec/typed-core/fixtures/PAYLOAD_RECORDS_LOWERING_V0.md`](spec/typed-core/fixtures/PAYLOAD_RECORDS_LOWERING_V0.md)
+  — record construction, variant payload, binder, and pure-match fixture
+- [`spec/typed-core/fixtures/ARITHMETIC_CONTROL_LOWERING_V0.md`](spec/typed-core/fixtures/ARITHMETIC_CONTROL_LOWERING_V0.md)
+  — explicit arithmetic-policy and pure-control fixture
 - [`docs/reviews/EXPERIMENTAL_TYPED_CORE_CHECKER_REVIEW.md`](docs/reviews/EXPERIMENTAL_TYPED_CORE_CHECKER_REVIEW.md)
   — first fixture-bounded type and exact-resource reconstruction pass
 - [`docs/f0/INDEPENDENT_USE_CASE_REQUEST.md`](docs/f0/INDEPENDENT_USE_CASE_REQUEST.md)

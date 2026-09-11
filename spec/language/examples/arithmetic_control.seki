@@ -1,0 +1,31 @@
+module seki::fixtures::arithmetic_control @ 1
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: type_well_formed, totality, determinism, resource_bounds.
+
+export fn addChecked left: U32 right: U32 -> Result[U32, ArithmeticError]
+arithmetic: checked [ left + right ].
+
+export fn addWrapping left: U32 right: U32 -> U32
+arithmetic: wrapping [ left + right ].
+
+export fn both left: Bool right: Bool -> Bool
+arithmetic: checked [ left andThen: [ right ] ].
+
+export fn choose condition: Bool yes: U32 no: U32 -> U32
+arithmetic: checked [ condition ifTrue: [ yes ] ifFalse: [ no ] ].
+
+export fn convertSaturating value: I64 -> I32
+arithmetic: saturating [ value as: I32 ].
+
+export fn divideWrapping left: U32 right: U32 -> Result[U32, ArithmeticError]
+arithmetic: wrapping [ left / right ].
+
+export fn less left: U32 right: U32 -> Bool
+arithmetic: checked [ left < right ].
+
+export fn negateChecked value: I32 -> Result[I32, ArithmeticError]
+arithmetic: checked [ value negated ].
+
+export fn shiftChecked value: U32 count: U32 -> Result[U32, ArithmeticError]
+arithmetic: checked [ value shiftLeft: count ].

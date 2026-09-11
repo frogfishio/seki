@@ -551,8 +551,9 @@ The next tasks, in dependency order, are:
    reopens imported signatures, expression types, kernel decisions, and exact
    resource tuples over the three current positive fixtures and eight isolated
    semantic hostile cases.
-8. Extend that checker one semantic family at a time, starting with record and
-   variant payload construction, and add canonical byte-level hostile cases.
+8. **Record/payload and arithmetic/control slices completed experimentally.**
+   Continue one semantic family at a time with remaining construction forms and
+   bounded intrinsics; add canonical byte-level hostile cases.
 9. Assemble the F0 review packet and request the exact scoped response.
 
 Tasks 3–8 are bootstrap/specification work and may proceed while F0 is open. No

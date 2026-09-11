@@ -124,14 +124,24 @@ export class TypedCoreChecker {
 
   field(module, fieldReference, recordType, path) {
     const [owner, fieldIndex] = fieldReference;
-    if (owner[0] !== 0) fail("0701", path);
-    const ref = this.resolveReference(module, owner[1], "types", `${path}/owner`);
+    if (owner[0] === 0) {
+      const ref = this.resolveReference(module, owner[1], "types", `${path}/owner`);
+      const declaration = ref.value[1];
+      if (declaration.tag !== 2) fail("0701", path);
+      const expectedOwner = [22, declKey(ref.module, ref.index)];
+      if (!same(recordType, expectedOwner)) fail("0704", path);
+      if (fieldIndex >= declaration.body.length) fail("0703", path);
+      return this.normalize(declaration.body[fieldIndex][1], ref.module, path);
+    }
+    const ref = this.resolveReference(module, owner[1][0], "types", `${path}/owner`);
     const declaration = ref.value[1];
-    if (declaration.tag !== 2) fail("0701", path);
-    const expectedOwner = [22, declKey(ref.module, ref.index)];
+    if (declaration.tag !== 3) fail("0701", path);
+    const variantCase = declaration.body.find(([tag]) => tag === owner[1][1]);
+    if (!variantCase || variantCase[1].payload === null) fail("0705", path);
+    const expectedOwner = [21, declKey(ref.module, ref.index), owner[1][1]];
     if (!same(recordType, expectedOwner)) fail("0704", path);
-    if (fieldIndex >= declaration.body.length) fail("0703", path);
-    return this.normalize(declaration.body[fieldIndex][1], ref.module, path);
+    if (fieldIndex >= variantCase[1].payload.length) fail("0703", path);
+    return this.normalize(variantCase[1].payload[fieldIndex][1], ref.module, path);
   }
 
   constructorInfo(module, constructor, path) {
@@ -180,6 +190,22 @@ export class TypedCoreChecker {
     else if (tag === 4) {
       if (term[1] >= environment.length) fail("0702", `${path}/term/reference`);
       inferred = environment[term[1]];
+    } else if (tag === 6) {
+      const ref = this.resolveReference(module, term[1], "types", `${path}/term/type`);
+      const declaration = ref.value[1];
+      if (declaration.tag !== 2) fail("0701", `${path}/term/type`);
+      if (term[2].length !== declaration.body.length) fail("0805", `${path}/term/fields`);
+      for (let index = 0; index < term[2].length; ++index) {
+        const [fieldReference, value] = term[2][index];
+        const owner = [22, declKey(ref.module, ref.index)];
+        const fieldType = this.field(module, fieldReference, owner,
+          `${path}/term/fields/${index}`);
+        if (fieldReference[1] !== index) fail("0805", `${path}/term/fields/${index}`);
+        const actual = this.infer(value, module, environment,
+          `${path}/term/fields/${index}/value`).type;
+        if (!same(actual, fieldType)) fail("0805", `${path}/term/fields/${index}/value`);
+      }
+      inferred = [22, declKey(ref.module, ref.index)];
     } else if (tag === 7) {
       const record = this.infer(term[1], module, environment, `${path}/term/record`);
       inferred = this.field(module, term[2], record.type, `${path}/term/field`);
@@ -188,17 +214,90 @@ export class TypedCoreChecker {
       if (ref.value[1].tag !== 3) fail("0701", `${path}/term/case`);
       const variantCase = ref.value[1].body.find(([stableTag]) => stableTag === term[1][1]);
       if (!variantCase) fail("0705", `${path}/term/case`);
-      if (term[2].length !== (variantCase[1].payload ?? []).length) {
+      const payload = variantCase[1].payload ?? [];
+      if (term[2].length !== payload.length) {
         fail("0806", `${path}/term/fields`);
+      }
+      for (let index = 0; index < payload.length; ++index) {
+        if (term[2][index][0] !== payload[index][0]) {
+          fail("0806", `${path}/term/fields/${index}/key`);
+        }
+        const actual = this.infer(term[2][index][1], module, environment,
+          `${path}/term/fields/${index}/value`).type;
+        const expected = this.normalize(payload[index][1], ref.module,
+          `${path}/term/fields/${index}/value`);
+        if (!same(actual, expected)) fail("0806", `${path}/term/fields/${index}/value`);
       }
       inferred = [22, declKey(ref.module, ref.index)];
       return this.finishExpression(expression, inferred, module, path,
         { constructor: [declKey(ref.module, ref.index), term[1][1]] });
-    } else if (tag === 14) {
+    } else if (tag === 14 || tag === 15) {
       const left = this.infer(term[1], module, environment, `${path}/term/left`);
       const right = this.infer(term[2], module, environment, `${path}/term/right`);
       if (!same(left.type, right.type)) fail("0801", path);
       inferred = [1];
+    } else if (tag === 16) {
+      const value = this.infer(term[1], module, environment, `${path}/term/value`);
+      if (!same(value.type, [1])) fail("0801", path);
+      inferred = [1];
+    } else if (tag === 17 || tag === 18) {
+      const left = this.infer(term[1], module, environment, `${path}/term/left`);
+      const right = this.infer(term[2], module, environment, `${path}/term/right`);
+      if (!same(left.type, [1]) || !same(right.type, [1])) fail("0801", path);
+      inferred = [1];
+    } else if (tag === 19) {
+      const left = this.infer(term[2], module, environment, `${path}/term/left`);
+      const right = this.infer(term[3], module, environment, `${path}/term/right`);
+      if (!same(left.type, right.type) || !this.isInteger(left.type)) fail("080a", path);
+      inferred = [1];
+    } else if (tag === 20) {
+      const left = this.infer(term[3], module, environment, `${path}/term/left`);
+      const right = this.infer(term[4], module, environment, `${path}/term/right`);
+      if (!same(left.type, right.type) || !this.isInteger(left.type)) fail("080b", path);
+      inferred = this.arithmeticResult(term[1], term[2], left.type);
+    } else if (tag === 21) {
+      const value = this.infer(term[3], module, environment, `${path}/term/value`);
+      if (!this.isInteger(value.type)) fail("080b", path);
+      if (value.type[0] < 6) fail("080d", path);
+      inferred = this.arithmeticResult(term[1], 0, value.type);
+    } else if (tag === 22) {
+      const value = this.infer(term[3], module, environment, `${path}/term/value`);
+      const count = this.infer(term[4], module, environment, `${path}/term/count`);
+      if (!this.isInteger(value.type)) fail("080b", path);
+      if (!same(count.type, [4])) fail("080c", path);
+      inferred = [16, value.type, [10]];
+    } else if (tag === 23) {
+      const value = this.infer(term[3], module, environment, `${path}/term/value`);
+      if (!this.isInteger(value.type)) fail("080b", path);
+      const target = [term[2] + 2];
+      inferred = term[1] === 0 ? [16, target, [10]] : target;
+    } else if (tag === 24) {
+      const condition = this.infer(term[1], module, environment, `${path}/term/condition`);
+      const yes = this.infer(term[2], module, environment, `${path}/term/when_true`);
+      const no = this.infer(term[3], module, environment, `${path}/term/when_false`);
+      if (!same(condition.type, [1])) fail("0801", `${path}/term/condition`);
+      if (!same(yes.type, no.type)) fail("0807", path);
+      inferred = yes.type;
+    } else if (tag === 25) {
+      const scrutinee = this.infer(term[1], module, environment,
+        `${path}/term/scrutinee`);
+      const seen = [];
+      let armType;
+      for (let index = 0; index < term[2].length; ++index) {
+        const [constructor, arm] = term[2][index];
+        const info = this.constructorInfo(module, constructor, `${path}/term/arms/${index}`);
+        if (!same(info.owner, scrutinee.type)) fail("0706", `${path}/term/arms/${index}`);
+        seen.push(constructor[1]);
+        const armEnvironment = info.payload === null ? environment : [info.payload, ...environment];
+        const current = this.infer(arm, module, armEnvironment,
+          `${path}/term/arms/${index}/body`).type;
+        if (armType !== undefined && !same(current, armType)) {
+          fail("0807", `${path}/term/arms/${index}/body`);
+        }
+        armType = current;
+      }
+      if (!same(seen, this.constructorTags(scrutinee.type))) fail("0808", `${path}/term/arms`);
+      inferred = armType;
     } else if (tag === 26) {
       const ref = this.resolveFunction(module, term[1], `${path}/term/function`);
       const body = ref.value[1];
@@ -228,6 +327,13 @@ export class TypedCoreChecker {
     const claimed = this.normalize(expression.claimedType, module, `${path}/claimed_type`);
     if (!same(claimed, inferred)) fail("0800", `${path}/claimed_type`);
     return { type: inferred, ...extra };
+  }
+
+  isInteger(type) { return type.length === 1 && type[0] >= 2 && type[0] <= 9; }
+
+  arithmeticResult(policy, operation, integerType) {
+    const alwaysResult = operation === 3 || operation === 4;
+    return policy === 0 || alwaysResult ? [16, integerType, [10]] : integerType;
   }
 
   checkKernel(expression, module, environment, accepted, rejection, order, floor, path) {
@@ -293,15 +399,66 @@ export class TypedCoreChecker {
     const tag = term[0];
     const leaf = () => ({ steps: 1, live: base + resultBits, depth: 1, workspace: 0,
       type: result });
-    if (tag <= 4 || tag === 8) return leaf();
+    if (tag <= 4) return leaf();
+    if (tag === 6) return this.analyzeStrict(term[2].map(([, value]) => value),
+      result, module, environment, base, path);
+    if (tag === 8) return this.analyzeStrict(term[2].map(([, value]) => value),
+      result, module, environment, base, path);
     if (tag === 7) {
       const child = this.analyzeExpr(term[1], module, environment, base, path);
       return { steps: 1 + child.steps,
         live: Math.max(child.live, base + this.width(child.type) + resultBits),
         depth: 1 + child.depth, workspace: child.workspace, type: result };
     }
-    if (tag === 14) return this.analyzeStrict(term.slice(1), result, module,
+    if (tag === 14 || tag === 15) return this.analyzeStrict(term.slice(1), result, module,
       environment, base, path);
+    if (tag === 16) return this.analyzeStrict([term[1]], result, module,
+      environment, base, path);
+    if (tag === 17 || tag === 18) {
+      const left = this.analyzeExpr(term[1], module, environment, base, path);
+      const right = this.analyzeExpr(term[2], module, environment, base, path);
+      return { steps: 1 + left.steps + right.steps,
+        live: Math.max(left.live, right.live), depth: 1 + Math.max(left.depth, right.depth),
+        workspace: Math.max(left.workspace, right.workspace), type: result };
+    }
+    if (tag === 19) return this.analyzeStrict(term.slice(2), result, module,
+      environment, base, path);
+    if (tag === 20) return this.analyzeStrict(term.slice(3), result, module,
+      environment, base, path);
+    if (tag === 21) return this.analyzeStrict([term[3]], result, module,
+      environment, base, path);
+    if (tag === 22) return this.analyzeStrict(term.slice(3), result, module,
+      environment, base, path);
+    if (tag === 23) return this.analyzeStrict([term[3]], result, module,
+      environment, base, path);
+    if (tag === 24) {
+      const condition = this.analyzeExpr(term[1], module, environment, base, path);
+      const yes = this.analyzeExpr(term[2], module, environment, base, path);
+      const no = this.analyzeExpr(term[3], module, environment, base, path);
+      return { steps: 1 + condition.steps + Math.max(yes.steps, no.steps),
+        live: Math.max(condition.live, yes.live, no.live),
+        depth: 1 + Math.max(condition.depth, yes.depth, no.depth),
+        workspace: Math.max(condition.workspace, yes.workspace, no.workspace), type: result };
+    }
+    if (tag === 25) {
+      const scrutinee = this.analyzeExpr(term[1], module, environment, base, path);
+      const scrutineeBits = this.width(scrutinee.type);
+      let armSteps = 0; let armLive = 0; let armDepth = 0; let armWorkspace = 0;
+      for (const [constructor, arm] of term[2]) {
+        const info = this.constructorInfo(module, constructor, path);
+        const payloadBits = info.payload === null ? 0 : this.width(info.payload);
+        const armEnvironment = info.payload === null ? environment : [info.payload, ...environment];
+        const cost = this.analyzeExpr(arm, module, armEnvironment,
+          base + scrutineeBits + payloadBits, path);
+        armSteps = Math.max(armSteps, cost.steps); armLive = Math.max(armLive, cost.live);
+        armDepth = Math.max(armDepth, cost.depth);
+        armWorkspace = Math.max(armWorkspace, cost.workspace);
+      }
+      return { steps: 1 + scrutinee.steps + armSteps,
+        live: Math.max(scrutinee.live, armLive),
+        depth: 1 + Math.max(scrutinee.depth, armDepth),
+        workspace: Math.max(scrutinee.workspace, armWorkspace), type: result };
+    }
     if (tag === 26) {
       let retained = 0; let steps = 1; let live = base; let depth = 1; let workspace = 0;
       for (const argument of term[2]) {

@@ -1,0 +1,38 @@
+module seki::fixtures::payload_records @ 1
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: type_well_formed, totality, determinism, resource_bounds.
+
+export record Pair {
+  left: U32,
+  right: U32
+}.
+
+export variant Wrapped [
+  Empty @ 0.
+  Pair @ 1 { left: U32, right: U32 }.
+].
+
+export fn leftOrZero wrapped: Wrapped
+-> U32
+arithmetic: checked
+bounded steps: 32 liveBits: 512 controlDepth: 16 workspaceBits: 0 [
+  match wrapped [
+    Empty: [ 0 ].
+    Pair: [ :payload | payload left ].
+  ]
+].
+
+export fn makePair left: U32 right: U32
+-> Pair
+arithmetic: checked
+bounded steps: 32 liveBits: 512 controlDepth: 16 workspaceBits: 0 [
+  Pair { left: left, right: right }
+].
+
+export fn wrapPair pair: Pair
+-> Wrapped
+arithmetic: checked
+bounded steps: 32 liveBits: 512 controlDepth: 16 workspaceBits: 0 [
+  Wrapped::Pair { left: (pair left), right: (pair right) }
+].

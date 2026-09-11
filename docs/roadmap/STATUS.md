@@ -48,6 +48,12 @@
 - Experimental semantic reconstruction accepts all three fixtures, reopens
   imported signatures, and independently reproduces their type and exact
   resource conclusions; eight isolated semantic hostile cases pass.
+- A fourth 753-byte fixture covers record construction, payload-bearing variants,
+  the single payload binder, payload-owned projection, and pure exhaustive match;
+  three additional hostile cases pass, including two byte mutations.
+- A fifth 1,072-byte fixture covers explicit arithmetic-policy result rules,
+  signed negation, conversion, shifts, comparison, short-circuit Boolean control,
+  and pure `If`; four additional semantic hostile cases pass.
 - Conservative C11 engineering standard and `make check` entry point added.
 
 ## Active work
@@ -58,9 +64,9 @@ immediate execution queue in the delivery plan and record its owner here.
 ## Next unblocked tasks
 
 1. F0-01 — independent consumer decision and reviewer selection.
-2. F1-C bootstrap design — extend semantic reconstruction from the current
-   fixture subset to record/variant payloads, remaining control, arithmetic, and
-   bounded intrinsic families, each with byte-level hostile cases.
+2. F1-C bootstrap design — extend semantic reconstruction to the remaining
+   construction and bounded-intrinsic families, each with byte-level hostile
+   cases.
 3. B0-08/B0-09 — exact Lean and Rocq source locks.
 4. B0-10 — CompCert acquisition and use profile.
 
