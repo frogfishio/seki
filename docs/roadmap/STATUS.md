@@ -60,6 +60,9 @@
 - A seventh 930-byte fixture covers `Fold`, `All`, `Any`, array/vector map, and
   array/vector filter, including static-capacity step expansion and intrinsic
   workspace; four additional hostile cases pass.
+- An eighth 354-byte fixture completes positive coverage of all six kernel-control
+  tags. A checked 69-tag semantic coverage ledger records 58 positive forms,
+  eleven positive-evidence gaps, and seven broader rule gaps.
 - Conservative C11 engineering standard and `make check` entry point added.
 
 ## Active work
@@ -70,8 +73,9 @@ immediate execution queue in the delivery plan and record its owner here.
 ## Next unblocked tasks
 
 1. F0-01 — independent consumer decision and reviewer selection.
-2. F1-C bootstrap design — audit node/rule coverage, then add module/profile
-   ceilings and the remaining kernel-control cases with byte-level hostile cases.
+2. F1-C bootstrap design — close the eleven positive-form gaps, then add
+   module/profile and bundle graph ceilings with checked-natural arithmetic and
+   byte-level hostile cases.
 3. B0-08/B0-09 — exact Lean and Rocq source locks.
 4. B0-10 — CompCert acquisition and use profile.
 

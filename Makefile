@@ -16,6 +16,7 @@ check-encoding-vectors:
 	./tools/encoding/check_decoder_vectors.sh
 	./tools/encoding/check_import_bundle.sh
 	./tools/encoding/check_typed_core_vectors.sh
+	node tools/encoding/check_semantic_coverage.mjs
 
 check-diff:
 	git diff --check

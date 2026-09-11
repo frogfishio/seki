@@ -417,6 +417,13 @@ export class TypedCoreChecker {
       const value = this.infer(expression[1], module, environment, `${path}/value`);
       this.checkKernel(expression[2], module, [value.type, ...environment], accepted,
         rejection, order, floor, `${path}/body`);
+    } else if (tag === 4) {
+      const condition = this.infer(expression[1], module, environment, `${path}/condition`);
+      if (!same(condition.type, [1])) fail("0801", `${path}/condition`);
+      this.checkKernel(expression[2], module, environment, accepted, rejection, order,
+        floor, `${path}/when_true`);
+      this.checkKernel(expression[3], module, environment, accepted, rejection, order,
+        floor, `${path}/when_false`);
     } else if (tag === 5) {
       const scrutinee = this.infer(expression[1], module, environment,
         `${path}/scrutinee`);
@@ -665,6 +672,15 @@ export class TypedCoreChecker {
       return { steps: 1 + value.steps + body.steps, live: Math.max(value.live, body.live),
         depth: 1 + Math.max(value.depth, body.depth),
         workspace: Math.max(value.workspace, body.workspace) };
+    }
+    if (tag === 4) {
+      const condition = this.analyzeExpr(expression[1], module, environment, base, path);
+      const yes = this.analyzeKernel(expression[2], module, environment, base, result, path);
+      const no = this.analyzeKernel(expression[3], module, environment, base, result, path);
+      return { steps: 1 + condition.steps + Math.max(yes.steps, no.steps),
+        live: Math.max(condition.live, yes.live, no.live),
+        depth: 1 + Math.max(condition.depth, yes.depth, no.depth),
+        workspace: Math.max(condition.workspace, yes.workspace, no.workspace) };
     }
     if (tag === 5) {
       const scrutinee = this.analyzeExpr(expression[1], module, environment, base, path);

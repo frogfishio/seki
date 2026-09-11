@@ -61,6 +61,12 @@ invalid fold block, a step count that omits static-capacity work, and map
 workspace that omits its output buffer. The family mutation operates on
 canonical module bytes.
 
+The kernel-conditional fixture completes positive coverage of the six
+kernel-control tags. Its hostile case rejects a non-Boolean `KernelIf` condition.
+The separate machine-checked coverage ledger now accounts for all 69 tagged
+types, declarations, pure terms, and kernel terms: 58 have positive fixture
+evidence and eleven remain explicit positive-evidence gaps.
+
 ## Boundary of the result
 
 Most hostile cases deliberately mutate freshly decoded objects after structural
@@ -78,7 +84,7 @@ cost algebra is correct.
 ## Conclusion
 
 The current type identity and resource recurrence survive their first composed
-implementation tests. The next useful work is an explicit node/rule coverage
-audit, module/profile ceilings, and remaining kernel control, continuing to add
+implementation tests. The next useful work is closing the eleven small positive
+fixture gaps, then module/profile and bundle graph ceilings, continuing to add
 byte-level hostile vectors before
 translating frozen rules into Lean.

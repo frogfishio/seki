@@ -20,6 +20,7 @@
 | Tuple item removed without changing claimed tuple | `0800` |
 | `All` changed to `MapBounded` without changing result bytes | `0800` |
 | `Fold` block has the wrong parameter count | `080e` |
+| `KernelIf` condition changed from `Bool` to `U32` | `0801` |
 | `All` step claim omits static-capacity work | `0b01` |
 | Map workspace claim omits the partial output | `0b04` |
 | Projection owner does not match record | `0704` |

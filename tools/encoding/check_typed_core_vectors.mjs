@@ -14,6 +14,7 @@ const payloadBytes = emit("emit_payload_records_scb0.mjs");
 const arithmeticBytes = emit("emit_arithmetic_control_scb0.mjs");
 const constructionBytes = emit("emit_construction_access_scb0.mjs");
 const traversalBytes = emit("emit_traversal_scb0.mjs");
+const kernelIfBytes = emit("emit_kernel_if_scb0.mjs");
 const payloadManifest = JSON.parse(fs.readFileSync(
   "spec/encoding/vectors/payload-records-v0.json", "utf8"));
 if (payloadBytes.length !== payloadManifest.length) throw new Error("payload vector length mismatch");
@@ -46,6 +47,14 @@ const traversalDigest = createHash("sha256")
   .update(Buffer.from(traversalManifest.digest_domain_terminator_hex, "hex"))
   .update(traversalBytes).digest("hex");
 if (traversalDigest !== traversalManifest.module_sha256) throw new Error("traversal vector digest mismatch");
+const kernelIfManifest = JSON.parse(fs.readFileSync(
+  "spec/encoding/vectors/kernel-if-v0.json", "utf8"));
+if (kernelIfBytes.length !== kernelIfManifest.length) throw new Error("kernel-if vector length mismatch");
+const kernelIfDigest = createHash("sha256")
+  .update(kernelIfManifest.digest_domain_ascii, "ascii")
+  .update(Buffer.from(kernelIfManifest.digest_domain_terminator_hex, "hex"))
+  .update(kernelIfBytes).digest("hex");
+if (kernelIfDigest !== kernelIfManifest.module_sha256) throw new Error("kernel-if vector digest mismatch");
 
 const freshCandidate = () => decodeModule(candidateBytes);
 const freshBundle = () => decodeBundle(bundleBytes);
@@ -73,6 +82,7 @@ expectAccepted("payload-records-v0", decodeModule(payloadBytes));
 expectAccepted("arithmetic-control-v0", decodeModule(arithmeticBytes));
 expectAccepted("construction-access-v0", decodeModule(constructionBytes));
 expectAccepted("traversal-v0", decodeModule(traversalBytes));
+expectAccepted("kernel-if-v0", decodeModule(kernelIfBytes));
 
 {
   const candidate = freshCandidate();
@@ -148,6 +158,12 @@ expectAccepted("traversal-v0", decodeModule(traversalBytes));
   expectRejected("fold-block-parameter-mismatch", traversal, "080e");
 }
 {
+  const kernelIf = decodeModule(kernelIfBytes);
+  const body = kernelIf.kernels[0][1];
+  body.parameters[0] = [4]; body.body[1].claimedType = [4];
+  expectRejected("kernel-if-condition-not-bool", kernelIf, "0801");
+}
+{
   const traversal = decodeModule(traversalBytes);
   traversal.functions[0][1].exact[0] = 10;
   expectRejected("all-must-charge-static-capacity", traversal, "0b01");
@@ -207,4 +223,4 @@ for (const [name, component, reason] of [
   expectRejected("callable-ceiling-below-exact", candidate, "0b05");
 }
 
-console.log("typed_core_semantics=verified positive=7 hostile=23 byte_hostile=6");
+console.log("typed_core_semantics=verified positive=8 hostile=24 byte_hostile=6");
