@@ -44,6 +44,7 @@ const expectRejected = (name, bytes, expected) => {
 expectDecoded("minimal-module-v0", minimal);
 expectDecoded("candidate-selection-v0", candidate);
 
+expectRejected("module-envelope-bytes-above-profile", Buffer.alloc(1048577), "0000");
 expectRejected("bad-magic", changed(candidate, (b) => { b[0] ^= 1; }), "0001");
 expectRejected("unsupported-version", changed(candidate, (b) => {
   b.writeUInt32BE(1, 4);
@@ -86,7 +87,7 @@ expectRejected("duplicate-theorem", changed(candidate, (b) => {
 
 const boundsAndPublication = Buffer.from(
   "00000800000080000000004000001000" +
-  "000000d400004bb300000008000000c900", "hex"
+  "000000d400004ba100000008000000c900", "hex"
 );
 const publicationAt = uniqueOffset(candidate, boundsAndPublication,
   "kernel bounds and publication flag") + boundsAndPublication.length - 1;
@@ -114,4 +115,4 @@ const canonicalCompeting = changed(candidate, (b) => {
 });
 expectRejected("earlier-path-within-canonical-layer", canonicalCompeting, "0100");
 
-console.log("scb0_decoder_mutations=verified positives=2 hostile=15");
+console.log("scb0_decoder_mutations=verified positives=2 hostile=16");

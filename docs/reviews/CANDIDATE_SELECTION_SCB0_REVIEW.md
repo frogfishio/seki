@@ -16,7 +16,7 @@
 4. The innermost binder environment is exactly `candidate, option, selection,
    input`, confirming `Local[3]` for the original input.
 5. The original 4,096-bit live-value ceiling was invalid. The input alone is
-   6,374 bits; the canonical schedule reaches 19,379 bits. The source ceiling is
+   6,368 bits; the canonical schedule reaches 19,361 bits. The source ceiling is
    corrected to 32,768.
 6. The source omitted an explicit module ceiling while typed core requires one.
    The draft `c11_bounded @ 1` profile now specifies deterministic elaboration
@@ -24,26 +24,25 @@
 
 ## Independent result
 
-The manually structured C11 and JavaScript emitters agree on all 1,025 bytes.
+The manually structured C11 and JavaScript emitters agree on all 1,021 bytes.
 Node and OpenSSL agree on the domain-separated module digest:
 
 ```text
-c3b30493bec34d241bf50298078ced60ca0c9586a42936bcf12ebc7203a81439
+ebb22139f834cbf94913b9b7df3436340ef91827d26188284568a69f22dd0168
 ```
 
 This exercises declarations, nominal identity, records, variants, built-in
-parameterized types, field and constructor references, blocks, bounded traversal,
+parameterized types, field and constructor references, blocks, bounded array traversal,
 nested matches, tail kernel control, rejection order, exports, theorem/claim
 sets, resource tuples, and dependency schedules.
 
 ## Remaining authority gaps
 
-- Neither emitter is an admission decoder; shared misunderstanding remains
-  possible even with independent bytes.
-- The resource recurrence is specified in executable order but not mechanized or
-  proved.
+- The experimental decoder and semantic checker remain bootstrap implementations,
+  not an independent proof.
+- The resource recurrence is executable but not mechanized in a proof assistant.
 - The semantic profile identity and ceilings remain bootstrap choices.
-- Hostile mutations and authoritative rejection pairs are not yet generated.
+- Hostile mutations are fixture-bound and the admission-result registry is not frozen.
 - The vector is not evidence of C generation or semantic equivalence.
 
 ## Conclusion

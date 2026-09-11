@@ -32,15 +32,15 @@ const importedFunctionRef = (w, importIndex, index) => {
   w.u8(1); w.u32(importIndex); w.u32(index);
 };
 const typeU32 = (w) => w.u8(4);
-const typeLocalToken = (w) => { w.u8(22); localTypeRef(w, 0); };
+const typeLocalToken = (w) => { w.u8(21); localTypeRef(w, 0); };
 const typeImportedToken = (w) => {
-  w.u8(22); importedTypeRef(w, 0, 0);
+  w.u8(21); importedTypeRef(w, 0, 0);
 };
 const bounds = (w, steps, live, depth, workspace) => {
   w.u32(steps); w.u32(live); w.u32(depth); w.u32(workspace);
 };
 const moduleBounds = (w) => {
-  w.u32(1048576); w.u32(1048576); w.u32(32); w.u32(4096);
+  w.u32(1048576); w.u32(32); w.u32(4096);
   w.u32(65536); w.u32(256); w.u32(32);
   bounds(w, 16777216, 8388608, 256, 8388608);
 };

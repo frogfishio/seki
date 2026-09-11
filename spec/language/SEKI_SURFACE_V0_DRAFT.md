@@ -123,7 +123,6 @@ Option[T]
 Result[T, E]
 Tuple[T1, ..., Tn]
 Array[T, N]
-BoundedVec[T, N]
 Decision[Accepted, Rejection]
 ```
 
@@ -388,22 +387,22 @@ results, or stored values. Surface bindings elaborate to `KernelLet`; a final
 conditional or match elaborates to `KernelIf` or `KernelMatch`. This makes every
 kernel path end in exactly one acceptance or rejection.
 
-## 11. Bounded collections
+## 11. Bounded array traversal
 
 The admitted traversal selector set is closed and versioned:
 
 ```text
-collection fold: initial with: [ :acc :item | ... ]
-collection findUnique: [ :item | ... ]
-collection all: [ :item | ... ]
-collection any: [ :item | ... ]
-collection mapBounded: [ :item | ... ]
-collection filterBounded: [ :item | ... ]
+array fold: initial with: [ :acc :item | ... ]
+array findUnique: [ :item | ... ]
+array all: [ :item | ... ]
+array any: [ :item | ... ]
+array map: [ :item | ... ]
 ```
 
 These selectors elaborate to dedicated typed-core operations. They are not
-ordinary dispatch and cannot be redefined. Their iteration bound comes from the
-collection's static capacity, not from an unchecked runtime value.
+ordinary dispatch and cannot be redefined. Their iteration bound is the array's
+static length, not an unchecked runtime value. They do not define a general
+collection protocol.
 
 General loops, recursion, `break`, `continue`, `goto`, and labels do not exist.
 
@@ -429,7 +428,7 @@ export record Candidate {
 export record Input {
   wanted: CandidateId,
   currentEpoch: Epoch,
-  candidates: BoundedVec[Candidate, 32]
+  candidates: Array[Candidate, 32]
 }.
 
 export variant Rejection [

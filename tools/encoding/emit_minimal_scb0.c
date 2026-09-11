@@ -67,7 +67,6 @@ minimal_module_payload(void)
     put_empty_sequence(&payload);         /* theorem requirements */
     put_empty_sequence(&payload);         /* claim ceiling */
 
-    put_u32(&payload, UINT32_C(0));       /* maximum input bytes */
     put_u32(&payload, UINT32_C(1024));    /* maximum typed-core bytes */
     for (index = 0; index < 9; ++index) { /* remaining module bounds */
         put_u32(&payload, UINT32_C(0));
@@ -97,4 +96,3 @@ main(void)
     }
     return 0;
 }
-

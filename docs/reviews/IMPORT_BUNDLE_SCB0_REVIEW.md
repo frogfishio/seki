@@ -13,14 +13,15 @@ import, imported type and function references, exported declaration checks, a
 local call edge, a nonempty function schedule, nested module envelopes, and root
 closure.
 
-The bundle is 872 bytes. Its two module digests are recomputed from nested exact
-envelopes, and fourteen hostile mutations produce their assigned rejection
+The bundle is 864 bytes. Its two module digests are recomputed from nested exact
+envelopes, and fifteen hostile mutations produce their assigned rejection
 pairs, including exact-digest graphs above the profile edge and depth ceilings.
 
 ## Findings
 
 1. Repeating module identity and digest in every imported reference was needless.
-   Canonical import-table indices reduced the consumer from 1,168 to 518 bytes.
+   Canonical import-table indices reduced the consumer to 514 bytes, roughly a
+   56% reduction from the original repeated-identity design.
 2. `imported_declaration_wrong_kind` was unreachable because imported domain,
    type, and function references are distinct tagged schemas. The provisional
    reason was removed.

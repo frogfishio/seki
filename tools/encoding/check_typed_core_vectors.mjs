@@ -108,7 +108,7 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
 }
 {
   const changed = Buffer.from(payloadBytes);
-  const payloadType = Buffer.from("15000000000100000001", "hex");
+  const payloadType = Buffer.from("14000000000100000001", "hex");
   const typeAt = changed.lastIndexOf(payloadType);
   if (typeAt < 0) throw new Error("payload claimed-type target absent");
   changed[typeAt + payloadType.length - 1] = 0;
@@ -134,12 +134,10 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
   expectRejected("if-branch-type-mismatch", arithmetic, "0807");
 }
 {
-  const changed = Buffer.from(constructionBytes);
-  const arrayGet = Buffer.from("0f041b1204", "hex");
-  const at = changed.indexOf(arrayGet);
-  if (at < 0) throw new Error("array-get target absent");
-  changed[at + 2] = 29;
-  expectRejected("array-vec-operation-mismatch-bytes", decodeModule(changed), "080e");
+  const construction = decodeModule(constructionBytes);
+  construction.functions[0][1].parameters[0] = [4];
+  construction.functions[0][1].body.term[1].claimedType = [4];
+  expectRejected("array-operation-collection-mismatch", construction, "080e");
 }
 {
   const changed = Buffer.from(constructionBytes);
@@ -151,20 +149,20 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
 }
 {
   const construction = decodeModule(constructionBytes);
-  construction.functions[5][1].body.term[2].term[1] = 2;
+  construction.functions[6][1].body.term[2].term[1] = 2;
   expectRejected("let-local-out-of-scope", construction, "0702");
 }
 {
   const changed = Buffer.from(traversalBytes);
-  const allTerm = Buffer.from("01201201", "hex");
+  const allTerm = Buffer.from("011e1201", "hex");
   const at = changed.indexOf(allTerm);
   if (at < 0) throw new Error("all traversal target absent");
-  changed[at + 1] = 34;
+  changed[at + 1] = 32;
   expectRejected("traversal-result-family-mismatch-bytes", decodeModule(changed), "0800");
 }
 {
   const traversal = decodeModule(traversalBytes);
-  traversal.functions[4][1].body.term[3].parameters.pop();
+  traversal.functions[2][1].body.term[3].parameters.pop();
   expectRejected("fold-block-parameter-mismatch", traversal, "080e");
 }
 {
@@ -172,6 +170,16 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
   const body = kernelIf.kernels[0][1];
   body.parameters[0] = [4]; body.body[1].claimedType = [4];
   expectRejected("kernel-if-condition-not-bool", kernelIf, "0801");
+}
+{
+  const kernelIf = decodeModule(kernelIfBytes);
+  kernelIf.claims = kernelIf.claims.filter((claim) => claim !== 7);
+  expectRejected("publication-eligible-without-publication-claim", kernelIf, "0a0a");
+}
+{
+  const kernelIf = decodeModule(kernelIfBytes);
+  kernelIf.theorems = kernelIf.theorems.filter((theorem) => theorem !== 6);
+  expectRejected("publication-eligible-without-equivalence-requirement", kernelIf, "0a0a");
 }
 {
   const changed = Buffer.from(coverageGapBytes);
@@ -189,37 +197,37 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
 }
 {
   const candidate = freshCandidate();
-  candidate.moduleBounds[7][0] = 1024;
+  candidate.moduleBounds[6][0] = 1024;
   expectRejected("module-resource-ceiling-below-callable", candidate, "0b06");
 }
 {
   const candidate = freshCandidate();
-  candidate.moduleBounds[2] = 33;
+  candidate.moduleBounds[1] = 33;
   expectRejected("module-import-ceiling-above-profile", candidate, "0b07");
 }
 {
   const candidate = freshCandidate();
-  candidate.moduleBounds[3] = 4;
+  candidate.moduleBounds[2] = 4;
   expectRejected("module-declaration-count-exceeded", candidate, "0b06");
 }
 {
   const candidate = freshCandidate();
-  candidate.moduleBounds[1] = 1024;
+  candidate.moduleBounds[0] = 1020;
   expectRejected("module-byte-ceiling-exceeded", candidate, "0b06");
 }
 {
   const candidate = freshCandidate();
-  candidate.moduleBounds[4] = 29;
+  candidate.moduleBounds[3] = 29;
   expectRejected("module-expression-count-exceeded", candidate, "0b06");
 }
 {
   const candidate = freshCandidate();
-  candidate.moduleBounds[5] = 6;
+  candidate.moduleBounds[4] = 6;
   expectRejected("module-syntax-nesting-exceeded", candidate, "0b06");
 }
 {
   const bundle = freshBundle();
-  bundle.rootModule.moduleBounds[6] = 2;
+  bundle.rootModule.moduleBounds[5] = 2;
   expectRejected("module-call-depth-exceeded", bundle, "0b08");
 }
 {
@@ -239,7 +247,7 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
 }
 {
   const construction = decodeModule(constructionBytes);
-  construction.functions[8][1].result = [14, 0];
+  construction.functions[2][1].result = [14, 0];
   expectRejected("zero-index-bound", construction, "0600");
 }
 {
@@ -254,12 +262,12 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
 }
 {
   const payload = decodeModule(payloadBytes);
-  payload.functions[0][1].parameters[0] = [21, [[0, 1], 1]];
+  payload.functions[0][1].parameters[0] = [20, [[0, 1], 1]];
   expectRejected("variant-payload-in-public-signature", payload, "0604");
 }
 {
   const coverage = decodeModule(coverageGapBytes);
-  coverage.functions[7][1].parameters[0] = [22, [0, 0]];
+  coverage.functions[7][1].parameters[0] = [21, [0, 0]];
   expectRejected("declared-reference-to-alias", coverage, "0606");
 }
 {
@@ -270,15 +278,14 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
 {
   const payload = decodeModule(payloadBytes);
   const pair = payload.types[0][1];
-  const recursive = [22, [0, 0]];
+  const recursive = [21, [0, 0]];
   pair.body[0][1] = recursive; pair.types[0] = recursive;
   expectRejected("recursive-type", payload, "0602");
 }
 for (const [name, mutate] of [
   ["empty-bytes-type", (module) => { module.functions[0][1].result = [11, 0]; }],
-  ["empty-tuple-type", (module) => { module.functions[4][1].result = [17, []]; }],
-  ["zero-length-array-type", (module) => { module.functions[0][1].parameters[0] = [18, [4], 0]; }],
-  ["zero-capacity-vector-type", (module) => { module.functions[7][1].parameters[0] = [19, [4], 0]; }]
+  ["empty-tuple-type", (module) => { module.functions[5][1].result = [17, []]; }],
+  ["zero-length-array-type", (module) => { module.functions[0][1].parameters[0] = [18, [4], 0]; }]
 ]) {
   const module = name === "empty-bytes-type"
     ? decodeModule(coverageGapBytes) : decodeModule(constructionBytes);
@@ -293,16 +300,16 @@ for (const [name, mutate] of [
 {
   const traversal = decodeModule(traversalBytes);
   traversal.functions[0][1].exact[0] = 10;
-  expectRejected("all-must-charge-static-capacity", traversal, "0b01");
+  expectRejected("array-all-must-charge-static-length", traversal, "0b01");
 }
 {
   const traversal = decodeModule(traversalBytes);
-  traversal.functions[5][1].exact[3] = 130;
+  traversal.functions[3][1].exact[3] = 130;
   expectRejected("map-workspace-omits-output", traversal, "0b04");
 }
 {
   const construction = decodeModule(constructionBytes);
-  const pair = construction.functions[4][1].body;
+  const pair = construction.functions[5][1].body;
   pair.term[1].pop();
   expectRejected("tuple-claim-mismatch", construction, "0800");
 }
@@ -350,4 +357,4 @@ for (const [name, component, reason] of [
   expectRejected("callable-ceiling-below-exact", candidate, "0b05");
 }
 
-console.log("typed_core_semantics=verified positive=9 hostile=47 byte_hostile=7");
+console.log("typed_core_semantics=verified positive=9 hostile=48 byte_hostile=6");

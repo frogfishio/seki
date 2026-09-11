@@ -29,17 +29,17 @@ const typeLeaf = (tag) => () => u8(tag);
 const unitType = typeLeaf(0);
 const boolType = typeLeaf(1);
 const u64Type = typeLeaf(5);
-const declaredType = (index) => () => { u8(22); typeRef(index); };
+const declaredType = (index) => () => { u8(21); typeRef(index); };
 const identityType = (domain, length) => () => {
   u8(12); domainRef(domain); u32(length);
 };
 const optionType = (item) => () => { u8(15); item(); };
 const resultType = (ok, error) => () => { u8(16); ok(); error(); };
-const boundedVecType = (item, capacity) => () => {
-  u8(19); item(); u32(capacity);
+const arrayType = (item, length) => () => {
+  u8(18); item(); u32(length);
 };
 const decisionType = (accepted, rejection) => () => {
-  u8(20); accepted(); rejection();
+  u8(19); accepted(); rejection();
 };
 
 const candidateType = declaredType(0);
@@ -47,7 +47,7 @@ const candidateIdType = declaredType(1);
 const epochType = declaredType(2);
 const inputType = declaredType(3);
 const rejectionType = declaredType(4);
-const candidateVecType = boundedVecType(candidateType, 32);
+const candidateArrayType = arrayType(candidateType, 32);
 const optionCandidateType = optionType(candidateType);
 const selectionType = resultType(optionCandidateType, unitType);
 const kernelResultType = decisionType(candidateType, rejectionType);
@@ -70,8 +70,8 @@ const predicateBody = equal(
 );
 
 const selectionExpr = () => expr(selectionType, () => {
-  u8(31);
-  project(candidateVecType, local(inputType, 0), 3, 0)();
+  u8(29);
+  project(candidateArrayType, local(inputType, 0), 3, 0)();
   sequence([candidateType], (type) => type());
   boolType();
   predicateBody();
@@ -152,7 +152,7 @@ const kernelBody = () => {
   sequence([1, 2, 3, 4], (tag) => variantRef(4, tag));
   kernelExpression();
   resourceBounds(2048, 32768, 64, 4096);
-  resourceBounds(212, 19379, 8, 201);
+  resourceBounds(212, 19361, 8, 201);
   u8(0);
 };
 
@@ -161,7 +161,6 @@ const functionKey = (base, labels) => {
 };
 
 const moduleBounds = () => {
-  u32(1048576);  // maximum_input_bytes
   u32(1048576);  // maximum_typed_core_bytes
   u32(32);       // maximum_imports
   u32(4096);     // maximum_declarations
@@ -188,7 +187,7 @@ const modulePayload = () => {
     ["CandidateId", () => nominalBody(identityType(0, 16))],
     ["Epoch", () => nominalBody(u64Type)],
     ["Input", () => recordBody([
-      ["candidates", candidateVecType], ["currentEpoch", epochType],
+      ["candidates", candidateArrayType], ["currentEpoch", epochType],
       ["wanted", candidateIdType]
     ])],
     ["Rejection", () => variantBody([
@@ -231,4 +230,3 @@ if (process.argv[2] === "--hex") {
 } else {
   process.stdout.write(moduleBytes);
 }
-

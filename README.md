@@ -16,7 +16,7 @@ plumbing remain ordinary C; self-hosting is not a project goal by itself.
 
 V0 deliberately avoids a general generic or package system. Typing is
 syntax-directed over concrete monomorphic types; parameterized built-ins such as
-`Option[T]` and `BoundedVec[T,N]` are fixed language schemas. Source modules use
+`Option[T]` and `Array[T,N]` are fixed language schemas. Source modules use
 exact versions and aliases, while generated committed `seki.lock` data binds the
 canonical-core digests. The admission checker receives the complete bundle and
 never searches a filesystem, registry, or network.
@@ -58,9 +58,9 @@ Current bootstrap records:
 - [`spec/typed-core/fixtures/ARITHMETIC_CONTROL_LOWERING_V0.md`](spec/typed-core/fixtures/ARITHMETIC_CONTROL_LOWERING_V0.md)
   — explicit arithmetic-policy and pure-control fixture
 - [`spec/typed-core/fixtures/CONSTRUCTION_ACCESS_LOWERING_V0.md`](spec/typed-core/fixtures/CONSTRUCTION_ACCESS_LOWERING_V0.md)
-  — value construction and constant-time array/vector access fixture
+  — value construction and constant-time array access fixture
 - [`spec/typed-core/fixtures/TRAVERSAL_LOWERING_V0.md`](spec/typed-core/fixtures/TRAVERSAL_LOWERING_V0.md)
-  — capacity-expanded traversal and intrinsic-workspace fixture
+  — static-length array traversal and intrinsic-workspace fixture
 - [`docs/reviews/SEMANTIC_COVERAGE_AUDIT_V0.md`](docs/reviews/SEMANTIC_COVERAGE_AUDIT_V0.md)
   — checked tagged-form coverage and explicit rule-gap inventory
 - [`spec/typed-core/fixtures/COVERAGE_GAPS_LOWERING_V0.md`](spec/typed-core/fixtures/COVERAGE_GAPS_LOWERING_V0.md)

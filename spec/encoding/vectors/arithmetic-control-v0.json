@@ -2,8 +2,8 @@
   "schema": "io.frogfish.seki/scb0-module-vector@0",
   "status": "experimental-not-frozen",
   "fixture": "arithmetic-control-v0",
-  "length": 1072,
-  "module_sha256": "9c62caef27938c9331f70515699e582c1dce4b304343c6104ef11b1f658a3a3d",
+  "length": 1068,
+  "module_sha256": "3d578a0e354a3f604fa0977cd22bca322e4c1b910649433ba2342c5129af92f4",
   "digest_domain_ascii": "io.frogfish.seki/module/scb0/sha256",
   "digest_domain_terminator_hex": "00"
 }

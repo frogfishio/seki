@@ -13,8 +13,8 @@ class Writer {
 const w = new Writer();
 const bool = (out) => out.u8(1), u32 = (out) => out.u8(4);
 const typeRef = (out, index) => { out.u8(0); out.u32(index); };
-const rejection = (out) => { out.u8(22); typeRef(out, 0); };
-const decision = (out) => { out.u8(20); u32(out); rejection(out); };
+const rejection = (out) => { out.u8(21); typeRef(out, 0); };
+const decision = (out) => { out.u8(19); u32(out); rejection(out); };
 const local = (out, type, index) => { type(out); out.u8(4); out.u32(index); };
 const bounds = (out, steps, live, depth, workspace = 0) => {
   out.u32(steps); out.u32(live); out.u32(depth); out.u32(workspace);
@@ -32,10 +32,11 @@ w.u8(4); // KernelIf
 local(w, bool, 1);
 w.u8(0); local(w, u32, 0); // accept
 w.u8(1); rejection(w); w.u8(8); typeRef(w, 0); w.u32(0); w.u32(0); w.u32(0); // reject
-bounds(w, 16, 256, 16); bounds(w, 5, 98, 4); w.u8(0);
+bounds(w, 16, 256, 16); bounds(w, 5, 98, 4); w.u8(1);
 w.u32(0); w.seq([0], (value) => w.u32(value)); w.u32(0); w.seq([0], (value) => w.u32(value));
-w.seq([0, 1, 2, 3, 4], (value) => w.u8(value)); w.seq([0], (value) => w.u8(value));
-w.u32(1048576); w.u32(1048576); w.u32(32); w.u32(4096); w.u32(65536); w.u32(256); w.u32(32);
+w.seq([0, 1, 2, 3, 4, 6], (value) => w.u8(value));
+w.seq([0, 7], (value) => w.u8(value));
+w.u32(1048576); w.u32(32); w.u32(4096); w.u32(65536); w.u32(256); w.u32(32);
 bounds(w, 16777216, 8388608, 256, 8388608);
 w.u32(0); w.seq([0], (value) => w.u32(value)); w.u32(0);
 

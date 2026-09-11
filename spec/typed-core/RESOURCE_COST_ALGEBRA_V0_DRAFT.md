@@ -13,7 +13,7 @@ memory consumption. It bounds admitted Seki evaluation; decoding, admission,
 proof checking, artifact generation, and host orchestration require separate
 resource profiles.
 
-Every addition, multiplication, maximum, tag calculation, and capacity expansion
+Every addition, multiplication, maximum, tag calculation, and length expansion
 uses checked natural-number arithmetic. SCB-0 v0 encodes every natural as `U32`,
 so an intermediate mathematical result greater than `4294967295` rejects with
 `bound_arithmetic_overflow` before stored-bound equality or profile-ceiling
@@ -45,7 +45,6 @@ tag_bits(t)     = 0, when t = 0
 | `Index[N]` | `choice_bits(N)` |
 | `Tuple[...]`, record, variant payload | sum of component/field widths |
 | `Array[T,N]` | `N * value_bits(T)` |
-| `BoundedVec[T,N]` | `counter_bits(N) + N*value_bits(T)` |
 | `Option[T]` | `1 + value_bits(T)` |
 | `Result[T,E]` | `1 + max(value_bits(T), value_bits(E))` |
 | `Decision[A,R]` | `1 + max(value_bits(A), value_bits(R))` |
@@ -77,9 +76,9 @@ The cost derivation symbolically executes this fixed abstract schedule:
    a fresh slot containing the complete payload.
 9. A bounded intrinsic retains its input values and declared intrinsic workspace
    while invoking its block. Block parameter slots are fresh copies.
-10. Branching nodes derive the maximum of their possible schedules. Bounded
-    traversal derives against static capacity even when runtime length or early
-    termination would execute fewer iterations.
+10. Branching nodes derive the maximum of their possible schedules. Array
+    traversal derives against static length even when early termination would
+    execute fewer iterations.
 
 `maximum_live_value_bits` is the maximum sum of live typed-slot widths at any
 point in this schedule, including initial parameters and the final result.
@@ -153,19 +152,16 @@ The right operand of short-circuit Boolean logic is charged because the bound is
 worst-case. The non-selected branch is not charged; the maximum selected branch
 is charged instead.
 
-For a collection with static capacity `N`, block invocation costs one step in
+For an array with static length `N`, block invocation costs one step in
 addition to its body:
 
 ```text
-S(VecLength(c))       = 1 + S(c)
 S(ArrayGet(c, i))     = 1 + S(c) + S(i)
-S(VecGet(c, i))       = 1 + S(c) + S(i)
-S(Fold(c, z, b))      = 1 + S(c) + S(z) + N*(1 + S(b.body))
-S(FindUnique(c, b))   = 1 + S(c) + N*(1 + S(b.body))
-S(All(c, b))          = 1 + S(c) + N*(1 + S(b.body))
-S(Any(c, b))          = 1 + S(c) + N*(1 + S(b.body))
-S(MapBounded(c, b))   = 1 + S(c) + N*(1 + S(b.body))
-S(FilterBounded(c,b)) = 1 + S(c) + N*(1 + S(b.body))
+S(ArrayFold(c,z,b))   = 1 + S(c) + S(z) + N*(1 + S(b.body))
+S(ArrayFindUnique(c,b)) = 1 + S(c) + N*(1 + S(b.body))
+S(ArrayAll(c,b))      = 1 + S(c) + N*(1 + S(b.body))
+S(ArrayAny(c,b))      = 1 + S(c) + N*(1 + S(b.body))
+S(ArrayMap(c,b))      = 1 + S(c) + N*(1 + S(b.body))
 ```
 
 Imported function costs are reopened from the exact digest-bound admitted module,
@@ -191,19 +187,18 @@ acyclic call graph. Neither quantity is a native stack-byte claim.
 ## 6. Abstract workspace
 
 Workspace is intrinsic state that is neither a source-visible environment slot
-nor a control frame. For collection capacity `N`, the intrinsic base workspace is:
+nor a control frame. For array length `N`, the intrinsic base workspace is:
 
 | Intrinsic | Workspace bits |
 | --- | --- |
-| `ArrayGet`, `VecLength`, `VecGet` | 0 |
-| `Fold[..., U]` | `counter_bits(N) + value_bits(U)` |
-| `FindUnique[..., T]` | `counter_bits(N) + 2 + value_bits(T)` |
-| `All`, `Any` | `counter_bits(N) + 1` |
-| `MapBounded[..., U]` | `counter_bits(N) + value_bits(output collection)` |
-| `FilterBounded[..., T]` | `counter_bits(N) + value_bits(BoundedVec[T,N])` |
+| `ArrayGet` | 0 |
+| `ArrayFold[..., U]` | `counter_bits(N) + value_bits(U)` |
+| `ArrayFindUnique[..., T]` | `counter_bits(N) + 2 + value_bits(T)` |
+| `ArrayAll`, `ArrayAny` | `counter_bits(N) + 1` |
+| `ArrayMap[..., U]` | `counter_bits(N) + value_bits(output array)` |
 
-The two `FindUnique` state bits distinguish zero, one, and multiple matches. A
-partial map/filter output becomes the returned value by move rather than copy.
+The two `ArrayFindUnique` state bits distinguish zero, one, and multiple matches.
+A partial map output becomes the returned value by move rather than copy.
 While a block runs, its workspace is added to the retaining intrinsic's base
 workspace. Across sequential children and iterations, workspace takes the
 maximum; across a call it includes the caller's retained workspace plus the

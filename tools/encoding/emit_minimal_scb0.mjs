@@ -29,7 +29,6 @@ const modulePayload = () => {
   for (let i = 0; i < 4; ++i) emptySequence(); // four export vectors
   emptySequence();                // theorem requirements
   emptySequence();                // claim ceiling
-  u32(0);                         // maximum input bytes
   u32(1024);                      // maximum typed-core bytes
   for (let i = 0; i < 9; ++i) u32(0); // remaining module bounds
   u32(0);                         // derivation schema version
@@ -58,4 +57,3 @@ if (process.argv[2] === "--hex") {
 } else {
   process.stdout.write(moduleBytes);
 }
-

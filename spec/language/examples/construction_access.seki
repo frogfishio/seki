@@ -9,6 +9,9 @@ arithmetic: checked [ items at: index ].
 export fn error -> Result[U32, Unit]
 arithmetic: checked [ Error[U32]: Unit ].
 
+export fn indexEcho value: Index[5] -> Index[5]
+arithmetic: checked [ value ].
+
 export fn none -> Option[U32]
 arithmetic: checked [ None[U32] ].
 
@@ -23,9 +26,3 @@ arithmetic: checked [ remembered := value. remembered ].
 
 export fn some value: U32 -> Option[U32]
 arithmetic: checked [ Some: value ].
-
-export fn vecAt items: BoundedVec[U32, 4] index: U32 -> Option[U32]
-arithmetic: checked [ items at: index ].
-
-export fn vecLength items: BoundedVec[U32, 4] -> Index[5]
-arithmetic: checked [ items length ].

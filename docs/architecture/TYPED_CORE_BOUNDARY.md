@@ -14,7 +14,7 @@ bounded decision kernel:
 - booleans and explicitly sized integers;
 - nominal identities that cannot be compared across domains;
 - records, variants, options, and results;
-- fixed-capacity arrays with explicit logical length;
+- fixed-length arrays whose length is part of the static type;
 - pure expressions, local bindings, and non-recursive function calls;
 - statically bounded traversal, search, and folds;
 - explicit accept and reject results; and

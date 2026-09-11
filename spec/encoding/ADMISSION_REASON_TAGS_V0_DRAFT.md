@@ -30,7 +30,7 @@ path. Implementations may report additional findings separately.
 ### Layer `00` — envelope
 
 ```text
-0000 input_bytes_ceiling_exceeded
+0000 module_envelope_bytes_ceiling_exceeded
 0001 bad_magic
 0002 unsupported_scb_version
 0003 wrong_object_kind

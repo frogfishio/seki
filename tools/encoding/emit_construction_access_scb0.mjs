@@ -19,7 +19,6 @@ const optionU32 = (out) => { out.u8(15); u32(out); };
 const resultU32Unit = (out) => { out.u8(16); u32(out); unit(out); };
 const tupleU32Bool = (out) => { out.u8(17); out.seq([u32, bool], (type) => type(out)); };
 const array4U32 = (out) => { out.u8(18); u32(out); out.u32(4); };
-const vec4U32 = (out) => { out.u8(19); u32(out); out.u32(4); };
 const local = (out, type, index) => { type(out); out.u8(4); out.u32(index); };
 const bounds = (out, steps, live, depth, workspace = 0) => {
   out.u32(steps); out.u32(live); out.u32(depth); out.u32(workspace);
@@ -33,13 +32,16 @@ const tail = (steps, live, depth) => { bounds(w, 32, 512, 16); bounds(w, steps, 
 w.u32(0); w.seq(["seki", "fixtures", "construction_access"], (part) => w.name(part));
 w.u32(1); w.name("c11_bounded"); w.u32(1);
 w.u32(0); w.u32(0); w.u32(0); // imports, domains, types
-w.u32(9);
+w.u32(8);
 
 head("arrayAt", ["items", "index"], [array4U32, u32], optionU32);
 optionU32(w); w.u8(27); local(w, array4U32, 1); local(w, u32, 0); tail(4, 353, 3);
 
 head("error", [], [], resultU32Unit);
 resultU32Unit(w); w.u8(13); u32(w); unit(w); w.u8(0); tail(3, 33, 3);
+
+head("indexEcho", ["value"], [index5], index5);
+local(w, index5, 0); tail(2, 6, 2);
 
 head("none", [], [], optionU32);
 optionU32(w); w.u8(10); u32(w); tail(2, 33, 2);
@@ -56,18 +58,12 @@ u32(w); w.u8(5); local(w, u32, 0); local(w, u32, 0); tail(4, 96, 3);
 head("some", ["value"], [u32], optionU32);
 optionU32(w); w.u8(11); local(w, u32, 0); tail(3, 97, 3);
 
-head("vecAt", ["items", "index"], [vec4U32, u32], optionU32);
-optionU32(w); w.u8(29); local(w, vec4U32, 1); local(w, u32, 0); tail(4, 359, 3);
-
-head("vecLength", ["items"], [vec4U32], index5);
-index5(w); w.u8(28); local(w, vec4U32, 0); tail(3, 265, 3);
-
 w.u32(0); w.u32(0); w.u32(0);
-w.seq([0, 1, 2, 3, 4, 5, 6, 7, 8], (value) => w.u32(value)); w.u32(0);
+w.seq([0, 1, 2, 3, 4, 5, 6, 7], (value) => w.u32(value)); w.u32(0);
 w.seq([0, 1, 2, 3], (value) => w.u8(value)); w.seq([0], (value) => w.u8(value));
-w.u32(1048576); w.u32(1048576); w.u32(32); w.u32(4096); w.u32(65536); w.u32(256); w.u32(32);
+w.u32(1048576); w.u32(32); w.u32(4096); w.u32(65536); w.u32(256); w.u32(32);
 bounds(w, 16777216, 8388608, 256, 8388608);
-w.u32(0); w.u32(0); w.seq([0, 1, 2, 3, 4, 5, 6, 7, 8], (value) => w.u32(value));
+w.u32(0); w.u32(0); w.seq([0, 1, 2, 3, 4, 5, 6, 7], (value) => w.u32(value));
 
 const payload = w.bytes(); const envelope = new Writer();
 envelope.raw("SEKI"); envelope.u32(0); envelope.u8(0); envelope.u32(payload.length); envelope.raw(payload);

@@ -26,7 +26,7 @@
 3. One abstract slot schedule determines live-value peaks and prevents checker
    implementations from choosing different liveness optimizations.
 4. Logical steps and evaluator-control depth have fixed node/frame meanings.
-5. Bounded collection signatures, traversal order, and capacity charging are
+5. Bounded array signatures, traversal order, and static-length charging are
    explicit.
 6. Intrinsic workspace is closed and separated from source-visible values and
    control frames.

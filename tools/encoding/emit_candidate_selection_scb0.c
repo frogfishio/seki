@@ -75,7 +75,7 @@ static void type_u64(struct buffer *b) { put_u8(b, UINT8_C(5)); }
 static void
 put_declared_type(struct buffer *buffer, uint32_t index)
 {
-    put_u8(buffer, UINT8_C(22));
+    put_u8(buffer, UINT8_C(21));
     put_local_type_ref(buffer, index);
 }
 
@@ -86,9 +86,9 @@ static void type_input(struct buffer *b) { put_declared_type(b, 3); }
 static void type_rejection(struct buffer *b) { put_declared_type(b, 4); }
 
 static void
-type_candidate_vec(struct buffer *buffer)
+type_candidate_array(struct buffer *buffer)
 {
-    put_u8(buffer, UINT8_C(19));
+    put_u8(buffer, UINT8_C(18));
     type_candidate(buffer);
     put_u32(buffer, UINT32_C(32));
 }
@@ -111,7 +111,7 @@ type_selection(struct buffer *buffer)
 static void
 type_kernel_result(struct buffer *buffer)
 {
-    put_u8(buffer, UINT8_C(20));
+    put_u8(buffer, UINT8_C(19));
     type_candidate(buffer);
     type_rejection(buffer);
 }
@@ -171,8 +171,8 @@ static void
 expr_selection(struct buffer *buffer)
 {
     type_selection(buffer);
-    put_u8(buffer, UINT8_C(31));
-    expr_project_local(buffer, type_candidate_vec, type_input, 0, 3, 0);
+    put_u8(buffer, UINT8_C(29));
+    expr_project_local(buffer, type_candidate_array, type_input, 0, 3, 0);
     put_u32(buffer, UINT32_C(1));
     type_candidate(buffer);
     type_bool(buffer);
@@ -304,7 +304,7 @@ put_type_declarations(struct buffer *buffer)
     put_name(buffer, "Input");
     put_u8(buffer, UINT8_C(2));
     put_u32(buffer, UINT32_C(3));
-    put_record_field(buffer, "candidates", type_candidate_vec);
+    put_record_field(buffer, "candidates", type_candidate_array);
     put_record_field(buffer, "currentEpoch", type_epoch);
     put_record_field(buffer, "wanted", type_candidate_id);
 
@@ -332,14 +332,13 @@ put_kernel(struct buffer *buffer)
     put_variant_ref(buffer, 3); put_variant_ref(buffer, 4);
     kernel_expression(buffer);
     put_resource_bounds(buffer, 2048, 32768, 64, 4096);
-    put_resource_bounds(buffer, 212, 19379, 8, 201);
+    put_resource_bounds(buffer, 212, 19361, 8, 201);
     put_u8(buffer, UINT8_C(0));
 }
 
 static void
 put_module_bounds(struct buffer *buffer)
 {
-    put_u32(buffer, UINT32_C(1048576));
     put_u32(buffer, UINT32_C(1048576));
     put_u32(buffer, UINT32_C(32));
     put_u32(buffer, UINT32_C(4096));
@@ -408,4 +407,3 @@ main(void)
     if (fwrite(module.bytes, 1, module.length, stdout) != module.length) return 1;
     return 0;
 }
-

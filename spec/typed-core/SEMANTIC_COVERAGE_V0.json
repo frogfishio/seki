@@ -21,10 +21,9 @@
     [16, "Result", "construction-access-v0"],
     [17, "Tuple", "construction-access-v0"],
     [18, "Array", "construction-access-v0"],
-    [19, "BoundedVec", "candidate-selection-v0"],
-    [20, "Decision", "candidate-selection-v0"],
-    [21, "VariantPayload", "payload-records-v0"],
-    [22, "Declared", "import-bundle-v0"]
+    [19, "Decision", "candidate-selection-v0"],
+    [20, "VariantPayload", "payload-records-v0"],
+    [21, "Declared", "import-bundle-v0"]
   ],
   "declarations": [
     [0, "Alias", "coverage-gaps-v0"],
@@ -61,14 +60,11 @@
     [25, "Match", "payload-records-v0"],
     [26, "Call", "import-bundle-v0"],
     [27, "ArrayGet", "construction-access-v0"],
-    [28, "VecLength", "construction-access-v0"],
-    [29, "VecGet", "construction-access-v0"],
-    [30, "Fold", "traversal-v0"],
-    [31, "FindUnique", "candidate-selection-v0"],
-    [32, "All", "traversal-v0"],
-    [33, "Any", "traversal-v0"],
-    [34, "MapBounded", "traversal-v0"],
-    [35, "FilterBounded", "traversal-v0"]
+    [28, "ArrayFold", "traversal-v0"],
+    [29, "ArrayFindUnique", "candidate-selection-v0"],
+    [30, "ArrayAll", "traversal-v0"],
+    [31, "ArrayAny", "traversal-v0"],
+    [32, "ArrayMap", "traversal-v0"]
   ],
   "kernel_terms": [
     [0, "Accept", "candidate-selection-v0"],
@@ -78,8 +74,5 @@
     [4, "If", "kernel-if-v0"],
     [5, "Match", "candidate-selection-v0"]
   ],
-  "rule_gaps": [
-    "source-input byte ceiling binding",
-    "publication declaration coupling"
-  ]
+  "rule_gaps": []
 }

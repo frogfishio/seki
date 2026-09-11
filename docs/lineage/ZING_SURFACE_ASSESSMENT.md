@@ -52,7 +52,7 @@ semantics.
 - implicit integer conversions, truthiness, and target-sized integers; and
 - customer-specific constructs from Gnosis, Kiku, or any other consumer.
 
-Bounded traversal is exposed through a closed set of statically recognized
+Bounded array traversal is exposed through a closed set of statically recognized
 combinators such as `fold:with:`, `findUnique:`, `all:`, and `any:`. Each lowers
 to an explicit typed-core node with a derived resource bound; it is not a
 dynamically dispatched library message.

@@ -11,9 +11,9 @@ const callableKey = (module, index) =>
   `${identityKey(module.identity)}#${digestKey(module)}:f${index}`;
 
 const choiceBits = (count) => count <= 1 ? 0 : Math.ceil(Math.log2(count));
-const counterBits = (capacity) => choiceBits(capacity + 1);
+const counterBits = (length) => choiceBits(length + 1);
 const tagBits = (tag) => tag === 0 ? 0 : Math.floor(Math.log2(tag)) + 1;
-const C11_BOUNDED_PROFILE = [1048576, 1048576, 32, 4096, 65536, 256, 32,
+const C11_BOUNDED_PROFILE = [1048576, 32, 4096, 65536, 256, 32,
   [16777216, 8388608, 256, 8388608]];
 const MAX_NAT = 0xffffffff;
 const checkedNat = (value, path = "bounds") => {
@@ -68,19 +68,19 @@ export class TypedCoreChecker {
       return [tag, domainKey(ref.module, ref.index), type[2]];
     }
     if (tag === 13 || tag === 14) return [...type];
-    if (tag === 15 || tag === 18 || tag === 19) {
+    if (tag === 15 || tag === 18) {
       return [tag, this.normalize(type[1], module, `${path}/item`, expanding), ...type.slice(2)];
     }
-    if (tag === 16 || tag === 20) return [tag,
+    if (tag === 16 || tag === 19) return [tag,
       this.normalize(type[1], module, `${path}/left`, expanding),
       this.normalize(type[2], module, `${path}/right`, expanding)];
     if (tag === 17) return [tag, type[1].map((item, index) =>
       this.normalize(item, module, `${path}/items/${index}`, expanding))];
-    if (tag === 21) {
+    if (tag === 20) {
       const owner = this.resolveReference(module, type[1][0], "types", `${path}/case`);
       return [tag, declKey(owner.module, owner.index), type[1][1]];
     }
-    if (tag === 22) {
+    if (tag === 21) {
       const ref = this.resolveReference(module, type[1], "types", `${path}/reference`);
       const key = declKey(ref.module, ref.index);
       if (ref.value[1].tag !== 0) return [tag, key];
@@ -100,21 +100,19 @@ export class TypedCoreChecker {
     if (tag === 11 || tag === 12 || tag === 13) return checkedMul(8, type.at(-1), path);
     if (tag === 14) return choiceBits(type[1]);
     if (tag === 15) return checkedAdd(1, this.width(type[1], path), path);
-    if (tag === 16 || tag === 20) return checkedAdd(1, Math.max(
+    if (tag === 16 || tag === 19) return checkedAdd(1, Math.max(
       this.width(type[1], path), this.width(type[2], path)), path);
     if (tag === 17) return type[1].reduce((sum, item) =>
       checkedAdd(sum, this.width(item, path), path), 0);
     if (tag === 18) return checkedMul(this.width(type[1], path), type[2], path);
-    if (tag === 19) return checkedAdd(counterBits(type[2]),
-      checkedMul(this.width(type[1], path), type[2], path), path);
-    if (tag === 21) {
+    if (tag === 20) {
       const entry = this.declarations.get(type[1]);
       const variantCase = entry?.declaration.body.find(([stableTag]) => stableTag === type[2]);
       if (!variantCase) fail("0705", path);
       return (variantCase[1].payload ?? []).reduce((sum, [, item]) =>
         checkedAdd(sum, this.width(this.normalize(item, entry.module, path), path), path), 0);
     }
-    if (tag === 22) {
+    if (tag === 21) {
       const entry = this.declarations.get(type[1]);
       if (!entry) fail("0700", path);
       const declaration = entry.declaration;
@@ -138,22 +136,22 @@ export class TypedCoreChecker {
   validateTypeFormation(type, module, path, allowVariantPayload = false) {
     const tag = type[0];
     if ((tag === 11 && type[1] === 0) || (tag === 17 && type[1].length === 0) ||
-      ((tag === 18 || tag === 19) && type[2] === 0)) fail("0608", path);
+      (tag === 18 && type[2] === 0)) fail("0608", path);
     if (tag === 13 && type[2] !== 32) fail("0601", path);
     if (tag === 14 && type[1] === 0) fail("0600", path);
-    if (tag === 21) {
+    if (tag === 20) {
       if (!allowVariantPayload) fail("0604", path);
       const ref = this.resolveReference(module, type[1][0], "types", path);
       const variantCase = ref.value[1].body?.find(([stableTag]) => stableTag === type[1][1]);
       if (!variantCase || variantCase[1].payload === null) fail("0604", path);
     }
-    if (tag === 22) {
+    if (tag === 21) {
       const ref = this.resolveReference(module, type[1], "types", path);
       if (ref.value[1].tag === 0) fail("0606", path);
     }
-    if (tag === 15 || tag === 18 || tag === 19) {
+    if (tag === 15 || tag === 18) {
       this.validateTypeFormation(type[1], module, `${path}/item`, allowVariantPayload);
-    } else if (tag === 16 || tag === 20) {
+    } else if (tag === 16 || tag === 19) {
       this.validateTypeFormation(type[1], module, `${path}/left`, allowVariantPayload);
       this.validateTypeFormation(type[2], module, `${path}/right`, allowVariantPayload);
     } else if (tag === 17) {
@@ -163,10 +161,10 @@ export class TypedCoreChecker {
   }
 
   localTypeReferences(type, result = new Set()) {
-    if (type[0] === 22 && type[1][0] === 0) result.add(type[1][1]);
-    if (type[0] === 15 || type[0] === 18 || type[0] === 19) {
+    if (type[0] === 21 && type[1][0] === 0) result.add(type[1][1]);
+    if (type[0] === 15 || type[0] === 18) {
       this.localTypeReferences(type[1], result);
-    } else if (type[0] === 16 || type[0] === 20) {
+    } else if (type[0] === 16 || type[0] === 19) {
       this.localTypeReferences(type[1], result); this.localTypeReferences(type[2], result);
     } else if (type[0] === 17) {
       for (const item of type[1]) this.localTypeReferences(item, result);
@@ -199,7 +197,7 @@ export class TypedCoreChecker {
       const ref = this.resolveReference(module, owner[1], "types", `${path}/owner`);
       const declaration = ref.value[1];
       if (declaration.tag !== 2) fail("0701", path);
-      const expectedOwner = [22, declKey(ref.module, ref.index)];
+      const expectedOwner = [21, declKey(ref.module, ref.index)];
       if (!same(recordType, expectedOwner)) fail("0704", path);
       if (fieldIndex >= declaration.body.length) fail("0703", path);
       return this.normalize(declaration.body[fieldIndex][1], ref.module, path);
@@ -209,7 +207,7 @@ export class TypedCoreChecker {
     if (declaration.tag !== 3) fail("0701", path);
     const variantCase = declaration.body.find(([tag]) => tag === owner[1][1]);
     if (!variantCase || variantCase[1].payload === null) fail("0705", path);
-    const expectedOwner = [21, declKey(ref.module, ref.index), owner[1][1]];
+    const expectedOwner = [20, declKey(ref.module, ref.index), owner[1][1]];
     if (!same(recordType, expectedOwner)) fail("0704", path);
     if (fieldIndex >= variantCase[1].payload.length) fail("0703", path);
     return this.normalize(variantCase[1].payload[fieldIndex][1], ref.module, path);
@@ -223,8 +221,8 @@ export class TypedCoreChecker {
       const variantCase = ref.value[1].body.find(([tag]) => tag === stableTag);
       if (!variantCase) fail("0705", path);
       const payload = variantCase[1].payload === null ? null :
-        [21, declKey(ref.module, ref.index), stableTag];
-      return { owner: [22, declKey(ref.module, ref.index)], payload };
+        [20, declKey(ref.module, ref.index), stableTag];
+      return { owner: [21, declKey(ref.module, ref.index)], payload };
     }
     if (owner[0] === 1) return { owner: [15, this.normalize(owner[1], module, path)],
       payload: stableTag === 0 ? null : stableTag === 1
@@ -233,7 +231,7 @@ export class TypedCoreChecker {
       if (stableTag > 1) fail("0705", path);
       const left = this.normalize(owner[1], module, path);
       const right = this.normalize(owner[2], module, path);
-      return { owner: [owner[0] === 2 ? 16 : 20, left, right],
+      return { owner: [owner[0] === 2 ? 16 : 19, left, right],
         payload: stableTag === 0 ? left : right };
     }
     if (stableTag > 3) fail("0705", path);
@@ -272,7 +270,7 @@ export class TypedCoreChecker {
       if (term[2].length !== declaration.body.length) fail("0805", `${path}/term/fields`);
       for (let index = 0; index < term[2].length; ++index) {
         const [fieldReference, value] = term[2][index];
-        const owner = [22, declKey(ref.module, ref.index)];
+        const owner = [21, declKey(ref.module, ref.index)];
         const fieldType = this.field(module, fieldReference, owner,
           `${path}/term/fields/${index}`);
         if (fieldReference[1] !== index) fail("0805", `${path}/term/fields/${index}`);
@@ -280,7 +278,7 @@ export class TypedCoreChecker {
           `${path}/term/fields/${index}/value`).type;
         if (!same(actual, fieldType)) fail("0805", `${path}/term/fields/${index}/value`);
       }
-      inferred = [22, declKey(ref.module, ref.index)];
+      inferred = [21, declKey(ref.module, ref.index)];
     } else if (tag === 7) {
       const record = this.infer(term[1], module, environment, `${path}/term/record`);
       inferred = this.field(module, term[2], record.type, `${path}/term/field`);
@@ -303,7 +301,7 @@ export class TypedCoreChecker {
           `${path}/term/fields/${index}/value`);
         if (!same(actual, expected)) fail("0806", `${path}/term/fields/${index}/value`);
       }
-      inferred = [22, declKey(ref.module, ref.index)];
+      inferred = [21, declKey(ref.module, ref.index)];
       return this.finishExpression(expression, inferred, module, path,
         { constructor: [declKey(ref.module, ref.index), term[1][1]] });
     } else if (tag === 9) {
@@ -388,18 +386,12 @@ export class TypedCoreChecker {
       }
       if (!same(seen, this.constructorTags(scrutinee.type))) fail("0808", `${path}/term/arms`);
       inferred = armType;
-    } else if (tag === 27 || tag === 29) {
+    } else if (tag === 27) {
       const collection = this.infer(term[1], module, environment,
         `${path}/term/collection`).type;
       const index = this.infer(term[2], module, environment, `${path}/term/index`).type;
-      const expectedTag = tag === 27 ? 18 : 19;
-      if (collection[0] !== expectedTag || !same(index, [4])) fail("080e", path);
+      if (collection[0] !== 18 || !same(index, [4])) fail("080e", path);
       inferred = [15, collection[1]];
-    } else if (tag === 28) {
-      const collection = this.infer(term[1], module, environment,
-        `${path}/term/collection`).type;
-      if (collection[0] !== 19) fail("080e", path);
-      inferred = [14, collection[2] + 1];
     } else if (tag === 26) {
       const ref = this.resolveFunction(module, term[1], `${path}/term/function`);
       const body = ref.value[1];
@@ -412,37 +404,37 @@ export class TypedCoreChecker {
         if (!same(actual, expected)) fail("0803", `${path}/term/arguments/${index}`);
       });
       inferred = this.normalize(body.result, ref.module, `${path}/term/result`);
-    } else if (tag === 30) {
+    } else if (tag === 28) {
       const collection = this.infer(term[1], module, environment,
         `${path}/term/collection`).type;
-      if (collection[0] !== 18 && collection[0] !== 19) fail("080e", path);
+      if (collection[0] !== 18) fail("080e", path);
       const initial = this.infer(term[2], module, environment,
         `${path}/term/initial`).type;
       const block = this.checkBlock(term[3], module, environment,
         [initial, collection[1]], initial, `${path}/term/block`);
       if (!same(block.type, initial)) fail("0804", `${path}/term/block/body`);
       inferred = initial;
-    } else if (tag === 31) {
+    } else if (tag === 29) {
       const collection = this.infer(term[1], module, environment,
         `${path}/term/collection`).type;
-      if (collection[0] !== 18 && collection[0] !== 19) fail("080e", path);
+      if (collection[0] !== 18) fail("080e", path);
       const item = collection[1];
       const block = this.checkBlock(term[2], module, environment, [item], [1],
         `${path}/term/block`);
       if (!same(block.type, [1])) fail("0804", `${path}/term/block/body`);
       inferred = [16, [15, item], [0]];
-    } else if (tag === 32 || tag === 33 || tag === 35) {
+    } else if (tag === 30 || tag === 31) {
       const collection = this.infer(term[1], module, environment,
         `${path}/term/collection`).type;
-      if (collection[0] !== 18 && collection[0] !== 19) fail("080e", path);
+      if (collection[0] !== 18) fail("080e", path);
       const block = this.checkBlock(term[2], module, environment, [collection[1]], [1],
         `${path}/term/block`);
       if (!same(block.type, [1])) fail("0804", `${path}/term/block/body`);
-      inferred = tag === 35 ? [19, collection[1], collection[2]] : [1];
-    } else if (tag === 34) {
+      inferred = [1];
+    } else if (tag === 32) {
       const collection = this.infer(term[1], module, environment,
         `${path}/term/collection`).type;
-      if (collection[0] !== 18 && collection[0] !== 19) fail("080e", path);
+      if (collection[0] !== 18) fail("080e", path);
       const parameter = term[2].parameters;
       if (parameter.length !== 1) fail("080e", `${path}/term/block/parameters`);
       const item = this.normalize(parameter[0], module, `${path}/term/block/parameters/0`);
@@ -451,14 +443,14 @@ export class TypedCoreChecker {
       const block = this.checkBlock(term[2], module, environment, [collection[1]], mapped,
         `${path}/term/block`);
       if (!same(block.type, mapped)) fail("0804", `${path}/term/block/body`);
-      inferred = [collection[0], mapped, collection[2]];
+      inferred = [18, mapped, collection[2]];
     } else fail("0904", `${path}/term`);
     return this.finishExpression(expression, inferred, module, path);
   }
 
   finishExpression(expression, inferred, module, path, extra = {}) {
     this.validateTypeFormation(expression.claimedType, module, `${path}/claimed_type`,
-      inferred[0] === 21 && expression.claimedType[0] === 21);
+      inferred[0] === 20 && expression.claimedType[0] === 20);
     const claimed = this.normalize(expression.claimedType, module, `${path}/claimed_type`);
     if (!same(claimed, inferred)) fail("0800", `${path}/claimed_type`);
     return { type: inferred, ...extra };
@@ -517,9 +509,9 @@ export class TypedCoreChecker {
   }
 
   constructorTags(type) {
-    if (type[0] === 15 || type[0] === 16 || type[0] === 20) return [0, 1];
+    if (type[0] === 15 || type[0] === 16 || type[0] === 19) return [0, 1];
     if (type[0] === 10) return [0, 1, 2, 3];
-    if (type[0] === 22) return this.declarations.get(type[1]).declaration.body
+    if (type[0] === 21) return this.declarations.get(type[1]).declaration.body
       .map(([stableTag]) => stableTag);
     return [];
   }
@@ -616,10 +608,8 @@ export class TypedCoreChecker {
         depth: 1 + Math.max(scrutinee.depth, armDepth),
         workspace: Math.max(scrutinee.workspace, armWorkspace), type: result };
     }
-    if (tag === 27 || tag === 29) return this.analyzeStrict(term.slice(1), result,
+    if (tag === 27) return this.analyzeStrict(term.slice(1), result,
       module, environment, base, path);
-    if (tag === 28) return this.analyzeStrict([term[1]], result, module,
-      environment, base, path);
     if (tag === 26) {
       let retained = 0; let steps = 1; let live = base; let depth = 1; let workspace = 0;
       for (const argument of term[2]) {
@@ -635,28 +625,28 @@ export class TypedCoreChecker {
       depth = Math.max(depth, 1 + callee.depth); workspace = Math.max(workspace, callee.workspace);
       return { steps, live, depth, workspace, type: result };
     }
-    if (tag === 30) return this.analyzeTraversal(expression, module, environment,
+    if (tag === 28) return this.analyzeTraversal(expression, module, environment,
       base, path, "fold");
-    if (tag === 31) {
+    if (tag === 29) {
       const collection = this.analyzeExpr(term[1], module, environment, base, path);
       const collectionBits = this.width(collection.type);
-      const capacity = collection.type[2];
+      const length = collection.type[2];
       const item = collection.type[1];
       const itemBits = this.width(item);
       const blockBase = base + collectionBits + itemBits;
       const block = this.analyzeExpr(term[2].body, module, [item, ...environment],
         blockBase, path);
-      const intrinsicWorkspace = counterBits(capacity) + 2 + itemBits;
+      const intrinsicWorkspace = counterBits(length) + 2 + itemBits;
       return { steps: checkedAdd(checkedAdd(1, collection.steps, path),
-          checkedMul(capacity, checkedAdd(1, block.steps, path), path), path),
+          checkedMul(length, checkedAdd(1, block.steps, path), path), path),
         live: Math.max(collection.live, block.live,
           base + collectionBits + resultBits),
         depth: Math.max(1 + collection.depth, 2 + block.depth),
         workspace: Math.max(collection.workspace, intrinsicWorkspace + block.workspace),
         type: result };
     }
-    if (tag >= 32 && tag <= 35) {
-      const kinds = { 32: "all", 33: "any", 34: "map", 35: "filter" };
+    if (tag >= 30 && tag <= 32) {
+      const kinds = { 30: "all", 31: "any", 32: "map" };
       return this.analyzeTraversal(expression, module, environment, base, path, kinds[tag]);
     }
     fail("0904", path);
@@ -667,7 +657,7 @@ export class TypedCoreChecker {
     const result = this.normalize(expression.claimedType, module, path);
     const collection = this.analyzeExpr(term[1], module, environment, base, path);
     const collectionBits = this.width(collection.type);
-    const capacity = collection.type[2];
+    const length = collection.type[2];
     const item = collection.type[1];
     const itemBits = this.width(item);
     let retained = collectionBits;
@@ -686,18 +676,18 @@ export class TypedCoreChecker {
       const parameterBits = parameterTypes.reduce((sum, type) => sum + this.width(type), 0);
       block = this.analyzeExpr(term[3].body, module,
         [...parameterTypes].reverse().concat(environment), base + retained + parameterBits, path);
-      intrinsicWorkspace = counterBits(capacity) + this.width(initial.type);
+      intrinsicWorkspace = counterBits(length) + this.width(initial.type);
     } else {
       const blockValue = term[2];
       const parameterBits = itemBits;
       block = this.analyzeExpr(blockValue.body, module, [item, ...environment],
         base + retained + parameterBits, path);
-      if (kind === "all" || kind === "any") intrinsicWorkspace = counterBits(capacity) + 1;
-      else if (kind === "map") intrinsicWorkspace = counterBits(capacity) + this.width(result);
-      else intrinsicWorkspace = counterBits(capacity) + this.width(result);
+      if (kind === "all" || kind === "any") intrinsicWorkspace = counterBits(length) + 1;
+      else if (kind === "map") intrinsicWorkspace = counterBits(length) + this.width(result);
+      else intrinsicWorkspace = counterBits(length) + this.width(result);
     }
     steps = checkedAdd(steps,
-      checkedMul(capacity, checkedAdd(1, block.steps, path), path), path);
+      checkedMul(length, checkedAdd(1, block.steps, path), path), path);
     live = Math.max(live, block.live);
     depth = Math.max(depth, 2 + block.depth);
     workspace = Math.max(workspace, intrinsicWorkspace + block.workspace);
@@ -790,25 +780,25 @@ export class TypedCoreChecker {
   checkModuleCeilings(module) {
     if (!same(module.profile, ["c11_bounded", 1])) fail("0b07", "module/profile");
     const declared = module.moduleBounds;
-    for (let index = 0; index < 7; ++index) {
+    for (let index = 0; index < 6; ++index) {
       if (declared[index] > C11_BOUNDED_PROFILE[index]) {
         fail("0b07", `module/bounds/${index}`);
       }
     }
-    declared[7].forEach((value, index) => {
-      if (value > C11_BOUNDED_PROFILE[7][index]) fail("0b07", `module/bounds/resources/${index}`);
+    declared[6].forEach((value, index) => {
+      if (value > C11_BOUNDED_PROFILE[6][index]) fail("0b07", `module/bounds/resources/${index}`);
     });
     const declarationCount = module.domains.length + module.types.length +
       module.functions.length + module.kernels.length;
-    if (module.canonicalBytes.length > declared[1] || module.imports.length > declared[2] ||
-      declarationCount > declared[3]) fail("0b06", "module/bounds");
+    if (module.canonicalBytes.length > declared[0] || module.imports.length > declared[1] ||
+      declarationCount > declared[2]) fail("0b06", "module/bounds");
     this.validateDeclarationGraph(module);
     module.types.forEach(([, declaration], declarationIndex) =>
       declaration.types.forEach((type, typeIndex) => {
         const path = `module/types/${declarationIndex}/${typeIndex}`;
         this.validateTypeFormation(type, module, path);
         const bits = this.width(this.normalize(type, module, path), path);
-        if (bits > C11_BOUNDED_PROFILE[7][1]) fail("0607", path);
+        if (bits > C11_BOUNDED_PROFILE[6][1]) fail("0607", path);
       }));
     module.types.forEach(([, declaration], declarationIndex) => {
       if (declaration.tag === 3) {
@@ -826,10 +816,10 @@ export class TypedCoreChecker {
           const path = `module/${kind}/${callableIndex}/types/${typeIndex}`;
           this.validateTypeFormation(type, module, path);
           const bits = this.width(this.normalize(type, module, path), path);
-          if (bits > C11_BOUNDED_PROFILE[7][1]) fail("0607", path);
+          if (bits > C11_BOUNDED_PROFILE[6][1]) fail("0607", path);
         });
         body.declared.forEach((value, index) => {
-          if (value > declared[7][index]) fail("0b06",
+          if (value > declared[6][index]) fail("0b06",
             `module/${kind}/${callableIndex}/declared/${index}`);
         });
       });
@@ -844,7 +834,7 @@ export class TypedCoreChecker {
       const metrics = this.kernelMetrics(body.body);
       expressionNodes += metrics.count; maximumNesting = Math.max(maximumNesting, metrics.nesting);
     }
-    if (expressionNodes > declared[4] || maximumNesting > declared[5]) {
+    if (expressionNodes > declared[3] || maximumNesting > declared[4]) {
       fail("0b06", "module/bounds/structure");
     }
   }
@@ -941,19 +931,19 @@ export class TypedCoreChecker {
           return Math.max(maximum, this.callableDepth.get(callableKey(ref.module, ref.index)) ?? 0);
         }, 0);
         this.callableDepth.set(callableKey(module, index), callDepth);
-        if (callDepth > module.moduleBounds[6]) fail("0b08", `module/functions/${index}`);
+        if (callDepth > module.moduleBounds[5]) fail("0b08", `module/functions/${index}`);
       }
       for (let index = 0; index < module.kernels.length; ++index) {
         const body = module.kernels[index][1];
         const parameters = body.parameters.map((type) => this.normalize(type, module));
         const result = this.normalize(body.result, module);
-        if (result[0] !== 20) fail("0a02", `module/kernels/${index}/result`);
+        if (result[0] !== 19) fail("0a02", `module/kernels/${index}/result`);
         const rejectionTags = [];
         for (let orderIndex = 0; orderIndex < body.rejectionOrder.length; ++orderIndex) {
           const variant = body.rejectionOrder[orderIndex];
           const ref = this.resolveReference(module, variant[0], "types",
             `module/kernels/${index}/rejection_order/${orderIndex}`);
-          if (!same([22, declKey(ref.module, ref.index)], result[2])) {
+          if (!same([21, declKey(ref.module, ref.index)], result[2])) {
             fail("0a03", `module/kernels/${index}/rejection_order/${orderIndex}`);
           }
           if (rejectionTags.includes(variant[1])) {
@@ -967,6 +957,10 @@ export class TypedCoreChecker {
         }
         this.checkKernel(body.body, module, [...parameters].reverse(), result[1], result[2],
           body.rejectionOrder, 0, `module/kernels/${index}/body`);
+        if (body.publicationEligible &&
+          (!module.claims.includes(7) || !module.theorems.includes(6))) {
+          fail("0a0a", `module/kernels/${index}/publication_eligible`);
+        }
         const base = parameters.reduce((sum, type) => sum + this.width(type), 0);
         const inner = this.analyzeKernel(body.body, module, [...parameters].reverse(), base,
           result, `module/kernels/${index}/body`);
@@ -977,7 +971,7 @@ export class TypedCoreChecker {
           const ref = this.resolveFunction(module, reference, "module/call_depth");
           return Math.max(maximum, this.callableDepth.get(callableKey(ref.module, ref.index)) ?? 0);
         }, 0);
-        if (callDepth > module.moduleBounds[6]) fail("0b08", `module/kernels/${index}`);
+        if (callDepth > module.moduleBounds[5]) fail("0b08", `module/kernels/${index}`);
       }
     }
     return true;

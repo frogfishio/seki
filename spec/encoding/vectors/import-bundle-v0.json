@@ -2,12 +2,12 @@
   "schema": "io.frogfish.seki/scb0-bundle-vector@0",
   "status": "experimental-not-frozen",
   "fixture": "import-bundle-v0",
-  "base_length": 297,
-  "base_module_sha256": "b2575e4967c7d52fe4249e843b45d343d6304e70c8cfae7c36581a2e65fd51f7",
-  "consumer_length": 518,
-  "consumer_module_sha256": "67ec57e4a41fbd7f28c0e7608b2612d62af64c4e293be20f015a1fd425026395",
-  "bundle_length": 872,
-  "bundle_transport_sha256": "d4a0357ef1060c9d3d27b9b18ccc6389bab0dd0cb8d7ddd148996fa5eb8d015d",
+  "base_length": 293,
+  "base_module_sha256": "e04360ea115d3ba3ae96bf1bb33cfe27618edc7651750d86b7d84769f09ee6d0",
+  "consumer_length": 514,
+  "consumer_module_sha256": "320f6f4305e294773b0c4128e875d3b4bb3fc731886ae64765b2805801fe5246",
+  "bundle_length": 864,
+  "bundle_transport_sha256": "42dcbdc9eb3a14b1fcb1d86a3b51d33625869a4dbbb789a633f64ae3242765e3",
   "digest_domain_ascii": "io.frogfish.seki/module/scb0/sha256",
   "digest_domain_terminator_hex": "00"
 }

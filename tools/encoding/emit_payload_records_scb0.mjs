@@ -14,11 +14,11 @@ class Writer {
 const w = new Writer();
 const typeU32 = (out) => out.u8(4);
 const typeRef = (out, index) => { out.u8(0); out.u32(index); };
-const declared = (index) => (out) => { out.u8(22); typeRef(out, index); };
+const declared = (index) => (out) => { out.u8(21); typeRef(out, index); };
 const pairType = declared(0);
 const wrappedType = declared(1);
 const variantRef = (out, owner, tag) => { typeRef(out, owner); out.u32(tag); };
-const payloadType = (out) => { out.u8(21); variantRef(out, 1, 1); };
+const payloadType = (out) => { out.u8(20); variantRef(out, 1, 1); };
 const bounds = (out, steps, live, depth, workspace) => {
   out.u32(steps); out.u32(live); out.u32(depth); out.u32(workspace);
 };
@@ -80,7 +80,7 @@ w.seq([0, 1, 2], (value) => w.u32(value));
 w.u32(0); // exported kernels
 w.seq([0, 1, 2, 3], (value) => w.u8(value));
 w.seq([0], (value) => w.u8(value));
-w.u32(1048576); w.u32(1048576); w.u32(32); w.u32(4096);
+w.u32(1048576); w.u32(32); w.u32(4096);
 w.u32(65536); w.u32(256); w.u32(32); bounds(w, 16777216, 8388608, 256, 8388608);
 w.u32(0); w.seq([0, 1], (value) => w.u32(value));
 w.seq([0, 1, 2], (value) => w.u32(value));

@@ -112,6 +112,8 @@ const expectRejected = (name, bytes, reason) => {
   throw new Error(`${name}: bundle decoded; expected ${reason}`);
 };
 
+expectRejected("bundle-bytes-above-profile", Buffer.alloc(16777217), "0008");
+
 const parts = bundleParts(bundle);
 const baseDigest = moduleDigest(base);
 
@@ -152,7 +154,7 @@ badOrderConsumer.writeUInt32BE(1, functionOrderAt + 12);
 expectRejected("nonminimal-function-order", makeBundle(parts.root,
   [base, badOrderConsumer]), "0d04");
 
-const importedType = Buffer.from("16010000000000000000", "hex");
+const importedType = Buffer.from("15010000000000000000", "hex");
 const importedTypeAt = consumer.indexOf(importedType);
 if (importedTypeAt < 0) throw new Error("imported type target absent");
 const badImportIndexConsumer = Buffer.from(consumer);
@@ -204,4 +206,4 @@ const renamedBase = (index) => replaceAll(base, Buffer.from("base", "ascii"),
     makeBundle(moduleIdentityBytes(graph.at(-1)), graph), "040b");
 }
 
-console.log("scb0_import_bundle=verified positive=1 hostile=14");
+console.log("scb0_import_bundle=verified positive=1 hostile=15");

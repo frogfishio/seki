@@ -8,6 +8,7 @@ one targeted mutation at a time:
 
 | Mutation | Expected reason |
 | --- | --- |
+| module envelope exceeds the profile byte ceiling | `0000 module_envelope_bytes_ceiling_exceeded` |
 | bad magic | `0001 bad_magic` |
 | unsupported SCB version | `0002 unsupported_scb_version` |
 | bundle kind supplied to module decoder | `0003 wrong_object_kind` |

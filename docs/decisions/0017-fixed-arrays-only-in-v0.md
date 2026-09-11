@@ -27,12 +27,12 @@ do not need rules for a runtime collection length or semantically inactive
 storage. Unchecked indexing remains absent.
 
 `VecLength`, `VecGet`, and `FilterBounded` leave the v0 typed core. Array access
-and bounded array traversal remain candidates. `MapBounded` becomes an
-array-only operation and should be renamed during the schema cleanup so its name
-does not imply a general collection abstraction.
+and bounded array traversal remain. The traversal nodes are named `ArrayFold`,
+`ArrayFindUnique`, `ArrayAll`, `ArrayAny`, and `ArrayMap`; their names do not
+imply a general collection abstraction.
 
-The candidate-selection fixture must model its bounded input with fixed slots,
-most likely `Array[Option[Candidate], 32]`, and define the treatment of absent
-slots explicitly. Existing SCB-0 tags and fixtures that mention bounded vectors
-are provisional and will be regenerated; no compatibility is promised before
-the F1-B encoding freeze.
+The candidate-selection fixture models its input as an exact
+`Array[Candidate, 32]`. An interface that admits absent slots must represent them
+explicitly, for example with `Array[Option[Candidate], 32]`. The affected SCB-0
+tags and fixtures were regenerated; no compatibility is promised before the
+F1-B encoding freeze.

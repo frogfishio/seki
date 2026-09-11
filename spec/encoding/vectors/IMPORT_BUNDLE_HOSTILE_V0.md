@@ -5,6 +5,7 @@
 
 | Mutation | Expected reason |
 | --- | --- |
+| bundle envelope exceeds the profile byte ceiling | `0008 bundle_total_bytes_ceiling_exceeded` |
 | change valid dependency bytes without updating import | `0405 imported_digest_mismatch` |
 | substitute the consumer's claimed import digest | `0405 imported_digest_mismatch` |
 | remove the dependency envelope | `0401 missing_dependency_module` |

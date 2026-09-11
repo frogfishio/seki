@@ -16,14 +16,14 @@ For the constructs actually used by those fixtures it:
 - reopens imported function signatures rather than trusting a copied summary;
 - checks de Bruijn locals, record projection ownership, equality operands, call
   arguments/results, record construction, payload-bearing variant construction,
-  pure and kernel matches, payload binders, `FindUnique` blocks, rejection
+  pure and kernel matches, payload binders, `ArrayFindUnique` blocks, rejection
   identity, and rejection precedence;
 - derives semantic value widths from declarations; and
 - independently reconstructs logical steps, maximum live value bits, evaluator
   depth, and intrinsic workspace.
 
 The reconstructed candidate-selection kernel tuple is exactly
-`{212, 19379, 8, 201}`. The imported functions reconstruct as:
+`{212, 19361, 8, 201}`. The imported functions reconstruct as:
 
 | Function | Steps | Live bits | Depth | Workspace bits |
 | --- | ---: | ---: | ---: | ---: |
@@ -48,22 +48,23 @@ different branch types, unsigned negation, and a non-`U32` shift count. The
 policy mutation operates on canonical module bytes.
 
 The construction/access fixture adds `Let`, tuples, both `Option` constructors,
-both `Result` constructors, array access, bounded-vector access, and
-bounded-vector length. Four hostile cases reject a collection-family mismatch,
-a false option item claim, an out-of-scope let local, and a tuple shape mismatch.
-The collection and option cases mutate canonical module bytes.
+both `Result` constructors, array access, and `Index`. Four hostile cases reject
+a non-array collection, a false option item claim, an out-of-scope let local,
+and a tuple shape mismatch. The option case mutates canonical module bytes.
 
-The traversal fixture adds `Fold`, `All`, `Any`, array/vector `MapBounded`, and
-array/vector `FilterBounded`. It independently checks capacity-multiplied steps,
+The traversal fixture adds `ArrayFold`, `ArrayAll`, `ArrayAny`, and `ArrayMap`.
+It independently checks static-length-multiplied steps,
 block frames and parameter slots, accumulator/state workspace, and partial-output
 workspace. Four hostile cases reject a changed traversal result family, an
-invalid fold block, a step count that omits static-capacity work, and map
+invalid fold block, a step count that omits static-length work, and map
 workspace that omits its output buffer. The family mutation operates on
 canonical module bytes.
 
 The kernel-conditional fixture completes positive coverage of the six
-kernel-control tags. Its hostile case rejects a non-Boolean `KernelIf` condition.
-The separate machine-checked coverage ledger now accounts for all 69 tagged
+kernel-control tags and supplies the positive publication-coupling case. Three
+hostile cases reject a non-Boolean `KernelIf` condition and independently remove
+the required publication claim and equivalence obligation.
+The separate machine-checked coverage ledger now accounts for all 65 tagged
 types, declarations, pure terms, and kernel terms with positive fixture evidence.
 The closure fixture supplies the former eleven gaps.
 
@@ -80,7 +81,7 @@ reconstructs callable depths one, two, and three. Three hostile cases cover the
 associated module and call-depth ceilings.
 
 All semantic bound naturals are now checked against the SCB-0 `U32` domain.
-Value-width multiplication and capacity-expanded traversal steps have explicit
+Value-width multiplication and static-length-expanded traversal steps have explicit
 overflow hostiles; overflow reports `0b00` before exact-bound mismatch.
 
 Type formation now rechecks zero `Index` bounds, SHA-256 digest length, empty and
@@ -89,21 +90,21 @@ recursive declarations, duplicate variant case names, forbidden public
 cover the rules. V0 equality is explicitly defined for every well-formed member
 of its closed value-type sum and therefore checks exact normalized type identity.
 
-The `c11_bounded@1` policy rejects empty bytes, tuples, arrays, and bounded
-vectors with `0608`, and rejects any single semantic value wider than the
-profile live-value ceiling with `0607`. A nominal accepts every otherwise
+The `c11_bounded@1` policy rejects empty bytes, tuples, and arrays with `0608`,
+and rejects any single semantic value wider than the profile live-value ceiling
+with `0607`. A nominal accepts every otherwise
 well-formed public v0 type, so the unused `invalid_nominal_representation` reason
 was removed rather than preserving an unreachable failure.
 
 ## Boundary of the result
 
 Most hostile cases deliberately mutate freshly decoded objects after structural
-and digest validation. This isolates the semantic layer; two cases now mutate
+and digest validation. This isolates the semantic layer; six cases now mutate
 SCB-0 bytes, but the suite is not yet a standalone hostile-vector corpus. The
-checker implements only the term forms reached by the seven current fixtures. In
-particular, it does not yet cover all construction forms, every
-comparison/arithmetic combination, the remaining bounded intrinsic families,
-module ceilings, or profile ceilings.
+checker has positive fixture evidence for all 65 tagged forms and enforces the
+current module/profile ceilings. Publication eligibility now requires both the
+publication claim and equivalence theorem requirement. Coverage remains
+fixture-bounded rather than a proof of admission completeness.
 
 The checker is ordinary unverified JavaScript. Agreement with hand-derived
 fixtures is useful design feedback, not evidence that the checker or the draft
@@ -112,6 +113,6 @@ cost algebra is correct.
 ## Conclusion
 
 The current type identity and resource recurrence survive their first composed
-implementation tests. The remaining broad rules are source-input ceiling meaning
-and publication declaration coupling, continuing to add byte-level hostile vectors before
-translating frozen rules into Lean.
+implementation tests. The enumerated broad rule-gap ledger is now empty;
+byte-level hostile-vector work still precedes translation of frozen rules into
+Lean.

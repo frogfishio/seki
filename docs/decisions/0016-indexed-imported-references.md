@@ -22,7 +22,8 @@ Source aliases remain elaboration-only and do not enter typed core.
 
 The first two-module fixture made the redundancy measurable. Repeating identity
 and digest bytes produced a 1,168-byte consumer. Indirection through the already
-canonical, digest-bound import table reduced it to 518 bytes, a 56% reduction,
+canonical, digest-bound import table reduced it by roughly 56%; after the later
+`ModuleBounds` simplification the consumer is 514 bytes,
 while retaining exactly the same authority relationship.
 
 ## Consequences
@@ -34,4 +35,3 @@ required kind. Transitive imports remain invisible.
 
 Reordering imports changes reference meaning, but canonical `ModuleId` order
 fixes one import table order and therefore one byte representation.
-

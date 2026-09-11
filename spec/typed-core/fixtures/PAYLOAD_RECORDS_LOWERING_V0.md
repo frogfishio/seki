@@ -26,5 +26,5 @@ order is `leftOrZero`, `makePair`, `wrapPair`.
 payload, for 65 bits. The payload match arm receives one fresh 64-bit
 `VariantPayload(Wrapped::Pair)` slot; it does not bind the two fields separately.
 
-The emitted module is 753 bytes and has domain-separated module digest
-`3406e18ebc7c20cd34561841cba1d1ba39760f798a1fe8bc8930e9ca538e1c0a`.
+The emitted module is 749 bytes and has domain-separated module digest
+`7b356852545a508404351a8dc6e0c6a417d9101ef8249c453795d89c2dd633e4`.

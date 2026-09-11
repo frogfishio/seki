@@ -173,7 +173,7 @@ const fieldRef = (reader, path) =>
   [fieldOwnerRef(reader, `${path}/owner`), reader.u32(`${path}/field_index`)];
 
 const typeValue = (reader, path) => {
-  const tag = knownTag(reader, `${path}/tag`, 22);
+  const tag = knownTag(reader, `${path}/tag`, 21);
   switch (tag) {
     case 11: return [tag, reader.u32(`${path}/length`)];
     case 12: return [tag, domainRef(reader, `${path}/domain`),
@@ -188,12 +188,10 @@ const typeValue = (reader, path) => {
       typeValue(reader, p))];
     case 18: return [tag, typeValue(reader, `${path}/item`),
       reader.u32(`${path}/length`)];
-    case 19: return [tag, typeValue(reader, `${path}/item`),
-      reader.u32(`${path}/capacity`)];
-    case 20: return [tag, typeValue(reader, `${path}/accepted`),
+    case 19: return [tag, typeValue(reader, `${path}/accepted`),
       typeValue(reader, `${path}/rejection`)];
-    case 21: return [tag, variantRef(reader, `${path}/case`)];
-    case 22: return [tag, typeRef(reader, `${path}/reference`)];
+    case 20: return [tag, variantRef(reader, `${path}/case`)];
+    case 21: return [tag, typeRef(reader, `${path}/reference`)];
     default: return [tag];
   }
 };
@@ -226,7 +224,7 @@ const expression = (reader, path) => ({
 });
 
 const term = (reader, path) => {
-  const tag = knownTag(reader, `${path}/tag`, 35);
+  const tag = knownTag(reader, `${path}/tag`, 32);
   const expr = (field) => expression(reader, `${path}/${field}`);
   switch (tag) {
     case 0: return [tag];
@@ -272,11 +270,10 @@ const term = (reader, path) => {
         (p) => expression(reader, `${p}/body`))];
     case 26: return [tag, functionRef(reader, `${path}/function`),
       sequence(reader, `${path}/arguments`, (p) => expression(reader, p))];
-    case 27: case 29: return [tag, expr("collection"), expr("index")];
-    case 28: return [tag, expr("collection")];
-    case 30: return [tag, expr("collection"), expr("initial"),
+    case 27: return [tag, expr("collection"), expr("index")];
+    case 28: return [tag, expr("collection"), expr("initial"),
       block(reader, `${path}/step_block`)];
-    case 31: case 32: case 33: case 34: case 35:
+    case 29: case 30: case 31: case 32:
       return [tag, expr("collection"), block(reader, `${path}/block`)];
     default: throw new Error("unreachable term tag");
   }
@@ -333,7 +330,7 @@ const kernelBody = (reader, path) => ({
 });
 
 const localTypeDependencies = (type, result) => {
-  if (type[0] === 22 && type[1][0] === 0) result.add(type[1][1]);
+  if (type[0] === 21 && type[1][0] === 0) result.add(type[1][1]);
   for (const value of type.slice(1)) {
     if (Array.isArray(value) && typeof value[0] === "number") {
       localTypeDependencies(value, result);
@@ -454,7 +451,6 @@ const parseModulePayload = (reader) => {
   const claims = setSequence(reader, "module/claim_ceiling",
     (p) => knownTag(reader, p, 7));
   const moduleBounds = [
-    reader.u32("module/bounds/maximum_input_bytes"),
     reader.u32("module/bounds/maximum_typed_core_bytes"),
     reader.u32("module/bounds/maximum_imports"),
     reader.u32("module/bounds/maximum_declarations"),
@@ -487,7 +483,7 @@ const parseModulePayload = (reader) => {
 };
 
 export const decodeModule = (bytes) => {
-  if (bytes.length > 16777216) fail("0000", "envelope");
+  if (bytes.length > 1048576) fail("0000", "envelope");
   if (bytes.length < 13) fail("0005", "envelope");
   if (!bytes.subarray(0, 4).equals(Buffer.from("SEKI", "ascii"))) {
     fail("0001", "envelope/magic");
@@ -531,10 +527,10 @@ const validateTypeImports = (type, module, byIdentity, path) => {
     case 12:
       resolveImported(module, type[1], "domains", byIdentity, `${path}/domain`);
       break;
-    case 15: case 18: case 19:
+    case 15: case 18:
       validateTypeImports(type[1], module, byIdentity, `${path}/item`);
       break;
-    case 16: case 20:
+    case 16: case 19:
       validateTypeImports(type[1], module, byIdentity, `${path}/left`);
       validateTypeImports(type[2], module, byIdentity, `${path}/right`);
       break;
@@ -542,10 +538,10 @@ const validateTypeImports = (type, module, byIdentity, path) => {
       type[1].forEach((item, index) => validateTypeImports(item, module, byIdentity,
         `${path}/items/${index}`));
       break;
-    case 21:
+    case 20:
       resolveImported(module, type[1][0], "types", byIdentity, `${path}/case/owner`);
       break;
-    case 22:
+    case 21:
       resolveImported(module, type[1], "types", byIdentity, `${path}/reference`);
       break;
   }
@@ -611,7 +607,7 @@ const validateModuleImportedReferences = (module, byIdentity) => {
 };
 
 export const decodeBundle = (bytes) => {
-  if (bytes.length > 16777216) fail("0000", "envelope");
+  if (bytes.length > 16777216) fail("0008", "envelope");
   if (bytes.length < 13) fail("0005", "envelope");
   if (!bytes.subarray(0, 4).equals(Buffer.from("SEKI", "ascii"))) {
     fail("0001", "envelope/magic");

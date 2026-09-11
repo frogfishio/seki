@@ -17,7 +17,7 @@ export record Candidate {
 export record Input {
   wanted: CandidateId,
   currentEpoch: Epoch,
-  candidates: BoundedVec[Candidate, 32]
+  candidates: Array[Candidate, 32]
 }.
 
 export variant Rejection [

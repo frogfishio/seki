@@ -21,7 +21,7 @@ record Candidate {
 }
 
 record Input {
-  candidates   : BoundedVec[Candidate, 32]
+  candidates   : Array[Candidate, 32]
   currentEpoch : Epoch
   wanted       : CandidateId
 }
@@ -55,7 +55,7 @@ required theorems = [type_well_formed, totality, determinism,
 
 ```text
 KernelLet(
-  value = FindUnique(
+  value = ArrayFindUnique(
     collection = Project(Local[0 /* input */], Input.candidates),
     predicate = Block(Candidate -> Bool,
       Equal(
@@ -96,7 +96,7 @@ KernelLet(
 `Error`, `Ok`, `None`, and `Some` above abbreviate fully instantiated intrinsic
 `ConstructorRef` values. They are not declared `VariantRef` values.
 
-The first two rejection cases arise from mutually exclusive `FindUnique` result
+The first two rejection cases arise from mutually exclusive `ArrayFindUnique` result
 constructors rather than `KernelRequire` nodes. Every `KernelReject` and every
 `KernelRequire` carries the corresponding index in the declared total order.
 
@@ -110,8 +110,8 @@ constructors rather than `KernelRequire` nodes. Every `KernelReject` and every
 | One matching candidate with wrong epoch | `Decision::Reject(Stale)` |
 | One matching current disabled candidate | `Decision::Reject(Disabled)` |
 | Byte-equal identity from another nominal domain | admission/type rejection before evaluation |
-| Maximum logical vector length of 32 | defined decision within derived bounds |
-| Decoded vector length 33 | representation/admission rejection before evaluation |
+| Input contains exactly 32 candidate slots | defined decision within derived bounds |
+| Input has type `Array[Candidate, 33]` | admission/type rejection before evaluation |
 
 ## Binder rule exercised
 

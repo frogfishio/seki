@@ -33,5 +33,5 @@ Short-circuit `both` releases the left condition before evaluating the right.
 Its maximum live-value count is therefore three bits, not the five bits a strict
 two-child schedule would derive.
 
-The emitted module is 1,072 bytes and has domain-separated module digest
-`9c62caef27938c9331f70515699e582c1dce4b304343c6104ef11b1f658a3a3d`.
+The emitted module is 1,068 bytes and has domain-separated module digest
+`3d578a0e354a3f604fa0977cd22bca322e4c1b910649433ba2342c5129af92f4`.

@@ -13,5 +13,5 @@ a three-byte literal, `NotEqual`, `Not`, and `OrElse`. Its eight function bounds
 are reconstructed by the ordinary semantic checker; the largest is the
 256-bit digest identity function at 512 live bits.
 
-The emitted module is 872 bytes and has domain-separated module digest
-`cd10b01a2d09e760ecda5530b969cfc16fe818ad746da968efb005d3bdfe63c1`.
+The emitted module is 868 bytes and has domain-separated module digest
+`70a10bb1cec408ecf8986ed6cdc25cf7d222e5372b9871bf5060ce7345189124`.

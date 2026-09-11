@@ -7,8 +7,8 @@
 
 ## Result
 
-A new cursor-based decoder independently reopens the 149-byte minimal module and
-the 1,025-byte candidate-selection module. It parses every current type, term,
+A new cursor-based decoder independently reopens the 145-byte minimal module and
+the 1,021-byte candidate-selection module. It parses every current type, term,
 kernel-control, reference, declaration, module, and resource field; checks
 bounded lengths; enforces table and set order during traversal; and validates the
 candidate's least type-dependency schedule.

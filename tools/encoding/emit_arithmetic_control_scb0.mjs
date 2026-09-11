@@ -75,7 +75,7 @@ w.u32(0); w.u32(0); // exported domains, types
 w.seq([0, 1, 2, 3, 4, 5, 6, 7, 8], (value) => w.u32(value));
 w.u32(0); // exported kernels
 w.seq([0, 1, 2, 3], (value) => w.u8(value)); w.seq([0], (value) => w.u8(value));
-w.u32(1048576); w.u32(1048576); w.u32(32); w.u32(4096); w.u32(65536); w.u32(256); w.u32(32);
+w.u32(1048576); w.u32(32); w.u32(4096); w.u32(65536); w.u32(256); w.u32(32);
 bounds(w, 16777216, 8388608, 256, 8388608);
 w.u32(0); w.u32(0); // derivation schema, empty type order
 w.seq([0, 1, 2, 3, 4, 5, 6, 7, 8], (value) => w.u32(value));

@@ -10,8 +10,8 @@
 The ledger now assigns positional fields or local discriminants to every current
 authority-bearing v0 shape:
 
-- 23 `Type` cases and four type-declaration cases;
-- 36 pure `Term` cases and six tail `KernelExpr` cases;
+- 22 `Type` cases and four type-declaration cases;
+- 33 pure `Term` cases and six tail `KernelExpr` cases;
 - all reference, constructor-owner, arithmetic-policy, comparison, integer, and
   shift sums;
 - module identity, imports, exports, claims, theorem requirements, declarations,

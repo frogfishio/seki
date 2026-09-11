@@ -54,7 +54,7 @@ AppliedType     <- BuiltinTypeConstructor LBrack Trivia TypeArg
                    (Trivia Comma Trivia TypeArg)* Trivia RBrack
 BuiltinTypeConstructor <- ('Bytes' / 'Identity' / 'Digest' / 'Index'
                           / 'Option' / 'Result' / 'Tuple' / 'Array'
-                          / 'BoundedVec' / 'Decision') !IdentRest
+                          / 'Decision') !IdentRest
 TypeArg         <- TypeRef / TypeIdent / Nat
 QualifiedType   <- ValueIdent PathSep TypeIdent
 

@@ -27,8 +27,8 @@ a C byte-layout or native stack claim.
 - A producer cannot choose among several conservative resource claims.
 - Both larger and smaller claims than the recomputed tuple reject admission.
 - Short-circuit and branching costs use the worst executable branch.
-- Collection traversal is charged to static capacity even when runtime length or
-  early termination is smaller.
+- Array traversal is charged to static length even when early termination would
+  execute fewer iterations.
 - F2/F3 must separately prove how semantic slots, frames, and workspace map to C
   objects and concrete byte bounds.
 - Admission/proof-checker and host-tool resources require separate profiles.

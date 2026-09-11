@@ -40,14 +40,14 @@ value_bits(Epoch)       = 64
 value_bits(Candidate)   = 1 + 64 + 128 = 193
 
 counter_bits(32) = choice_bits(33) = 6
-value_bits(BoundedVec[Candidate, 32]) = 6 + 32*193 = 6182
-value_bits(Input) = 6182 + 64 + 128 = 6374
+value_bits(Array[Candidate, 32]) = 32*193 = 6176
+value_bits(Input) = 6176 + 64 + 128 = 6368
 
 tag_bits(max rejection tag 4) = 3
 value_bits(Rejection) = 3
 value_bits(Decision[Candidate, Rejection]) = 1 + max(193, 3) = 194
 
-FindUnique base workspace = counter_bits(32) + 2 + value_bits(Candidate)
+ArrayFindUnique base workspace = counter_bits(32) + 2 + value_bits(Candidate)
                           = 6 + 2 + 193
                           = 201
 ```

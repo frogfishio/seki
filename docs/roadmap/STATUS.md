@@ -35,36 +35,36 @@
   typed key orders, envelope, `U32` ceiling, and SHA-256 domain rule drafted;
   provisional admission tags, proofs, and hostile vectors remain open.
 - First experimental SCB-0 vector emitted independently by C11 and JavaScript;
-  the 149-byte minimal module agrees, and Node/OpenSSL independently agree on its
+  the 145-byte minimal module agrees, and Node/OpenSSL independently agree on its
   domain-separated SHA-256 digest.
 - Candidate-selection lowered completely to provisional SCB-0. Independent C11
-  and JavaScript emitters agree on 1,025 bytes and its digest; composition exposed
+  and JavaScript emitters agree on 1,021 bytes and its digest; composition exposed
   and corrected an invalid live-value ceiling and missing profile defaults.
-- Independent cursor decoder reopens both positive vectors; fifteen structural
+- Independent cursor decoder reopens both positive vectors; sixteen structural
   mutations now verify provisional rejection pairs and primary-error traversal.
 - Two-module bundle fixture reopens one exported type, imported function, local
-  call chain, exact digest closure, and nonempty function schedule; fourteen
+  call chain, exact digest closure, and nonempty function schedule; fifteen
   bundle mutations pass, including edge/depth profile ceilings. Indexed imports
   reduced the consumer by 56%.
 - Experimental semantic reconstruction accepts all three fixtures, reopens
   imported signatures, and independently reproduces their type and exact
   resource conclusions; eight isolated semantic hostile cases pass.
-- A fourth 753-byte fixture covers record construction, payload-bearing variants,
+- A fourth 749-byte fixture covers record construction, payload-bearing variants,
   the single payload binder, payload-owned projection, and pure exhaustive match;
   three additional hostile cases pass, including two byte mutations.
-- A fifth 1,072-byte fixture covers explicit arithmetic-policy result rules,
+- A fifth 1,068-byte fixture covers explicit arithmetic-policy result rules,
   signed negation, conversion, shifts, comparison, short-circuit Boolean control,
   and pure `If`; four additional semantic hostile cases pass.
-- A sixth 975-byte fixture covers `Let`, tuples, intrinsic sum constructors, and
-  constant-time array/vector access; four additional hostile cases pass,
-  including two byte mutations.
-- A seventh 930-byte fixture covers `Fold`, `All`, `Any`, array/vector map, and
-  array/vector filter, including static-capacity step expansion and intrinsic
+- A sixth 859-byte fixture covers `Let`, tuples, intrinsic sum constructors,
+  `Index`, and constant-time array access; four additional hostile cases pass,
+  including one byte mutation.
+- A seventh 597-byte fixture covers array fold, Boolean predicates, and map,
+  including static-length step expansion and intrinsic
   workspace; four additional hostile cases pass.
-- An eighth 354-byte fixture completes positive coverage of all six kernel-control
-  tags. A checked 69-tag semantic coverage ledger records 58 positive forms,
+- An eighth 352-byte fixture completes positive coverage of all six kernel-control
+  tags. A checked 65-tag semantic coverage ledger records 54 positive forms,
   eleven positive-evidence gaps, and seven broader rule gaps.
-- A ninth 872-byte fixture closes all eleven tagged-form gaps; all 69 tags now
+- A ninth 868-byte fixture closes all eleven tagged-form gaps; all 65 tags now
   have positive canonical evidence. Initial module/profile ceiling enforcement
   adds four hostile cases.
 - Canonical structural observations now enforce expression-node count, syntax
@@ -77,9 +77,18 @@
   recursive declarations, duplicate case names, internal payload placement, and
   alias expansion. V0 equality now explicitly admits every well-formed value
   type by exact normalized identity.
-- The profile now rejects four redundant empty storage forms, caps every semantic
+- The profile now rejects three redundant empty storage forms, caps every semantic
   value by maximum live bits, and admits any otherwise well-formed public nominal
-  representation; five additional profile/type hostile cases pass.
+  representation; four additional profile/type hostile cases pass.
+- V0 collections are now fixed arrays only. The bounded-vector type and three
+  associated operations were removed; SCB-0 now has 65 fully covered semantic
+  tags.
+- The uncheckable `maximum_input_bytes` field was removed from typed core and
+  SCB-0. Source-file limits are host-tool safeguards; runtime byte bounds require
+  a future explicit interchange encoding.
+- Publication eligibility now requires both the publication claim and the
+  publication-equivalence theorem obligation. Two independent hostile cases
+  exercise the coupling, and the enumerated semantic rule-gap ledger is empty.
 - Conservative C11 engineering standard and `make check` entry point added.
 
 ## Active work
@@ -90,10 +99,8 @@ immediate execution queue in the delivery plan and record its owner here.
 ## Next unblocked tasks
 
 1. F0-01 — independent consumer decision and reviewer selection.
-2. F1-A/F1-C bootstrap design — resolve the meaning and authority boundary of
-   `maximum_input_bytes`, then implement publication declaration coupling.
-3. B0-08/B0-09 — exact Lean and Rocq source locks.
-4. B0-10 — CompCert acquisition and use profile.
+2. B0-08/B0-09 — exact Lean and Rocq source locks.
+3. B0-10 — CompCert acquisition and use profile.
 
 ## Open decisions and blockers
 

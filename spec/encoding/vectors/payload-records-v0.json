@@ -2,8 +2,8 @@
   "schema": "io.frogfish.seki/scb0-module-vector@0",
   "status": "experimental-not-frozen",
   "fixture": "payload-records-v0",
-  "length": 753,
-  "module_sha256": "3406e18ebc7c20cd34561841cba1d1ba39760f798a1fe8bc8930e9ca538e1c0a",
+  "length": 749,
+  "module_sha256": "7b356852545a508404351a8dc6e0c6a417d9101ef8249c453795d89c2dd633e4",
   "digest_domain_ascii": "io.frogfish.seki/module/scb0/sha256",
   "digest_domain_terminator_hex": "00"
 }

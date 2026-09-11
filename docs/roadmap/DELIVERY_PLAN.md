@@ -258,7 +258,7 @@ them rather than trust them.
 #### F1-D: Lean evaluator and libraries
 
 Deliver executable semantics for primitives, records, variants, options, results,
-tuples, bounded collections, conditionals, matches, calls, arithmetic policies,
+tuples, fixed arrays, conditionals, matches, calls, arithmetic policies,
 and kernel decisions. Add the proved bounded graph-traversal library only after
 the simpler collection basis is stable.
 
@@ -273,7 +273,7 @@ Use the fixture-independent candidate-selection kernel. Required cases include:
 - stale epoch;
 - disabled candidate;
 - substituted nominal identity;
-- maximum valid capacity;
+- maximum valid array length;
 - oversized decoded input; and
 - multiple simultaneous failures proving rejection precedence.
 
@@ -551,15 +551,13 @@ The next tasks, in dependency order, are:
    reopens imported signatures, expression types, kernel decisions, and exact
    resource tuples over the three current positive fixtures and eight isolated
    semantic hostile cases.
-8. **Record/payload and arithmetic/control slices completed experimentally.**
-   The construction/access slice is also complete experimentally. Continue with
-   Capacity-expanding traversal and workspace recurrence are also complete
-   experimentally. Kernel-control coverage and the checked node audit are now
-   complete, and all 69 tags now have positive evidence. Initial module/profile
-   tuple and structural module checks are implemented, and bundle graph ceilings
-   have constructive vectors, checked `U32` bound arithmetic is implemented, and
-   fixed type-formation/equality and empty-form profile rules are checked. Resolve
-   the source-input ceiling boundary before implementing publication coupling.
+8. **Semantic bootstrap slices completed experimentally.** Record/payload,
+   arithmetic/control, construction/access, array traversal, workspace,
+   kernel-control, and the checked node audit are complete; all 65 tags have
+   positive evidence. Module/profile and bundle-graph ceilings, checked `U32`
+   bound arithmetic, fixed type formation/equality, empty-form policy, source-byte
+   authority, and publication coupling now have explicit rules and executable
+   checks. This is fixture evidence, not a proof or admission freeze.
 9. Assemble the F0 review packet and request the exact scoped response.
 
 Tasks 3–8 are bootstrap/specification work and may proceed while F0 is open. No

@@ -9,17 +9,8 @@ arithmetic: checked [ items all: [ :item | item ] ].
 export fn any items: Array[Bool, 4] -> Bool
 arithmetic: checked [ items any: [ :item | item ] ].
 
-export fn filterArray items: Array[U32, 4] -> BoundedVec[U32, 4]
-arithmetic: checked [ items filter: [ :item | true ] ].
-
-export fn filterVec items: BoundedVec[U32, 4] -> BoundedVec[U32, 4]
-arithmetic: checked [ items filter: [ :item | true ] ].
-
 export fn fold items: Array[U32, 4] initial: U32 -> U32
 arithmetic: checked [ items fold: initial with: [ :accumulator :item | accumulator ] ].
 
 export fn mapArray items: Array[U32, 4] -> Array[U32, 4]
-arithmetic: checked [ items mapBounded: [ :item | item ] ].
-
-export fn mapVec items: BoundedVec[U32, 4] -> BoundedVec[U32, 4]
-arithmetic: checked [ items mapBounded: [ :item | item ] ].
+arithmetic: checked [ items map: [ :item | item ] ].

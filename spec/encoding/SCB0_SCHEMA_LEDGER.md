@@ -68,10 +68,10 @@ Type:
   12 Identity(domain,length)
   13 Digest(algorithm,length)
   14 Index(bound)        15 Option(item)         16 Result(ok,error)
-  17 Tuple(items)        18 Array(item,length)   19 BoundedVec(item,capacity)
-  20 Decision(accepted,rejection)
-  21 VariantPayload(case)
-  22 Declared(reference)
+  17 Tuple(items)        18 Array(item,length)
+  19 Decision(accepted,rejection)
+  20 VariantPayload(case)
+  21 Declared(reference)
 
 TypeDeclBody: alias=0, nominal=1, record=2, variant=3
 ```
@@ -130,14 +130,11 @@ Term:
   25 Match(scrutinee,arms)
   26 Call(function,arguments)
   27 ArrayGet(collection,index)
-  28 VecLength(collection)
-  29 VecGet(collection,index)
-  30 Fold(collection,initial,step_block)
-  31 FindUnique(collection,predicate_block)
-  32 All(collection,predicate_block)
-  33 Any(collection,predicate_block)
-  34 MapBounded(collection,map_block)
-  35 FilterBounded(collection,predicate_block)
+  28 ArrayFold(collection,initial,step_block)
+  29 ArrayFindUnique(collection,predicate_block)
+  30 ArrayAll(collection,predicate_block)
+  31 ArrayAny(collection,predicate_block)
+  32 ArrayMap(collection,map_block)
 ```
 
 `Expr` encodes `claimed_type, term`. `Block` encodes `parameters, result, body`.
@@ -186,7 +183,7 @@ ResourceBounds:
   maximum_workspace_bits
 
 ModuleBounds:
-  maximum_input_bytes, maximum_typed_core_bytes, maximum_imports,
+  maximum_typed_core_bytes, maximum_imports,
   maximum_declarations, maximum_expression_nodes, maximum_nesting,
   maximum_call_depth, maximum_resource_bounds
 

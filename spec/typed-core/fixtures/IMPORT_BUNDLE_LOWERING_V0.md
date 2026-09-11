@@ -24,7 +24,7 @@ The import table has one entry at index zero:
 
 ```text
 imports[0]: seki::fixtures::base @ 1
-  sha256 b2575e4967c7d52fe4249e843b45d343d6304e70c8cfae7c36581a2e65fd51f7
+  sha256 e04360ea115d3ba3ae96bf1bb33cfe27618edc7651750d86b7d84769f09ee6d0
 ```
 
 Every imported `Token` type is `ImportedTypeRef(0, 0)`. The call to `keep` is
@@ -50,12 +50,12 @@ Modules are encoded in identity order `base`, then `consumer`; the designated
 root is `consumer`.
 
 ```text
-base module:      297 bytes
-base digest:      b2575e4967c7d52fe4249e843b45d343d6304e70c8cfae7c36581a2e65fd51f7
-consumer module:  518 bytes
-consumer digest:  67ec57e4a41fbd7f28c0e7608b2612d62af64c4e293be20f015a1fd425026395
-bundle:           872 bytes
-bundle SHA-256:   d4a0357ef1060c9d3d27b9b18ccc6389bab0dd0cb8d7ddd148996fa5eb8d015d
+base module:      293 bytes
+base digest:      e04360ea115d3ba3ae96bf1bb33cfe27618edc7651750d86b7d84769f09ee6d0
+consumer module:  514 bytes
+consumer digest:  320f6f4305e294773b0c4128e875d3b4bb3fc731886ae64765b2805801fe5246
+bundle:           864 bytes
+bundle SHA-256:   42dcbdc9eb3a14b1fcb1d86a3b51d33625869a4dbbb789a633f64ae3242765e3
 ```
 
 The last hash is only an experimental transport fingerprint. It is not a
@@ -67,4 +67,3 @@ The emitter and structural decoder agree on this bundle. The decoder validates
 identity closure, profiles, cycles, module digests, exported imported references,
 and both dependency schedules. It does not yet recompute full static types or
 resource bounds, so this is not an admitted bundle.
-

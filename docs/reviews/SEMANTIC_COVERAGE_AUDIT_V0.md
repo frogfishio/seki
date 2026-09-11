@@ -7,9 +7,9 @@
 
 ## Result
 
-The SCB-0 schema currently contains 69 tagged semantic forms: 23 types, four
-declaration bodies, 36 pure terms, and six kernel-control terms. The checked
-ledger now records positive fixture evidence for all 69 forms and no tagged-form
+The SCB-0 schema currently contains 65 tagged semantic forms: 22 types, four
+declaration bodies, 33 pure terms, and six kernel-control terms. The checked
+ledger now records positive fixture evidence for all 65 forms and no tagged-form
 gaps.
 
 The closure fixture added `BytesLit`, `NotEqual`, `Not`, `OrElse`, `Alias`, `U8`,
@@ -23,11 +23,11 @@ silently.
 
 ## Rule-level gaps
 
-Tagged-node coverage does not establish admission completeness. Two larger
-rule families remain open:
-
-1. source-input byte ceiling binding;
-2. publication declaration coupling.
+Tagged-node coverage does not establish admission completeness. The current
+enumerated rule-gap ledger is empty after placing source-byte limits outside
+typed-core authority and defining
+publication declaration coupling. This is an inventory result, not a proof that
+the inventory itself is complete.
 
 The ledger checker freezes the inventory shape and tag/name correspondence. It
 will fail when a schema tag is omitted, reordered, or silently renamed. It does
@@ -44,6 +44,6 @@ arithmetic now rejects width and traversal-step overflow as `0b00` before stored
 tuple comparison. Fixed type-formation rules now reject zero `Index`, invalid
 SHA-256 length, empty variants, recursive declarations, duplicate case names, public
 `VariantPayload`, and unexpanded alias references. The remaining type-policy
-questions are now resolved: the profile rejects the four empty storage forms,
+questions are now resolved: the profile rejects the three empty storage forms,
 bounds every single semantic value by its live-value ceiling, and permits any
 otherwise well-formed public type as a nominal representation.

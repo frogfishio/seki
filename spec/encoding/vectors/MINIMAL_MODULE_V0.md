@@ -16,7 +16,6 @@ Module {
   exports: all empty,
   required_theorems/claim_ceiling: empty,
   declared_module_ceiling: {
-    maximum_input_bytes: 0,
     maximum_typed_core_bytes: 1024,
     every other quantity: 0
   },
@@ -24,9 +23,9 @@ Module {
 }
 ```
 
-The complete envelope is 149 octets and its payload is 136 octets (`0x88`). The
+The complete envelope is 145 octets and its payload is 132 octets (`0x84`). The
 recorded digest is SHA-256 over the specified ASCII domain, one zero octet, and
-the complete 149-octet module envelope.
+the complete 145-octet module envelope.
 
 The vector establishes agreement about current field order, zero-octet singleton
 values, empty sequences, framing, and digest domain separation. It does not yet
@@ -38,4 +37,3 @@ Run:
 ```sh
 make check-encoding-vectors
 ```
-

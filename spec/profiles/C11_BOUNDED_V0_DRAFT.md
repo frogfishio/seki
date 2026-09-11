@@ -25,7 +25,6 @@ maximum_bundle_modules:              32
 maximum_bundle_import_edges:          64
 maximum_bundle_dependency_depth:       8
 
-maximum_input_bytes:             1048576
 maximum_typed_core_bytes:        1048576
 maximum_imports:                      32
 maximum_declarations:               4096
@@ -49,8 +48,8 @@ Every admitted semantic value type has `value_bits(T) <= 8388608`. This applies
 even to a declaration not reached by a callable, preventing dead declarations
 from carrying values the profile can never evaluate.
 
-This profile rejects `Bytes[0]`, `Tuple[]`, `Array[T,0]`, and
-`BoundedVec[T,0]`. `Unit` is the single zero-payload value form. Avoiding
+This profile rejects `Bytes[0]`, `Tuple[]`, and `Array[T,0]`. `Unit` is the
+single zero-payload value form. Avoiding
 additional empty storage shapes removes zero-length-array and empty-aggregate
 cases from later ISO C representation proofs. `Option[Unit]`, variants, and
 other useful zero-payload choices remain available.
@@ -73,4 +72,4 @@ values must not exceed the module or profile resource tuple.
 
 - Decide whether to rename this semantic profile before identity freeze.
 - Validate the ceilings against the first Gnosis and Kiku kernels.
-- Separate semantic input bits from future encoded input-byte and C-layout bounds.
+- Specify any future runtime interchange encoding and its byte bounds separately.

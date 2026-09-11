@@ -248,15 +248,14 @@ Type ::= Unit
        | Result(ok: Type, error: Type)
        | Tuple(items: Vec[Type])
        | Array(item: Type, length: Nat)
-       | BoundedVec(item: Type, capacity: Nat)
        | Decision(accepted: Type, rejection: Type)
        | VariantPayload(case: VariantRef)
        | Declared(reference: TypeRef)
 ```
 
 All natural parameters must fit the selected profile and participate in type
-identity. `Index[0]` is invalid. Empty byte strings, arrays, tuples, and bounded
-vectors remain profile decisions; they are not inferred from host behavior.
+identity. `Index[0]` is invalid. Empty byte strings, arrays, and tuples remain
+profile decisions; they are not inferred from host behavior.
 `Digest(sha256, length)` requires `length = 32` in v0.
 `VariantPayload` is an internal type for the canonical field record carried by
 one declared variant case; it cannot be named in surface signatures. A case with
@@ -374,7 +373,8 @@ digest-bound declarations.
 `publication_eligible` is a declaration of intended use, not permission to
 publish. It is valid only when `publication` is in the module claim ceiling and
 `publication_equivalence` is required. Publication still requires the later
-certificate and host protocol.
+certificate and host protocol. The implication is one-way: either module-level
+entry may be present while a kernel remains ineligible.
 
 Every function and kernel carries an explicit effective resource ceiling in
 typed core. A surface declaration that omits `bounded` inherits the selected
@@ -653,18 +653,15 @@ executes. More permissive semantic analysis is not part of v0 admission.
 This node makes rejection precedence structural rather than an incidental property
 of generated control flow.
 
-### 8.8 Bounded collection operations
+### 8.8 Bounded array operations
 
 ```text
 Term ::= ArrayGet(collection, index)
-       | VecLength(collection)
-       | VecGet(collection, index)
-       | Fold(collection, initial, step_block)
-       | FindUnique(collection, predicate_block)
-       | All(collection, predicate_block)
-       | Any(collection, predicate_block)
-       | MapBounded(collection, map_block)
-       | FilterBounded(collection, predicate_block)
+       | ArrayFold(collection, initial, step_block)
+       | ArrayFindUnique(collection, predicate_block)
+       | ArrayAll(collection, predicate_block)
+       | ArrayAny(collection, predicate_block)
+       | ArrayMap(collection, map_block)
 
 Block ::= {
   parameters: Vec[Type],
@@ -673,38 +670,31 @@ Block ::= {
 }
 ```
 
-Let `Collection[T, N]` mean either `Array[T, N]` or
-`BoundedVec[T, N]`. The v0 signatures are closed:
+The v0 signatures are closed:
 
 ```text
 ArrayGet(Array[T, N], U32) -> Option[T]
-VecLength(BoundedVec[T, N]) -> Index[N + 1]
-VecGet(BoundedVec[T, N], U32) -> Option[T]
-Fold(Collection[T, N], U, Block[U, T] -> U) -> U
-FindUnique(Collection[T, N], Block[T] -> Bool)
+ArrayFold(Array[T, N], U, Block[U, T] -> U) -> U
+ArrayFindUnique(Array[T, N], Block[T] -> Bool)
   -> Result[Option[T], Unit]
-All(Collection[T, N], Block[T] -> Bool) -> Bool
-Any(Collection[T, N], Block[T] -> Bool) -> Bool
-MapBounded(Array[T, N], Block[T] -> U) -> Array[U, N]
-MapBounded(BoundedVec[T, N], Block[T] -> U) -> BoundedVec[U, N]
-FilterBounded(Collection[T, N], Block[T] -> Bool) -> BoundedVec[T, N]
+ArrayAll(Array[T, N], Block[T] -> Bool) -> Bool
+ArrayAny(Array[T, N], Block[T] -> Bool) -> Bool
+ArrayMap(Array[T, N], Block[T] -> U) -> Array[U, N]
 ```
 
-`N + 1` must fit the selected profile. An index greater than or equal to the
-logical length returns `None`; arrays have logical length `N`. `Fold`, map, and
-filter traverse in increasing index order. Filter preserves relative order.
-`All` and `Any` may stop once their result is known. Their resource derivation
-still charges the complete static capacity.
+An index greater than or equal to `N` returns `None`. Array fold and map traverse
+in increasing index order. `ArrayAll` and `ArrayAny` may stop once their result
+is known. Their resource derivation still charges the complete static length.
 
 Blocks are embedded syntax, not values. Captures are de Bruijn references to
 immutable enclosing locals. A block cannot escape, be stored, compared, exported,
 or called except by its owning intrinsic.
 
-Traversal count derives from the static array length or bounded-vector capacity.
+Traversal count derives from the static array length.
 There is no early exit unless the intrinsic semantics explicitly define it and
 the bound derivation still accounts for the worst case.
 
-`FindUnique[T]` scans the complete logical collection and returns:
+`ArrayFindUnique[T]` scans the complete array and returns:
 
 ```text
 Result[Option[T], Unit]
@@ -717,7 +707,7 @@ Result[Option[T], Unit]
 Scanning the full collection prevents discovery order from incorrectly reporting
 one match before a later duplicate.
 
-`ArrayGet` and `VecGet` return `Option[T]`; unchecked indexing does not exist.
+`ArrayGet` returns `Option[T]`; unchecked indexing does not exist.
 
 ## 9. Bounds
 
@@ -730,7 +720,6 @@ ResourceBounds ::= {
 }
 
 ModuleBounds ::= {
-  maximum_input_bytes: Nat,
   maximum_typed_core_bytes: Nat,
   maximum_imports: Nat,
   maximum_declarations: Nat,
@@ -780,7 +769,7 @@ The module structural ceilings use one canonical syntactic observation:
 Node count is summed across local callable declarations. Nesting and call depth
 take the maximum. This separates source structure, evaluator-control depth, and
 call-graph depth instead of allowing one implementation-dependent stack notion.
-Traversal costs use static capacities, not runtime lengths. Hidden heap,
+Traversal costs use static array lengths. Hidden heap,
 recursive call stacks, or host callbacks are impossible in admitted expressions.
 
 ## 10. Evaluation result

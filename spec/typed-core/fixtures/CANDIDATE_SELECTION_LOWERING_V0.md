@@ -25,7 +25,7 @@ types:
   0 Candidate    = record(enabled: Bool, epoch: Declared[2], id: Declared[1])
   1 CandidateId  = nominal Identity[Domain[0], 16]
   2 Epoch        = nominal U64
-  3 Input        = record(candidates: BoundedVec[Declared[0], 32],
+  3 Input        = record(candidates: Array[Declared[0], 32],
                           currentEpoch: Declared[2], wanted: Declared[1])
   4 Rejection    = variant(1 Missing, 2 Duplicate, 3 Stale, 4 Disabled)
 
@@ -56,7 +56,7 @@ rejection_order:
    VariantRef(LocalTypeRef[4], 3), VariantRef(LocalTypeRef[4], 4)]
 
 declared_ceiling: { steps: 2048, live: 32768, depth: 64, workspace: 4096 }
-exact_derived_bounds: { steps: 212, live: 19379, depth: 8, workspace: 201 }
+exact_derived_bounds: { steps: 212, live: 19361, depth: 8, workspace: 201 }
 publication_eligible: false
 ```
 
@@ -97,10 +97,10 @@ Equal(Project(Local[0], Candidate.id), Project(Local[1], Input.wanted))
 = 1 + (1 + 1) + (1 + 1) = 5
 ```
 
-At capacity 32:
+At static length 32:
 
 ```text
-FindUnique = 1 + 2 + 32 * (1 + 5) = 195
+ArrayFindUnique = 1 + 2 + 32 * (1 + 5) = 195
 outer KernelMatch = 15
 KernelLet = 1 + 195 + 15 = 211
 callable root = 1 + 211 = 212
@@ -112,28 +112,28 @@ Relevant semantic widths are:
 
 ```text
 Candidate = 193
-BoundedVec[Candidate,32] = 6182
-Input = 6374
+Array[Candidate,32] = 6176
+Input = 6368
 CandidateId = 128
-FindUnique result = 195
+ArrayFindUnique result = 195
 ```
 
 The peak occurs in the predicate while its left identity result is retained and
 the right projection constructs a fresh identity result from a fresh local read:
 
 ```text
-enclosing input environment                         6374
-retained FindUnique collection                      6182
+enclosing input environment                         6368
+retained ArrayFindUnique array                      6176
 block parameter Candidate                            193
 retained left CandidateId                            128
-fresh Local read of Input                           6374
+fresh Local read of Input                           6368
 fresh right CandidateId                              128
                                                    -----
-                                                   19379 bits
+                                                   19361 bits
 ```
 
 This demonstrates why the original `liveBits: 4096` declaration was invalid even
-before encoding: the input alone is 6374 bits. The source ceiling is now 32768.
+before encoding: the input alone is 6368 bits. The source ceiling is now 32768.
 
 ## 7. Other exact conclusions
 
@@ -144,7 +144,7 @@ requirement, disabled requirement, accept node, and accepted local expression:
 maximum_control_depth = 8
 ```
 
-`FindUnique` is the only intrinsic workspace owner:
+`ArrayFindUnique` is the only intrinsic workspace owner:
 
 ```text
 counter_bits(32) + 2 + value_bits(Candidate) = 6 + 2 + 193 = 201
@@ -155,9 +155,9 @@ counter_bits(32) + 2 + value_bits(Candidate) = 6 + 2 + 193 = 201
 Independent C11 and JavaScript fixture emitters agree on the complete module:
 
 ```text
-envelope bytes: 1025
-payload bytes:  1012 (0x000003f4)
-module digest:  c3b30493bec34d241bf50298078ced60ca0c9586a42936bcf12ebc7203a81439
+envelope bytes: 1021
+payload bytes:  1008 (0x000003f0)
+module digest:  ebb22139f834cbf94913b9b7df3436340ef91827d26188284568a69f22dd0168
 ```
 
 Node and OpenSSL independently agree on the domain-separated SHA-256 digest. The
