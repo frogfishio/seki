@@ -29,17 +29,16 @@ precedence behavior.
 
 - The decoder constructs an experimental JavaScript object, not a verified Lean
   value.
-- It validates only the empty function dependency schedule exercised by current
-  fixtures.
-- It does not recompute expression types, resource tuples, imports, exports, or
-  kernel precedence semantics.
+- It now validates the nonempty function schedule and bundle/import structure
+  exercised by the later import fixture, but static semantics remain a separate
+  experimental pass rather than part of this structural decoder.
 - Mutation generation currently operates from recorded positive bytes rather
   than storing independent binary hostile artifacts.
 
-## Next work
+## Follow-up
 
-The next fixture should be a two-module bundle containing one exported type and
-one imported pure function. That forces module-envelope nesting, digest reopening,
-qualified imported references, export validation, import DAG ordering, and a
-nonempty function dependency schedule before more local expression work is added.
-
+The two-module import/export fixture now exercises module-envelope nesting,
+digest reopening, indexed qualified references, export validation, import DAG
+ordering, and a nonempty function dependency schedule. Its review is recorded
+separately. The first fixture-bounded static type and resource pass is recorded
+in `EXPERIMENTAL_TYPED_CORE_CHECKER_REVIEW.md`.

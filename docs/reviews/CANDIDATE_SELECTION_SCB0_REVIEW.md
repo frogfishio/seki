@@ -50,6 +50,5 @@ sets, resource tuples, and dependency schedules.
 
 The first serious composition test found two specification defects and fixed
 both rather than encoding around them. No additional missing SCB-0 field or sum
-case appeared. The next useful test is a small independent decoder plus targeted
-mutations, not a larger positive fixture.
-
+case appeared. The independent decoder and targeted mutations were completed in
+the following work package; no larger local-only positive fixture was needed.

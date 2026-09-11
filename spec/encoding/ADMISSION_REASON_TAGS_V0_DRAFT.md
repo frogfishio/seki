@@ -83,17 +83,16 @@ path. Implementations may report additional findings separately.
 0400 duplicate_module_identity
 0401 missing_dependency_module
 0402 unused_dependency_module
-0403 imported_digest_mismatch
-0404 imported_profile_mismatch
-0405 undeclared_direct_import
-0406 transitive_reference_not_visible
-0407 import_cycle
+0403 imported_profile_mismatch
+0404 import_cycle
+0405 imported_digest_mismatch
+0406 undeclared_direct_import
+0407 transitive_reference_not_visible
 0408 imported_declaration_not_exported
-0409 imported_declaration_wrong_kind
-040a imported_signature_mismatch
-040b bundle_module_count_mismatch
-040c bundle_import_edge_ceiling_exceeded
-040d bundle_dependency_depth_ceiling_exceeded
+0409 imported_signature_mismatch
+040a bundle_module_count_mismatch
+040b bundle_import_edge_ceiling_exceeded
+040c bundle_dependency_depth_ceiling_exceeded
 ```
 
 ### Layer `05` — declarations

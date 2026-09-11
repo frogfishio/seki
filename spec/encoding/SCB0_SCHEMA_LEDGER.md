@@ -52,8 +52,9 @@ SumTypeRef: declared_variant=0, intrinsic_option=1, intrinsic_result=2,
 ```
 
 `KernelRef`, `FieldRef`, `VariantRef`, and `ConstructorRef` are positional records,
-not tagged sums. Local indices are `U32`. Imported references encode `ModuleId`,
-`DigestId`, then the `U32` declaration index. Intrinsic constructor stable tags
+not tagged sums. Local indices are `U32`. Imported references encode the `U32`
+canonical import-table index followed by the `U32` declaration index. The table
+entry supplies exact identity and digest bytes. Intrinsic constructor stable tags
 are the `U32` forms of their language tags.
 
 ## 3. Type and declaration sums

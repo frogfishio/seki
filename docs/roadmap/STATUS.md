@@ -42,6 +42,12 @@
   and corrected an invalid live-value ceiling and missing profile defaults.
 - Independent cursor decoder reopens both positive vectors; fifteen structural
   mutations now verify provisional rejection pairs and primary-error traversal.
+- Two-module bundle fixture reopens one exported type, imported function, local
+  call chain, exact digest closure, and nonempty function schedule; twelve bundle
+  mutations pass. Indexed imports reduced the consumer by 56%.
+- Experimental semantic reconstruction accepts all three fixtures, reopens
+  imported signatures, and independently reproduces their type and exact
+  resource conclusions; eight isolated semantic hostile cases pass.
 - Conservative C11 engineering standard and `make check` entry point added.
 
 ## Active work
@@ -52,8 +58,9 @@ immediate execution queue in the delivery plan and record its owner here.
 ## Next unblocked tasks
 
 1. F0-01 — independent consumer decision and reviewer selection.
-2. F1-B bundle work — encode and reopen a two-module fixture with exported types,
-   an imported function, digest binding, and nonempty dependency schedules.
+2. F1-C bootstrap design — extend semantic reconstruction from the current
+   fixture subset to record/variant payloads, remaining control, arithmetic, and
+   bounded intrinsic families, each with byte-level hostile cases.
 3. B0-08/B0-09 — exact Lean and Rocq source locks.
 4. B0-10 — CompCert acquisition and use profile.
 

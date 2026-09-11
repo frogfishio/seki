@@ -14,6 +14,8 @@ check-encoding-vectors:
 	./tools/encoding/check_minimal_vector.sh
 	./tools/encoding/check_candidate_vector.sh
 	./tools/encoding/check_decoder_vectors.sh
+	./tools/encoding/check_import_bundle.sh
+	./tools/encoding/check_typed_core_vectors.sh
 
 check-diff:
 	git diff --check

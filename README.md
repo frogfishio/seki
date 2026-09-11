@@ -51,6 +51,10 @@ Current bootstrap records:
   — canonical static derivations by deterministic reconstruction
 - [`spec/typed-core/fixtures/CANDIDATE_SELECTION_LOWERING_V0.md`](spec/typed-core/fixtures/CANDIDATE_SELECTION_LOWERING_V0.md)
   — first complete experimental lowering and SCB-0 composition vector
+- [`spec/typed-core/fixtures/IMPORT_BUNDLE_LOWERING_V0.md`](spec/typed-core/fixtures/IMPORT_BUNDLE_LOWERING_V0.md)
+  — two-module digest-bound import and export fixture
+- [`docs/reviews/EXPERIMENTAL_TYPED_CORE_CHECKER_REVIEW.md`](docs/reviews/EXPERIMENTAL_TYPED_CORE_CHECKER_REVIEW.md)
+  — first fixture-bounded type and exact-resource reconstruction pass
 - [`docs/f0/INDEPENDENT_USE_CASE_REQUEST.md`](docs/f0/INDEPENDENT_USE_CASE_REQUEST.md)
   — materially different use-case review
 - [`docs/governance/PROJECT_CHARTER.md`](docs/governance/PROJECT_CHARTER.md)

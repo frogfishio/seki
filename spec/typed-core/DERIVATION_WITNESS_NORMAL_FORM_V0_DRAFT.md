@@ -16,7 +16,7 @@ Instead, the canonical core itself carries the conclusions needed for replay:
 - every `Expr` carries its proposed concrete type;
 - every callable carries its concrete signature, declared ceiling, and one exact
   derived resource tuple;
-- every imported use carries exact module identity and digest;
+- every imported use selects an exact identity-and-digest-bearing import entry;
 - every rejection site carries its exact precedence index; and
 - all rule selection follows from closed node discriminants.
 
@@ -125,4 +125,3 @@ from the module does not weaken SSDC-1.
 - assign final SCB-0 fields and tags; and
 - add hostile vectors for every malformed dependency order and mismatched stored
   conclusion.
-

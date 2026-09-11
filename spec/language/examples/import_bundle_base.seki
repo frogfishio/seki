@@ -1,0 +1,16 @@
+module seki::fixtures::base @ 1
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: type_well_formed, totality, determinism, resource_bounds.
+
+export record Token {
+  value: U32
+}.
+
+export fn keep value: Token
+-> Token
+arithmetic: checked
+bounded steps: 16 liveBits: 128 controlDepth: 8 workspaceBits: 0 [
+  value
+].
+

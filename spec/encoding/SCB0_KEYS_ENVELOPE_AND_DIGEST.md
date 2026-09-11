@@ -46,9 +46,10 @@ Type           = type tag, then case fields recursively
 ```
 
 Local reference cases compare their `U32` index. Imported cases compare
-`ModuleId`, `DigestId`, then index. SHA-256 digest octets compare unsigned and
-lexicographically. The order is structural and terminating because admitted
-types are finite and nonrecursive.
+`import_index`, then declaration index. Import-table keys still compare by
+`ModuleId`, and SHA-256 digest octets compare unsigned and lexicographically. The
+order is structural and terminating because admitted types are finite and
+nonrecursive.
 
 A table sequence must be strictly increasing under its declared key order.
 Equality or decrease rejects; the decoder never sorts it.

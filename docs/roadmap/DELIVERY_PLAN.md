@@ -547,10 +547,13 @@ The next tasks, in dependency order, are:
    rejection-precedence model.
 5. **B0-08/B0-09:** bind Lean and Rocq exact sources and licenses.
 6. **B0-10:** resolve the CompCert acquisition/use profile.
-7. Extend the experimental decoder with a two-module import/export fixture,
-   bundle reopening, digest validation, nonempty function schedules, and their
-   hostile vectors.
-8. Assemble the F0 review packet and request the exact scoped response.
+7. **Completed experimentally:** add a separate syntax-directed checker that
+   reopens imported signatures, expression types, kernel decisions, and exact
+   resource tuples over the three current positive fixtures and eight isolated
+   semantic hostile cases.
+8. Extend that checker one semantic family at a time, starting with record and
+   variant payload construction, and add canonical byte-level hostile cases.
+9. Assemble the F0 review packet and request the exact scoped response.
 
-Tasks 3–7 are bootstrap/specification work and may proceed while F0 is open. No
-F1 completion or authority claim may be made until task 8 closes the gate.
+Tasks 3–8 are bootstrap/specification work and may proceed while F0 is open. No
+F1 completion or authority claim may be made until task 9 closes the gate.

@@ -69,21 +69,26 @@ dependency module bytes. It does not resolve locations. It:
    dependency depth before or during bounded allocation;
 2. decodes every supplied module canonically;
 3. requires unique exact `ModuleId` values;
-4. recomputes every canonical module digest;
-5. requires every import identity and digest to match exactly one supplied module;
-6. rejects unused supplied modules, missing modules, substitutions, and profile
-   mismatches;
-7. requires one semantic profile across the v0 bundle;
-8. rejects cycles; and
+4. resolves every import identity against exactly one supplied module and rejects
+   missing or unused modules;
+5. requires one semantic profile across the v0 bundle;
+6. rejects import cycles from identities before inspecting claimed digests;
+7. recomputes every canonical module digest and rejects substitutions;
+8. validates imported export kinds, indices, and exact signatures; and
 9. admits modules in deterministic dependency order, then admits the root.
+
+Checking identity closure and cycles before digest equality makes every graph
+rejection constructive and testable without requiring a cryptographic fixed point
+for a cyclic pair of digest-bearing modules.
 
 The lockfile is useful build evidence but is not trusted by itself. Authority
 comes from reopening the actual bundled module bytes and their digests.
 
 ## 4. Qualified lookup
 
-An imported typed-core reference contains exact module identity, digest, and
-canonical declaration index. Admission verifies that:
+An imported typed-core reference contains a canonical import-table index and a
+canonical declaration index. The selected import-table entry supplies the exact
+module identity and digest. Admission verifies that:
 
 - the module is a direct declared import;
 - the digest matches both the import and supplied module;

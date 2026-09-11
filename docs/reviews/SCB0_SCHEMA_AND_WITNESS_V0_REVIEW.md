@@ -57,8 +57,8 @@ The candidate now has:
    and empty tables are handled identically by independent encoders.
 5. At least two implementations must agree on module, bundle, and digest bytes
    before any assignment freezes.
-6. A decoder independent of both fixture emitters must reopen the complete
-   candidate-selection vector and reject targeted mutations.
+6. The experimental decoder must grow from structural reopening into independent
+   type and resource recomputation over the composed fixtures.
 
 ## Conclusion
 

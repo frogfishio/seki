@@ -1,0 +1,21 @@
+module seki::fixtures::consumer @ 1
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: type_well_formed, totality, determinism, resource_bounds.
+
+use seki::fixtures::base @ 1 as base.
+
+export fn forward value: base::Token
+-> base::Token
+arithmetic: checked
+bounded steps: 32 liveBits: 256 controlDepth: 16 workspaceBits: 0 [
+  base::keep value: value
+].
+
+export fn twice value: base::Token
+-> base::Token
+arithmetic: checked
+bounded steps: 32 liveBits: 256 controlDepth: 16 workspaceBits: 0 [
+  forward value: (forward value: value)
+].
+

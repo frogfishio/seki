@@ -69,8 +69,9 @@ octets. Adding an algorithm requires a profile/version decision. Path spelling i
 case-sensitive ASCII. Empty components, `.`/`..`, alternate separators, Unicode
 normalization, and version ranges do not exist in typed core.
 
-Every reference crossing a module boundary includes the exact `ModuleId` and
-module digest. Ambient resolution is impossible.
+Every reference crossing a module boundary names a canonical local import-table
+index. That table entry contains the exact `ModuleId` and module digest. Ambient
+resolution is impossible, and repeating identity bytes at every use is avoided.
 
 ## 4. Module
 
@@ -161,15 +162,15 @@ in semantic identity.
 
 ```text
 TypeRef ::= LocalTypeRef(type_index)
-          | ImportedTypeRef(module, digest, type_index)
+          | ImportedTypeRef(import_index, type_index)
 
 FunctionRef ::= LocalFunctionRef(function_index)
-              | ImportedFunctionRef(module, digest, function_index)
+              | ImportedFunctionRef(import_index, function_index)
 
 KernelRef ::= LocalKernelRef(kernel_index)
 
 DomainRef ::= LocalDomainRef(domain_index)
-            | ImportedDomainRef(module, digest, domain_index)
+            | ImportedDomainRef(import_index, domain_index)
 
 FieldOwnerRef ::= RecordType(type: TypeRef)
                 | VariantPayloadOwner(case: VariantRef)
@@ -200,7 +201,8 @@ Indices address the canonically sorted declaration tables, never surface order.
 Admission verifies that each index is in range and that the indexed declaration
 has the expected kind.
 
-Every imported reference must name a direct import and one of that module's
+Every imported reference's `import_index` must select one direct entry in the
+canonical import table, and its declaration index must select one of that module's
 explicit exports. Transitive imports are not visible. Imported kernels are not
 referenced or callable in v0.
 
