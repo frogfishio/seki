@@ -12,6 +12,8 @@ const candidateBytes = emit("emit_candidate_selection_scb0.mjs");
 const bundleBytes = emit("emit_import_bundle_scb0.mjs", "--bundle");
 const payloadBytes = emit("emit_payload_records_scb0.mjs");
 const arithmeticBytes = emit("emit_arithmetic_control_scb0.mjs");
+const constructionBytes = emit("emit_construction_access_scb0.mjs");
+const traversalBytes = emit("emit_traversal_scb0.mjs");
 const payloadManifest = JSON.parse(fs.readFileSync(
   "spec/encoding/vectors/payload-records-v0.json", "utf8"));
 if (payloadBytes.length !== payloadManifest.length) throw new Error("payload vector length mismatch");
@@ -28,6 +30,22 @@ const arithmeticDigest = createHash("sha256")
   .update(Buffer.from(arithmeticManifest.digest_domain_terminator_hex, "hex"))
   .update(arithmeticBytes).digest("hex");
 if (arithmeticDigest !== arithmeticManifest.module_sha256) throw new Error("arithmetic vector digest mismatch");
+const constructionManifest = JSON.parse(fs.readFileSync(
+  "spec/encoding/vectors/construction-access-v0.json", "utf8"));
+if (constructionBytes.length !== constructionManifest.length) throw new Error("construction vector length mismatch");
+const constructionDigest = createHash("sha256")
+  .update(constructionManifest.digest_domain_ascii, "ascii")
+  .update(Buffer.from(constructionManifest.digest_domain_terminator_hex, "hex"))
+  .update(constructionBytes).digest("hex");
+if (constructionDigest !== constructionManifest.module_sha256) throw new Error("construction vector digest mismatch");
+const traversalManifest = JSON.parse(fs.readFileSync(
+  "spec/encoding/vectors/traversal-v0.json", "utf8"));
+if (traversalBytes.length !== traversalManifest.length) throw new Error("traversal vector length mismatch");
+const traversalDigest = createHash("sha256")
+  .update(traversalManifest.digest_domain_ascii, "ascii")
+  .update(Buffer.from(traversalManifest.digest_domain_terminator_hex, "hex"))
+  .update(traversalBytes).digest("hex");
+if (traversalDigest !== traversalManifest.module_sha256) throw new Error("traversal vector digest mismatch");
 
 const freshCandidate = () => decodeModule(candidateBytes);
 const freshBundle = () => decodeBundle(bundleBytes);
@@ -53,6 +71,8 @@ expectAccepted("candidate-selection-v0", freshCandidate());
 expectAccepted("import-bundle-v0", freshBundle());
 expectAccepted("payload-records-v0", decodeModule(payloadBytes));
 expectAccepted("arithmetic-control-v0", decodeModule(arithmeticBytes));
+expectAccepted("construction-access-v0", decodeModule(constructionBytes));
+expectAccepted("traversal-v0", decodeModule(traversalBytes));
 
 {
   const candidate = freshCandidate();
@@ -92,6 +112,56 @@ expectAccepted("arithmetic-control-v0", decodeModule(arithmeticBytes));
   const choose = arithmetic.functions[3][1];
   choose.body.term[3] = { claimedType: [1], term: [4, 2] };
   expectRejected("if-branch-type-mismatch", arithmetic, "0807");
+}
+{
+  const changed = Buffer.from(constructionBytes);
+  const arrayGet = Buffer.from("0f041b1204", "hex");
+  const at = changed.indexOf(arrayGet);
+  if (at < 0) throw new Error("array-get target absent");
+  changed[at + 2] = 29;
+  expectRejected("array-vec-operation-mismatch-bytes", decodeModule(changed), "080e");
+}
+{
+  const changed = Buffer.from(constructionBytes);
+  const none = Buffer.from("0f040a04", "hex");
+  const at = changed.indexOf(none);
+  if (at < 0) throw new Error("option-none target absent");
+  changed[at + 3] = 1;
+  expectRejected("option-item-claim-mismatch-bytes", decodeModule(changed), "0800");
+}
+{
+  const construction = decodeModule(constructionBytes);
+  construction.functions[5][1].body.term[2].term[1] = 2;
+  expectRejected("let-local-out-of-scope", construction, "0702");
+}
+{
+  const changed = Buffer.from(traversalBytes);
+  const allTerm = Buffer.from("01201201", "hex");
+  const at = changed.indexOf(allTerm);
+  if (at < 0) throw new Error("all traversal target absent");
+  changed[at + 1] = 34;
+  expectRejected("traversal-result-family-mismatch-bytes", decodeModule(changed), "0800");
+}
+{
+  const traversal = decodeModule(traversalBytes);
+  traversal.functions[4][1].body.term[3].parameters.pop();
+  expectRejected("fold-block-parameter-mismatch", traversal, "080e");
+}
+{
+  const traversal = decodeModule(traversalBytes);
+  traversal.functions[0][1].exact[0] = 10;
+  expectRejected("all-must-charge-static-capacity", traversal, "0b01");
+}
+{
+  const traversal = decodeModule(traversalBytes);
+  traversal.functions[5][1].exact[3] = 130;
+  expectRejected("map-workspace-omits-output", traversal, "0b04");
+}
+{
+  const construction = decodeModule(constructionBytes);
+  const pair = construction.functions[4][1].body;
+  pair.term[1].pop();
+  expectRejected("tuple-claim-mismatch", construction, "0800");
 }
 {
   const arithmetic = decodeModule(arithmeticBytes);
@@ -137,4 +207,4 @@ for (const [name, component, reason] of [
   expectRejected("callable-ceiling-below-exact", candidate, "0b05");
 }
 
-console.log("typed_core_semantics=verified positive=5 hostile=15 byte_hostile=3");
+console.log("typed_core_semantics=verified positive=7 hostile=23 byte_hostile=6");

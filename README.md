@@ -57,6 +57,10 @@ Current bootstrap records:
   — record construction, variant payload, binder, and pure-match fixture
 - [`spec/typed-core/fixtures/ARITHMETIC_CONTROL_LOWERING_V0.md`](spec/typed-core/fixtures/ARITHMETIC_CONTROL_LOWERING_V0.md)
   — explicit arithmetic-policy and pure-control fixture
+- [`spec/typed-core/fixtures/CONSTRUCTION_ACCESS_LOWERING_V0.md`](spec/typed-core/fixtures/CONSTRUCTION_ACCESS_LOWERING_V0.md)
+  — value construction and constant-time array/vector access fixture
+- [`spec/typed-core/fixtures/TRAVERSAL_LOWERING_V0.md`](spec/typed-core/fixtures/TRAVERSAL_LOWERING_V0.md)
+  — capacity-expanded traversal and intrinsic-workspace fixture
 - [`docs/reviews/EXPERIMENTAL_TYPED_CORE_CHECKER_REVIEW.md`](docs/reviews/EXPERIMENTAL_TYPED_CORE_CHECKER_REVIEW.md)
   — first fixture-bounded type and exact-resource reconstruction pass
 - [`docs/f0/INDEPENDENT_USE_CASE_REQUEST.md`](docs/f0/INDEPENDENT_USE_CASE_REQUEST.md)

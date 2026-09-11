@@ -552,8 +552,10 @@ The next tasks, in dependency order, are:
    resource tuples over the three current positive fixtures and eight isolated
    semantic hostile cases.
 8. **Record/payload and arithmetic/control slices completed experimentally.**
-   Continue one semantic family at a time with remaining construction forms and
-   bounded intrinsics; add canonical byte-level hostile cases.
+   The construction/access slice is also complete experimentally. Continue with
+   Capacity-expanding traversal and workspace recurrence are also complete
+   experimentally. Audit node/rule coverage, then cover module/profile ceilings
+   and remaining kernel control; add canonical byte-level hostile cases.
 9. Assemble the F0 review packet and request the exact scoped response.
 
 Tasks 3–8 are bootstrap/specification work and may proceed while F0 is open. No

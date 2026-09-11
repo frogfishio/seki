@@ -14,6 +14,14 @@
 | Pure `If` branches have different types | `0807` |
 | Negation operand changed to unsigned | `080d` |
 | Shift count changed from `U32` to `Bool` | `080c` |
+| Array operation changed to vector operation in canonical bytes | `080e` |
+| `Option::None` item type changed without changing claim bytes | `0800` |
+| `Let` body local points beyond its extended environment | `0702` |
+| Tuple item removed without changing claimed tuple | `0800` |
+| `All` changed to `MapBounded` without changing result bytes | `0800` |
+| `Fold` block has the wrong parameter count | `080e` |
+| `All` step claim omits static-capacity work | `0b01` |
+| Map workspace claim omits the partial output | `0b04` |
 | Projection owner does not match record | `0704` |
 | Reopened imported parameter type differs from call argument | `0803` |
 | False exact logical steps | `0b01` |
@@ -23,6 +31,6 @@
 | Declared callable ceiling below exact result | `0b05` |
 
 These cases begin after successful structural decoding so that each mutation
-isolates the semantic checker. Three cases now operate on canonical module bytes;
+isolates the semantic checker. Six cases now operate on canonical module bytes;
 the remaining object-level cases must eventually gain byte-level
 counterparts. This file does not claim an admission-result vector freeze.

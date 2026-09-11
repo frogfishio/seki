@@ -190,6 +190,10 @@ export class TypedCoreChecker {
     else if (tag === 4) {
       if (term[1] >= environment.length) fail("0702", `${path}/term/reference`);
       inferred = environment[term[1]];
+    } else if (tag === 5) {
+      const value = this.infer(term[1], module, environment, `${path}/term/value`);
+      inferred = this.infer(term[2], module, [value.type, ...environment],
+        `${path}/term/body`).type;
     } else if (tag === 6) {
       const ref = this.resolveReference(module, term[1], "types", `${path}/term/type`);
       const declaration = ref.value[1];
@@ -231,6 +235,21 @@ export class TypedCoreChecker {
       inferred = [22, declKey(ref.module, ref.index)];
       return this.finishExpression(expression, inferred, module, path,
         { constructor: [declKey(ref.module, ref.index), term[1][1]] });
+    } else if (tag === 9) {
+      inferred = [17, term[1].map((item, index) => this.infer(item, module,
+        environment, `${path}/term/items/${index}`).type)];
+    } else if (tag === 10) {
+      inferred = [15, this.normalize(term[1], module, `${path}/term/item_type`)];
+    } else if (tag === 11) {
+      inferred = [15, this.infer(term[1], module, environment,
+        `${path}/term/value`).type];
+    } else if (tag === 12) {
+      inferred = [16, this.infer(term[2], module, environment,
+        `${path}/term/value`).type,
+      this.normalize(term[1], module, `${path}/term/error_type`)];
+    } else if (tag === 13) {
+      inferred = [16, this.normalize(term[1], module, `${path}/term/ok_type`),
+        this.infer(term[2], module, environment, `${path}/term/error`).type];
     } else if (tag === 14 || tag === 15) {
       const left = this.infer(term[1], module, environment, `${path}/term/left`);
       const right = this.infer(term[2], module, environment, `${path}/term/right`);
@@ -298,6 +317,18 @@ export class TypedCoreChecker {
       }
       if (!same(seen, this.constructorTags(scrutinee.type))) fail("0808", `${path}/term/arms`);
       inferred = armType;
+    } else if (tag === 27 || tag === 29) {
+      const collection = this.infer(term[1], module, environment,
+        `${path}/term/collection`).type;
+      const index = this.infer(term[2], module, environment, `${path}/term/index`).type;
+      const expectedTag = tag === 27 ? 18 : 19;
+      if (collection[0] !== expectedTag || !same(index, [4])) fail("080e", path);
+      inferred = [15, collection[1]];
+    } else if (tag === 28) {
+      const collection = this.infer(term[1], module, environment,
+        `${path}/term/collection`).type;
+      if (collection[0] !== 19) fail("080e", path);
+      inferred = [14, collection[2] + 1];
     } else if (tag === 26) {
       const ref = this.resolveFunction(module, term[1], `${path}/term/function`);
       const body = ref.value[1];
@@ -310,6 +341,16 @@ export class TypedCoreChecker {
         if (!same(actual, expected)) fail("0803", `${path}/term/arguments/${index}`);
       });
       inferred = this.normalize(body.result, ref.module, `${path}/term/result`);
+    } else if (tag === 30) {
+      const collection = this.infer(term[1], module, environment,
+        `${path}/term/collection`).type;
+      if (collection[0] !== 18 && collection[0] !== 19) fail("080e", path);
+      const initial = this.infer(term[2], module, environment,
+        `${path}/term/initial`).type;
+      const block = this.checkBlock(term[3], module, environment,
+        [initial, collection[1]], initial, `${path}/term/block`);
+      if (!same(block.type, initial)) fail("0804", `${path}/term/block/body`);
+      inferred = initial;
     } else if (tag === 31) {
       const collection = this.infer(term[1], module, environment,
         `${path}/term/collection`).type;
@@ -319,6 +360,27 @@ export class TypedCoreChecker {
         `${path}/term/block`);
       if (!same(block.type, [1])) fail("0804", `${path}/term/block/body`);
       inferred = [16, [15, item], [0]];
+    } else if (tag === 32 || tag === 33 || tag === 35) {
+      const collection = this.infer(term[1], module, environment,
+        `${path}/term/collection`).type;
+      if (collection[0] !== 18 && collection[0] !== 19) fail("080e", path);
+      const block = this.checkBlock(term[2], module, environment, [collection[1]], [1],
+        `${path}/term/block`);
+      if (!same(block.type, [1])) fail("0804", `${path}/term/block/body`);
+      inferred = tag === 35 ? [19, collection[1], collection[2]] : [1];
+    } else if (tag === 34) {
+      const collection = this.infer(term[1], module, environment,
+        `${path}/term/collection`).type;
+      if (collection[0] !== 18 && collection[0] !== 19) fail("080e", path);
+      const parameter = term[2].parameters;
+      if (parameter.length !== 1) fail("080e", `${path}/term/block/parameters`);
+      const item = this.normalize(parameter[0], module, `${path}/term/block/parameters/0`);
+      if (!same(item, collection[1])) fail("080e", `${path}/term/block/parameters/0`);
+      const mapped = this.normalize(term[2].result, module, `${path}/term/block/result`);
+      const block = this.checkBlock(term[2], module, environment, [collection[1]], mapped,
+        `${path}/term/block`);
+      if (!same(block.type, mapped)) fail("0804", `${path}/term/block/body`);
+      inferred = [collection[0], mapped, collection[2]];
     } else fail("0904", `${path}/term`);
     return this.finishExpression(expression, inferred, module, path);
   }
@@ -399,7 +461,16 @@ export class TypedCoreChecker {
     const tag = term[0];
     const leaf = () => ({ steps: 1, live: base + resultBits, depth: 1, workspace: 0,
       type: result });
-    if (tag <= 4) return leaf();
+    if (tag <= 4 || tag === 10) return leaf();
+    if (tag === 5) {
+      const value = this.analyzeExpr(term[1], module, environment, base, path);
+      const valueBits = this.width(value.type);
+      const body = this.analyzeExpr(term[2], module, [value.type, ...environment],
+        base + valueBits, path);
+      return { steps: 1 + value.steps + body.steps, live: Math.max(value.live, body.live),
+        depth: 1 + Math.max(value.depth, body.depth),
+        workspace: Math.max(value.workspace, body.workspace), type: result };
+    }
     if (tag === 6) return this.analyzeStrict(term[2].map(([, value]) => value),
       result, module, environment, base, path);
     if (tag === 8) return this.analyzeStrict(term[2].map(([, value]) => value),
@@ -410,6 +481,12 @@ export class TypedCoreChecker {
         live: Math.max(child.live, base + this.width(child.type) + resultBits),
         depth: 1 + child.depth, workspace: child.workspace, type: result };
     }
+    if (tag === 9) return this.analyzeStrict(term[1], result, module,
+      environment, base, path);
+    if (tag === 11) return this.analyzeStrict([term[1]], result, module,
+      environment, base, path);
+    if (tag === 12 || tag === 13) return this.analyzeStrict([term[2]], result, module,
+      environment, base, path);
     if (tag === 14 || tag === 15) return this.analyzeStrict(term.slice(1), result, module,
       environment, base, path);
     if (tag === 16) return this.analyzeStrict([term[1]], result, module,
@@ -459,6 +536,10 @@ export class TypedCoreChecker {
         depth: 1 + Math.max(scrutinee.depth, armDepth),
         workspace: Math.max(scrutinee.workspace, armWorkspace), type: result };
     }
+    if (tag === 27 || tag === 29) return this.analyzeStrict(term.slice(1), result,
+      module, environment, base, path);
+    if (tag === 28) return this.analyzeStrict([term[1]], result, module,
+      environment, base, path);
     if (tag === 26) {
       let retained = 0; let steps = 1; let live = base; let depth = 1; let workspace = 0;
       for (const argument of term[2]) {
@@ -474,6 +555,8 @@ export class TypedCoreChecker {
       depth = Math.max(depth, 1 + callee.depth); workspace = Math.max(workspace, callee.workspace);
       return { steps, live, depth, workspace, type: result };
     }
+    if (tag === 30) return this.analyzeTraversal(expression, module, environment,
+      base, path, "fold");
     if (tag === 31) {
       const collection = this.analyzeExpr(term[1], module, environment, base, path);
       const collectionBits = this.width(collection.type);
@@ -491,7 +574,55 @@ export class TypedCoreChecker {
         workspace: Math.max(collection.workspace, intrinsicWorkspace + block.workspace),
         type: result };
     }
+    if (tag >= 32 && tag <= 35) {
+      const kinds = { 32: "all", 33: "any", 34: "map", 35: "filter" };
+      return this.analyzeTraversal(expression, module, environment, base, path, kinds[tag]);
+    }
     fail("0904", path);
+  }
+
+  analyzeTraversal(expression, module, environment, base, path, kind) {
+    const term = expression.term;
+    const result = this.normalize(expression.claimedType, module, path);
+    const collection = this.analyzeExpr(term[1], module, environment, base, path);
+    const collectionBits = this.width(collection.type);
+    const capacity = collection.type[2];
+    const item = collection.type[1];
+    const itemBits = this.width(item);
+    let retained = collectionBits;
+    let steps = 1 + collection.steps;
+    let live = collection.live;
+    let depth = 1 + collection.depth;
+    let workspace = collection.workspace;
+    let block;
+    let intrinsicWorkspace;
+    if (kind === "fold") {
+      const initial = this.analyzeExpr(term[2], module, environment, base + retained, path);
+      retained += this.width(initial.type); steps += initial.steps;
+      live = Math.max(live, initial.live); depth = Math.max(depth, 1 + initial.depth);
+      workspace = Math.max(workspace, initial.workspace);
+      const parameterTypes = [initial.type, item];
+      const parameterBits = parameterTypes.reduce((sum, type) => sum + this.width(type), 0);
+      block = this.analyzeExpr(term[3].body, module,
+        [...parameterTypes].reverse().concat(environment), base + retained + parameterBits, path);
+      intrinsicWorkspace = counterBits(capacity) + this.width(initial.type);
+    } else {
+      const blockValue = term[2];
+      const parameterBits = itemBits;
+      block = this.analyzeExpr(blockValue.body, module, [item, ...environment],
+        base + retained + parameterBits, path);
+      if (kind === "all" || kind === "any") intrinsicWorkspace = counterBits(capacity) + 1;
+      else if (kind === "map") intrinsicWorkspace = counterBits(capacity) + this.width(result);
+      else intrinsicWorkspace = counterBits(capacity) + this.width(result);
+    }
+    steps += capacity * (1 + block.steps);
+    live = Math.max(live, block.live);
+    depth = Math.max(depth, 2 + block.depth);
+    workspace = Math.max(workspace, intrinsicWorkspace + block.workspace);
+    if (kind === "all" || kind === "any") {
+      live = Math.max(live, base + retained + this.width(result));
+    }
+    return { steps, live, depth, workspace, type: result };
   }
 
   analyzeStrict(children, result, module, environment, base, path) {

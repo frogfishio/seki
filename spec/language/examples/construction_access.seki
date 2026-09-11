@@ -1,0 +1,31 @@
+module seki::fixtures::construction_access @ 1
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: type_well_formed, totality, determinism, resource_bounds.
+
+export fn arrayAt items: Array[U32, 4] index: U32 -> Option[U32]
+arithmetic: checked [ items at: index ].
+
+export fn error -> Result[U32, Unit]
+arithmetic: checked [ Error[U32]: Unit ].
+
+export fn none -> Option[U32]
+arithmetic: checked [ None[U32] ].
+
+export fn ok value: U32 -> Result[U32, Unit]
+arithmetic: checked [ Ok[Unit]: value ].
+
+export fn pair value: U32 flag: Bool -> Tuple[U32, Bool]
+arithmetic: checked [ Tuple[value, flag] ].
+
+export fn remember value: U32 -> U32
+arithmetic: checked [ remembered := value. remembered ].
+
+export fn some value: U32 -> Option[U32]
+arithmetic: checked [ Some: value ].
+
+export fn vecAt items: BoundedVec[U32, 4] index: U32 -> Option[U32]
+arithmetic: checked [ items at: index ].
+
+export fn vecLength items: BoundedVec[U32, 4] -> Index[5]
+arithmetic: checked [ items length ].

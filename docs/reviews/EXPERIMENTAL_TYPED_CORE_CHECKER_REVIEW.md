@@ -47,12 +47,26 @@ evaluation, and pure `If`. Four hostile cases reject a policy/result mismatch,
 different branch types, unsigned negation, and a non-`U32` shift count. The
 policy mutation operates on canonical module bytes.
 
+The construction/access fixture adds `Let`, tuples, both `Option` constructors,
+both `Result` constructors, array access, bounded-vector access, and
+bounded-vector length. Four hostile cases reject a collection-family mismatch,
+a false option item claim, an out-of-scope let local, and a tuple shape mismatch.
+The collection and option cases mutate canonical module bytes.
+
+The traversal fixture adds `Fold`, `All`, `Any`, array/vector `MapBounded`, and
+array/vector `FilterBounded`. It independently checks capacity-multiplied steps,
+block frames and parameter slots, accumulator/state workspace, and partial-output
+workspace. Four hostile cases reject a changed traversal result family, an
+invalid fold block, a step count that omits static-capacity work, and map
+workspace that omits its output buffer. The family mutation operates on
+canonical module bytes.
+
 ## Boundary of the result
 
 Most hostile cases deliberately mutate freshly decoded objects after structural
 and digest validation. This isolates the semantic layer; two cases now mutate
 SCB-0 bytes, but the suite is not yet a standalone hostile-vector corpus. The
-checker implements only the term forms reached by the five current fixtures. In
+checker implements only the term forms reached by the seven current fixtures. In
 particular, it does not yet cover all construction forms, every
 comparison/arithmetic combination, the remaining bounded intrinsic families,
 module ceilings, or profile ceilings.
@@ -64,6 +78,7 @@ cost algebra is correct.
 ## Conclusion
 
 The current type identity and resource recurrence survive their first composed
-implementation tests. The next useful work is the remaining construction and
-bounded-intrinsic families, continuing to add byte-level hostile vectors before
+implementation tests. The next useful work is an explicit node/rule coverage
+audit, module/profile ceilings, and remaining kernel control, continuing to add
+byte-level hostile vectors before
 translating frozen rules into Lean.
