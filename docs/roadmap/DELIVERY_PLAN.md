@@ -212,7 +212,7 @@ and resource-bound foundation. F1 emits no qualified C backend.
 | F1-A04 | Nominal identity and equality rules. |
 | F1-A05 | Fixed-width arithmetic and conversion rules. |
 | F1-A06 | Deterministic evaluation and rejection precedence. |
-| F1-A07 | Step, live-value, stack, and workspace cost algebra. |
+| F1-A07 | Step, live-value, control-depth, and workspace algebra; concrete storage mapping is deferred. |
 | F1-A08 | Explicit exclusions and profile ceilings. |
 
 No concrete encoding is frozen until every admitted value has one defined schema
@@ -281,7 +281,8 @@ identity, source digests, canonical test-vector manifest, and clean-room command
 
 - Typed-core and encoding are versioned and frozen for the profile.
 - Admission and evaluator are executable and proved total/deterministic.
-- Logical-step, live-value, stack, and workspace bounds are proved.
+- Logical-step, live-value, evaluator-control-depth, and abstract-workspace
+  bounds are proved; later phases prove their concrete stack/storage mapping.
 - Canonical serialization is injective over admitted values.
 - Hostile vectors reject with stable reasons.
 - Graph traversal meets its stated bounded theorem portfolio.

@@ -283,9 +283,9 @@ in any order, but elaboration produces the canonical table and typed-core evalua
 uses canonical field order. This prevents source field order from changing a
 module's digest or failure selection.
 
-Variants require unique stable tags within their declaration and unique case
-names. Zero is a valid tag unless a representation profile explicitly reserves it.
-Source position is irrelevant. Unknown tags never construct a value.
+Variants are nonempty and require unique stable tags within their declaration and
+unique case names. Zero is a valid tag unless a representation profile explicitly
+reserves it. Source position is irrelevant. Unknown tags never construct a value.
 
 Recursive and mutually recursive types are excluded from v0.
 
@@ -432,11 +432,12 @@ evaluates its right child only when the left child is false. Conditions are exac
 ```text
 Term ::= IntBinary(policy, op, left, right)
        | IntUnary(policy, op, value)
+       | IntShift(policy, direction, value, count)
        | IntConvert(policy, target, value)
 
 IntBinaryOp ::= add | subtract | multiply | divide | remainder
-              | shift_left | shift_right
 IntUnaryOp  ::= negate
+ShiftDirection ::= left | right
 
 ArithmeticError ::= Overflow @ 0
                   | DivideByZero @ 1
@@ -444,8 +445,16 @@ ArithmeticError ::= Overflow @ 0
                   | OutOfRange @ 3
 ```
 
-Operands have one explicit integer type; there are no promotions. The stable
-intrinsic `ArithmeticError` tags above are part of language v0.
+Binary operands have one identical explicit integer type `T`; there are no
+promotions. Negation accepts signed integer types only. A shift value has type
+`T` and its count has type `U32`. The stable intrinsic `ArithmeticError` tags
+above are part of language v0.
+
+For an N-bit integer type `T`, `min_T` and `max_T` are its mathematical bounds.
+`wrap_T(z)` is the unique value in that range congruent to `z` modulo `2^N`, with
+the upper half of the residue range interpreted as negative for signed types.
+`sat_T(z)` is `min(max(z, min_T), max_T)`. These mathematical definitions do not
+inherit C overflow, conversion, division, remainder, or shift behavior.
 
 Result types are exact:
 
@@ -457,13 +466,31 @@ Result types are exact:
 | divide, remainder | `Result[T, ArithmeticError]` | `Result[T, ArithmeticError]` | `Result[T, ArithmeticError]` |
 | shift left/right | `Result[T, ArithmeticError]` | `Result[T, ArithmeticError]` | `Result[T, ArithmeticError]` |
 
-Division or remainder by zero produces `DivideByZero` under every policy. Signed
-minimum divided by -1 produces `Overflow` when checked, the signed minimum when
-wrapping, and the signed maximum when saturating. A shift count outside
-`0 <= count < N` produces `InvalidShift` under every policy. For a valid count,
-left-shift overflow follows the selected policy; right shift is logical for
-unsigned values and sign-extending for signed values. Failed checked conversion
-produces `OutOfRange`.
+Add, subtract, multiply, and signed negate first compute the mathematical integer
+result `z`. Checked policy returns `Ok(z)` when `z` is in range and
+`Error(Overflow)` otherwise. Wrapping returns `wrap_T(z)` and saturating returns
+`sat_T(z)` directly. Unsigned negation is a static type error under every policy.
+
+For nonzero divisor `y`, signed division computes quotient `q` by truncation
+toward zero and remainder `r = x - q*y`; unsigned division uses the ordinary
+natural quotient and remainder. Division or remainder by zero returns
+`Error(DivideByZero)` under every policy. The signed `min_T / -1` case returns
+`Error(Overflow)` when checked, `Ok(min_T)` when wrapping, and `Ok(max_T)` when
+saturating. Its remainder is `Ok(0)` under every policy; a C backend must guard
+this case rather than evaluating the undefined C expression.
+
+A shift count `k >= N` returns `Error(InvalidShift)` under every policy. For a
+valid left shift, compute `z = x * 2^k` and apply the selected checked, wrapping,
+or saturating rule, wrapped in `Ok` where successful. Valid unsigned right shift
+is floor division by `2^k`; valid signed right shift is mathematical floor
+division by `2^k`, giving the defined sign-extending result. Valid right shifts
+always return `Ok(value)`.
+
+Conversion treats the source as its mathematical value `z`. Checked conversion
+returns `Ok(z)` when it lies in the target range and `Error(OutOfRange)` otherwise.
+Wrapping conversion returns `wrap_Target(z)`; saturating conversion returns
+`sat_Target(z)`. Converting to the same type is admitted and follows the same
+rule, yielding the unchanged value. The target must be an `IntegerType`.
 
 Surface propagation syntax remains to be frozen. Admission rejects any claimed
 result inconsistent with the effective node policy and operation.
@@ -609,6 +636,29 @@ Block ::= {
 }
 ```
 
+Let `Collection[T, N]` mean either `Array[T, N]` or
+`BoundedVec[T, N]`. The v0 signatures are closed:
+
+```text
+ArrayGet(Array[T, N], U32) -> Option[T]
+VecLength(BoundedVec[T, N]) -> Index[N + 1]
+VecGet(BoundedVec[T, N], U32) -> Option[T]
+Fold(Collection[T, N], U, Block[U, T] -> U) -> U
+FindUnique(Collection[T, N], Block[T] -> Bool)
+  -> Result[Option[T], Unit]
+All(Collection[T, N], Block[T] -> Bool) -> Bool
+Any(Collection[T, N], Block[T] -> Bool) -> Bool
+MapBounded(Array[T, N], Block[T] -> U) -> Array[U, N]
+MapBounded(BoundedVec[T, N], Block[T] -> U) -> BoundedVec[U, N]
+FilterBounded(Collection[T, N], Block[T] -> Bool) -> BoundedVec[T, N]
+```
+
+`N + 1` must fit the selected profile. An index greater than or equal to the
+logical length returns `None`; arrays have logical length `N`. `Fold`, map, and
+filter traverse in increasing index order. Filter preserves relative order.
+`All` and `Any` may stop once their result is known. Their resource derivation
+still charges the complete static capacity.
+
 Blocks are embedded syntax, not values. Captures are de Bruijn references to
 immutable enclosing locals. A block cannot escape, be stored, compared, exported,
 or called except by its owning intrinsic.
@@ -639,7 +689,7 @@ ResourceBounds ::= {
   logical_steps: Nat,
   maximum_live_value_bits: Nat,
   maximum_control_depth: Nat,
-  workspace_bits: Nat
+  maximum_workspace_bits: Nat
 }
 
 ModuleBounds ::= {
@@ -658,6 +708,10 @@ The selected profile and module supply hard ceilings. Admission derives the exac
 `ResourceBounds` of each function and kernel compositionally, checks the stored
 exact result and derivation, and then checks it against the declared ceiling.
 Integer overflow while calculating a bound rejects admission.
+
+“Exact derived” means the unique output of the canonical structural cost algebra,
+not the least bound obtainable by solving semantic path feasibility. The algebra
+is defined in `RESOURCE_COST_ALGEBRA_V0_DRAFT.md`.
 
 F1 measurements are semantic and representation-independent: logical steps,
 maximum simultaneously live value bits, maximum evaluator-control depth, and

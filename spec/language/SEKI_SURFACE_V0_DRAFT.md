@@ -184,6 +184,10 @@ Every function has an explicit result type. A body returns its final expression;
 Every typed-core function has an explicit resource ceiling. If a surface
 function omits `bounded`, elaboration inserts the selected profile's
 per-function ceiling. Kernels spell their ceiling explicitly in v0.
+`steps`, `liveBits`, `controlDepth`, and `workspaceBits` map respectively to the
+typed-core ceiling fields `logical_steps`, `maximum_live_value_bits`,
+`maximum_control_depth`, and `maximum_workspace_bits`. They are declared maxima;
+the canonical structural derivation is stored and checked separately.
 
 `rejects:` declares every rejection constructor once, from highest to lowest
 precedence. Its type must be one declared variant, local or exact-digest imported.
@@ -249,13 +253,14 @@ From tightest to loosest, Seki parses:
 
 1. primary expressions and grouping;
 2. unary field projection;
-3. `*` and `/`;
-4. `+` and `-`;
-5. `<`, `<=`, `>`, and `>=`;
-6. `==` and `!=`;
-7. `&&`;
-8. `||`; and
-9. keyword messages.
+3. unary `-`;
+4. `*`, `/`, and `%`;
+5. `+` and binary `-`;
+6. `<`, `<=`, `>`, and `>=`;
+7. `==` and `!=`;
+8. `&&`;
+9. `||`; and
+10. keyword messages.
 
 Arithmetic binary operators associate left. Comparisons do not chain. `&&` and
 `||` short-circuit. Parentheses group exactly one expression.
@@ -278,8 +283,16 @@ next := wrapping: [ counter + 1 ].
 ```
 
 There are no implicit promotions. Mixed widths and signedness require an
-explicit checked conversion operation. Division by zero and failed checked
-operations produce typed operational results; exact surface forms remain tied
+explicit conversion operation. Unary `-` is admitted only for signed integers.
+Decimal literal digits with an optional adjacent leading minus denote one
+mathematical value: `-128` is a literal, not checked negation of `128`. A minus
+separated from the literal or applied to another expression is policy-sensitive
+unary negation. Elaboration uses the unique expected integer type and rejects a
+literal when its type is ambiguous or its value is out of range.
+`/` truncates signed quotients toward zero and `%` uses the corresponding
+remainder. Division, remainder, and shifts return typed operational results
+because zero divisors and invalid shift counts remain possible under every
+policy. Exact conversion, shift, and result-propagation surface forms remain tied
 to the typed-core error model and are not frozen by this draft.
 
 ## 10. Conditionals, matching, and rejection

@@ -24,6 +24,8 @@
 - Initial typed-core, admission-rule, and candidate-selection fixture drafts created.
 - Typed-core draft 0.2 structural review completed; freeze blockers recorded.
 - Binder and rejection-precedence review completed; kernel control is tail-formed.
+- Arithmetic and resource-algebra review completed; mathematical operations and
+  the canonical structural cost schedule are drafted.
 - Conservative C11 engineering standard and `make check` entry point added.
 
 ## Active work
@@ -34,10 +36,9 @@ immediate execution queue in the delivery plan and record its owner here.
 ## Next unblocked tasks
 
 1. F0-01 — independent consumer decision and reviewer selection.
-2. F1-A05/F1-A07 — freeze arithmetic details and resource-cost algebra.
-3. F1-B comparison — compare canonical encoding candidates without freezing one.
-4. B0-08/B0-09 — exact Lean and Rocq source locks.
-5. B0-10 — CompCert acquisition and use profile.
+2. F1-B comparison — compare canonical encoding candidates without freezing one.
+3. B0-08/B0-09 — exact Lean and Rocq source locks.
+4. B0-10 — CompCert acquisition and use profile.
 
 ## Open decisions and blockers
 

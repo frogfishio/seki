@@ -70,8 +70,10 @@ Each layer requires at least one positive boundary vector and negative vectors f
 - local references at every binder-depth boundary;
 - nominally distinct but representation-equal values;
 - incomplete records and non-exhaustive or duplicate match arms;
-- mixed-width arithmetic, invalid intrinsic constructor references, and incorrect
-  operation/policy result types;
+- mixed-width arithmetic, unsigned negation, non-`U32` shift counts, invalid
+  intrinsic constructor references, and incorrect operation/policy result types;
+- every integer-width boundary for overflow, conversion, zero division,
+  `min / -1`, `min % -1`, and shift counts `N-1`/`N`;
 - invalid collection capacities and block signatures;
 - rejection-order omissions, duplicate constructors, bad site indices, and
   reason/index mismatches;
@@ -79,7 +81,8 @@ Each layer requires at least one positive boundary vector and negative vectors f
 - non-increasing rejection indices through lets, conditionals, matches, and
   requirements along one continuation path;
 - wrong binder arity for nullary and payload-bearing match constructors;
-- mismatched exact steps, live-value bits, control depth, or workspace bits;
+- mismatched exact steps, live-value bits, control depth, or maximum workspace
+  bits, including imported-call and nested-intrinsic costs;
 - arithmetic overflow in bound calculation; and
 - valid core constructs unavailable in the selected backend profile.
 

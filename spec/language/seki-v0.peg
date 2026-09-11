@@ -71,13 +71,15 @@ AndExpr         <- EqualityExpr (Trivia '&&' Trivia EqualityExpr)*
 EqualityExpr    <- CompareExpr (Trivia ('==' / '!=') Trivia CompareExpr)?
 CompareExpr     <- AddExpr (Trivia ('<=' / '>=' / '<' / '>') Trivia AddExpr)?
 AddExpr         <- MulExpr (Trivia ('+' / '-') Trivia MulExpr)*
-MulExpr         <- UnaryExpr (Trivia ('*' / '/') Trivia UnaryExpr)*
-UnaryExpr       <- Primary (Sp UnarySelector)*
+MulExpr         <- UnaryExpr (Trivia ('*' / '/' / '%') Trivia UnaryExpr)*
+UnaryExpr       <- NegativeIntLit / '-' Trivia UnaryExpr
+                 / Primary (Sp UnarySelector)*
 UnarySelector   <- ValueIdent !Colon
 
 Primary         <- BoolLit / UnitLit / IntLit / DigestLiteral / RecordLiteral
-                 / VariantRef / MatchExpr / Block / ParenExpr
+                 / VariantRef / MatchExpr / PolicyExpr / Block / ParenExpr
                  / ValueIdent / TypeIdent
+PolicyExpr      <- ArithmeticPolicy Colon Trivia Block
 ParenExpr       <- LParen Trivia Expr Trivia RParen
 Block           <- LBrack Trivia BlockParams? BodySeq Trivia RBrack
 BlockParams     <- BlockParam (Sp BlockParam)* Trivia Bar Trivia
@@ -94,6 +96,7 @@ DigestLiteral   <- 'sha256:' StringLiteral
 BoolLit         <- 'true' !IdentRest / 'false' !IdentRest
 UnitLit         <- 'unit' !IdentRest
 IntLit          <- '0' !Digit / [1-9] Digit*
+NegativeIntLit  <- '-' IntLit
 Nat             <- IntLit
 
 TypeIdent       <- [A-Z] IdentRest*

@@ -35,12 +35,12 @@ These block a typed-core or language freeze, but not further bootstrap design:
 
 1. Select the canonical wire encoding and specify the one normal form for every
    digest-bearing derivation witness.
-2. Define the exact compositional algebra for steps, live-value bits,
-   evaluator-control depth, and abstract workspace bits.
-3. Finish the signatures and evaluation/cost rules for every admitted bounded
-   collection intrinsic; decide whether `countWhere` belongs in v0.
+2. Mechanize and validate the drafted step, live-value, evaluator-control-depth,
+   and workspace algebra against the eventual evaluator.
+3. Decide whether `countWhere` should be added to the now-closed v0 collection
+   intrinsic basis.
 4. Freeze declared-variant construction and payload-pattern surface syntax.
-5. Freeze checked arithmetic conversion and result-propagation surface syntax.
+5. Freeze arithmetic conversion, shift, and result-propagation surface syntax.
 6. Specify export/import visibility, imported theorem reopening, and claim
    compatibility rules in admission detail.
 7. Assign stable admission-reason tags only after the encoding schema is chosen.
@@ -50,6 +50,6 @@ These block a typed-core or language freeze, but not further bootstrap design:
 No known contradiction remains among the module model, candidate-selection
 fixture, surface example, and admission ordering at this abstraction level. The
 F1-A04/F1-A06 follow-up is recorded separately and introduces tail-formed kernel
-control. The next productive review is F1-A05/F1-A07 arithmetic and resource
-algebra. Encoding comparison should use this draft but must not freeze it while
-the controlled findings remain.
+control. The F1-A05/F1-A07 arithmetic and resource-algebra follow-up is also
+recorded separately. Encoding comparison may now use these drafts but must not
+freeze them while the controlled findings remain.

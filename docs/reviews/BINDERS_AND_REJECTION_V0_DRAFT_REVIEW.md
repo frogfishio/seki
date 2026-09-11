@@ -45,7 +45,8 @@ original input at local index 3 exactly as documented.
 
 - Add canonical positive and hostile vectors once the wire encoding is selected.
 - Freeze declared-variant field-pattern surface syntax.
-- Include `KernelExpr` nodes in the exact step/control-depth cost algebra.
+- Validate the drafted `KernelExpr` step/control-depth rules against the eventual
+  evaluator.
 - Prove the structural checker sound with respect to the eventual evaluation
   relation during F1.
 
