@@ -208,6 +208,21 @@ expectAccepted("coverage-gaps-v0", decodeModule(coverageGapBytes));
   expectRejected("module-byte-ceiling-exceeded", candidate, "0b06");
 }
 {
+  const candidate = freshCandidate();
+  candidate.moduleBounds[4] = 29;
+  expectRejected("module-expression-count-exceeded", candidate, "0b06");
+}
+{
+  const candidate = freshCandidate();
+  candidate.moduleBounds[5] = 6;
+  expectRejected("module-syntax-nesting-exceeded", candidate, "0b06");
+}
+{
+  const bundle = freshBundle();
+  bundle.rootModule.moduleBounds[6] = 2;
+  expectRejected("module-call-depth-exceeded", bundle, "0b08");
+}
+{
   const traversal = decodeModule(traversalBytes);
   traversal.functions[0][1].exact[0] = 10;
   expectRejected("all-must-charge-static-capacity", traversal, "0b01");
@@ -267,4 +282,4 @@ for (const [name, component, reason] of [
   expectRejected("callable-ceiling-below-exact", candidate, "0b05");
 }
 
-console.log("typed_core_semantics=verified positive=9 hostile=30 byte_hostile=7");
+console.log("typed_core_semantics=verified positive=9 hostile=33 byte_hostile=7");

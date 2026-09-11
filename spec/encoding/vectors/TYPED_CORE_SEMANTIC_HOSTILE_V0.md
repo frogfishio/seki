@@ -27,6 +27,9 @@
 | Declared module import ceiling exceeds the profile | `0b07` |
 | Actual declaration count exceeds the module ceiling | `0b06` |
 | Canonical module bytes exceed the module ceiling | `0b06` |
+| Local expression-node count exceeds the module ceiling | `0b06` |
+| Local syntax nesting exceeds the module ceiling | `0b06` |
+| Reopened callable chain exceeds module call depth | `0b08` |
 | `All` step claim omits static-capacity work | `0b01` |
 | Map workspace claim omits the partial output | `0b04` |
 | Projection owner does not match record | `0704` |

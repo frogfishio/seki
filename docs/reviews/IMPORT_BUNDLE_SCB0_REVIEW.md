@@ -14,7 +14,8 @@ local call edge, a nonempty function schedule, nested module envelopes, and root
 closure.
 
 The bundle is 872 bytes. Its two module digests are recomputed from nested exact
-envelopes, and twelve hostile mutations produce their assigned rejection pairs.
+envelopes, and fourteen hostile mutations produce their assigned rejection
+pairs, including exact-digest graphs above the profile edge and depth ceilings.
 
 ## Findings
 
@@ -38,8 +39,7 @@ envelopes, and twelve hostile mutations produce their assigned rejection pairs.
   coverage remains open.
 - Resource tuples are now independently reconstructed for this fixture, but the
   checker is unverified and the recurrence remains a draft.
-- Import edge/depth profile ceilings and all export substitution cases need more
-  hostile coverage.
+- Additional export substitution cases need hostile coverage.
 
 ## Conclusion
 

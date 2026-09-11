@@ -23,16 +23,14 @@ silently.
 
 ## Rule-level gaps
 
-Tagged-node coverage does not establish admission completeness. Seven larger
+Tagged-node coverage does not establish admission completeness. Five larger
 rule families remain open:
 
 1. type parameter and profile well-formedness;
 2. equality-admitting type classification;
 3. checked natural arithmetic during derivation;
-4. module expression-node, nesting, and call-depth ceilings;
-5. source-input byte ceiling binding;
-6. hostile evidence for bundle import-edge and dependency-depth ceilings; and
-7. publication declaration coupling.
+4. source-input byte ceiling binding;
+5. publication declaration coupling.
 
 The ledger checker freezes the inventory shape and tag/name correspondence. It
 will fail when a schema tag is omitted, reordered, or silently renamed. It does
@@ -42,6 +40,8 @@ not certify that a named fixture is sufficient evidence for the associated rule.
 
 The small positive-form gaps are closed. Declared module/profile tuple checks now
 cover bytes, imports, declaration counts, callable resource ceilings, and profile
-maxima. Next derive expression-node, nesting, and call-depth observations and add
-bundle graph-ceiling vectors. Checked-natural overflow should enter that pass so
+maxima. Expression-node, nesting, and reopened callable-depth observations now
+have explicit recurrences and hostile cases. Bundle edge and dependency-depth
+ceilings now have constructive byte-level vectors. Checked-natural overflow is
+next so
 arithmetic failures have one deliberate precedence.

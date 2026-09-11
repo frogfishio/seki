@@ -43,8 +43,9 @@
 - Independent cursor decoder reopens both positive vectors; fifteen structural
   mutations now verify provisional rejection pairs and primary-error traversal.
 - Two-module bundle fixture reopens one exported type, imported function, local
-  call chain, exact digest closure, and nonempty function schedule; twelve bundle
-  mutations pass. Indexed imports reduced the consumer by 56%.
+  call chain, exact digest closure, and nonempty function schedule; fourteen
+  bundle mutations pass, including edge/depth profile ceilings. Indexed imports
+  reduced the consumer by 56%.
 - Experimental semantic reconstruction accepts all three fixtures, reopens
   imported signatures, and independently reproduces their type and exact
   resource conclusions; eight isolated semantic hostile cases pass.
@@ -66,6 +67,10 @@
 - A ninth 872-byte fixture closes all eleven tagged-form gaps; all 69 tags now
   have positive canonical evidence. Initial module/profile ceiling enforcement
   adds four hostile cases.
+- Canonical structural observations now enforce expression-node count, syntax
+  nesting, and reopened callable depth; three additional hostile cases pass.
+- Constructive exact-digest bundle graphs now cover the 64-edge and depth-eight
+  profile ceilings with `040b` and `040c`.
 - Conservative C11 engineering standard and `make check` entry point added.
 
 ## Active work
@@ -76,8 +81,8 @@ immediate execution queue in the delivery plan and record its owner here.
 ## Next unblocked tasks
 
 1. F0-01 — independent consumer decision and reviewer selection.
-2. F1-C bootstrap design — derive expression-node, nesting, and call depth;
-   add bundle graph-ceiling vectors and checked-natural arithmetic.
+2. F1-C bootstrap design — add checked-natural arithmetic, then close
+   type-parameter well-formedness and equality-admitting classification.
 3. B0-08/B0-09 — exact Lean and Rocq source locks.
 4. B0-10 — CompCert acquisition and use profile.
 

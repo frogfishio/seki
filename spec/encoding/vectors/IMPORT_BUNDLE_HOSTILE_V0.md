@@ -17,8 +17,9 @@
 | use unexported imported type index 1 | `0408 imported_declaration_not_exported` |
 | call unexported imported function index 1 | `0408 imported_declaration_not_exported` |
 | add a dependency-to-consumer identity edge | `0404 import_cycle` |
+| construct a ten-module chain of dependency depth nine | `040c import_depth_ceiling_exceeded` |
+| construct a thirteen-module DAG with 78 import edges | `040b import_edge_ceiling_exceeded` |
 
 Cycle detection intentionally precedes digest equality. A digest-bearing import
 cycle otherwise requires a cryptographic fixed point before the cycle tag can be
 observed; malformed ordinary cycle fixtures would always report digest mismatch.
-

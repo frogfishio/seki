@@ -67,7 +67,7 @@ const bundleParts = (bytes) => {
 };
 const makeBundle = (root, modules) =>
   envelope(1, Buffer.concat([root, u32(modules.length), ...modules]));
-const addImport = (moduleBytes, importedIdentity, importedDigest) => {
+const addImports = (moduleBytes, imports) => {
   let importsOffset = moduleIdExtent(moduleBytes, 13 + 4);
   const profileLength = moduleBytes.readUInt32BE(importsOffset);
   importsOffset += 4 + profileLength + 4;
@@ -76,13 +76,17 @@ const addImport = (moduleBytes, importedIdentity, importedDigest) => {
   }
   const payloadOffset = importsOffset - 13;
   const oldPayload = moduleBytes.subarray(13);
+  const encodedImports = imports.flatMap(([identity, digest]) =>
+    [identity, Buffer.from([0]), digest]);
   const newPayload = Buffer.concat([
     oldPayload.subarray(0, payloadOffset),
-    u32(1), importedIdentity, Buffer.from([0]), importedDigest,
+    u32(imports.length), ...encodedImports,
     oldPayload.subarray(payloadOffset + 4)
   ]);
   return envelope(0, newPayload);
 };
+const addImport = (moduleBytes, importedIdentity, importedDigest) =>
+  addImports(moduleBytes, [[importedIdentity, importedDigest]]);
 const replaceAll = (bytes, oldValue, newValue) => {
   const result = Buffer.from(bytes);
   let position = 0;
@@ -173,4 +177,31 @@ const cyclicBase = addImport(base, moduleIdentityBytes(consumer), moduleDigest(c
 expectRejected("identity-import-cycle", makeBundle(parts.root,
   [cyclicBase, consumer]), "0404");
 
-console.log("scb0_import_bundle=verified positive=1 hostile=12");
+const renamedBase = (index) => replaceAll(base, Buffer.from("base", "ascii"),
+  Buffer.from(`b${String(index).padStart(3, "0")}`, "ascii"));
+{
+  const chain = [];
+  for (let index = 0; index < 10; ++index) {
+    let module = renamedBase(index);
+    if (chain.length > 0) {
+      const dependency = chain.at(-1);
+      module = addImport(module, moduleIdentityBytes(dependency), moduleDigest(dependency));
+    }
+    chain.push(module);
+  }
+  expectRejected("dependency-depth-above-profile",
+    makeBundle(moduleIdentityBytes(chain.at(-1)), chain), "040c");
+}
+{
+  const graph = [];
+  for (let index = 0; index < 13; ++index) {
+    let module = renamedBase(index);
+    module = addImports(module, graph.map((dependency) =>
+      [moduleIdentityBytes(dependency), moduleDigest(dependency)]));
+    graph.push(module);
+  }
+  expectRejected("import-edges-above-profile",
+    makeBundle(moduleIdentityBytes(graph.at(-1)), graph), "040b");
+}
+
+console.log("scb0_import_bundle=verified positive=1 hostile=14");

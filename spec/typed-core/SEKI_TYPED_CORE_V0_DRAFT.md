@@ -754,6 +754,25 @@ bound.
 
 The function-call contribution to control depth derives from the acyclic call
 graph; expression nesting and intrinsic/block frames contribute as well.
+
+The module structural ceilings use one canonical syntactic observation:
+
+- `maximum_expression_nodes` counts every `Expr` and `KernelExpr` in every local
+  function and kernel exactly once. Callable roots, blocks, match arms, types,
+  declarations, and imported callable bodies are not additional nodes. An
+  expression inside a block or arm is counted normally.
+- `maximum_nesting` is the greatest number of local `Expr`/`KernelExpr` nodes on
+  one syntax-tree path. A callable body begins at one. Blocks and arms add no
+  level of their own; their body expression is a child of the owning intrinsic
+  or match. Following a function call does not add syntax nesting.
+- `maximum_call_depth` counts simultaneously active callable frames. A local
+  function with no calls has depth one. A call adds one to the exact reopened
+  callee depth. A kernel is a callable root and may call pure functions; imported
+  depths are reopened from the exact bundle. Blocks are not callable frames.
+
+Node count is summed across local callable declarations. Nesting and call depth
+take the maximum. This separates source structure, evaluator-control depth, and
+call-graph depth instead of allowing one implementation-dependent stack notion.
 Traversal costs use static capacities, not runtime lengths. Hidden heap,
 recursive call stacks, or host callbacks are impossible in admitted expressions.
 

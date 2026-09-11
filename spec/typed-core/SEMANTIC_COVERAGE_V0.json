@@ -82,9 +82,7 @@
     "type parameter/profile well-formedness",
     "equality-admitting type classification",
     "checked natural overflow during derivation",
-    "module expression-node, nesting, and call-depth ceilings",
     "source-input byte ceiling binding",
-    "bundle import-edge and dependency-depth hostile evidence",
     "publication declaration coupling"
   ]
 }

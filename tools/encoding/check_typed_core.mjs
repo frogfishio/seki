@@ -27,6 +27,7 @@ export class TypedCoreChecker {
         this.declarations.set(declKey(module, index), { module, index, declaration }));
     }
     this.callableBounds = new Map();
+    this.callableDepth = new Map();
   }
 
   importedModule(module, importIndex, path) {
@@ -734,6 +735,75 @@ export class TypedCoreChecker {
           `module/${kind}/${callableIndex}/declared/${index}`);
       }));
     }
+    let expressionNodes = 0;
+    let maximumNesting = 0;
+    for (const [, body] of module.functions) {
+      const metrics = this.expressionMetrics(body.body);
+      expressionNodes += metrics.count; maximumNesting = Math.max(maximumNesting, metrics.nesting);
+    }
+    for (const [, body] of module.kernels) {
+      const metrics = this.kernelMetrics(body.body);
+      expressionNodes += metrics.count; maximumNesting = Math.max(maximumNesting, metrics.nesting);
+    }
+    if (expressionNodes > declared[4] || maximumNesting > declared[5]) {
+      fail("0b06", "module/bounds/structure");
+    }
+  }
+
+  expressionMetrics(expression, depth = 1) {
+    let count = 1; let nesting = depth;
+    const walk = (value) => {
+      if (value === null || value === undefined || Buffer.isBuffer(value)) return;
+      if (typeof value === "object" && !Array.isArray(value) &&
+        Object.hasOwn(value, "claimedType")) {
+        const child = this.expressionMetrics(value, depth + 1);
+        count += child.count; nesting = Math.max(nesting, child.nesting); return;
+      }
+      if (typeof value === "object" && !Array.isArray(value) &&
+        Object.hasOwn(value, "parameters") && Object.hasOwn(value, "body")) {
+        const child = this.expressionMetrics(value.body, depth + 1);
+        count += child.count; nesting = Math.max(nesting, child.nesting); return;
+      }
+      if (Array.isArray(value)) for (const item of value) walk(item);
+      else if (typeof value === "object") for (const item of Object.values(value)) walk(item);
+    };
+    walk(expression.term);
+    return { count, nesting };
+  }
+
+  kernelMetrics(kernel, depth = 1) {
+    let count = 1; let nesting = depth;
+    const addExpression = (expression) => {
+      const child = this.expressionMetrics(expression, depth + 1);
+      count += child.count; nesting = Math.max(nesting, child.nesting);
+    };
+    const addKernel = (childKernel) => {
+      const child = this.kernelMetrics(childKernel, depth + 1);
+      count += child.count; nesting = Math.max(nesting, child.nesting);
+    };
+    switch (kernel[0]) {
+      case 0: addExpression(kernel[1]); break;
+      case 1: addExpression(kernel[1]); break;
+      case 2: addExpression(kernel[1]); addExpression(kernel[2]); addKernel(kernel[4]); break;
+      case 3: addExpression(kernel[1]); addKernel(kernel[2]); break;
+      case 4: addExpression(kernel[1]); addKernel(kernel[2]); addKernel(kernel[3]); break;
+      case 5:
+        addExpression(kernel[1]);
+        for (const [, arm] of kernel[2]) addKernel(arm);
+        break;
+    }
+    return { count, nesting };
+  }
+
+  calledFunctions(value, result = []) {
+    if (value === null || value === undefined || Buffer.isBuffer(value)) return result;
+    if (Array.isArray(value)) {
+      if (value[0] === 26 && Array.isArray(value[1])) result.push(value[1]);
+      for (const item of value) this.calledFunctions(item, result);
+    } else if (typeof value === "object") {
+      for (const item of Object.values(value)) this.calledFunctions(item, result);
+    }
+    return result;
   }
 
   check() {
@@ -766,6 +836,13 @@ export class TypedCoreChecker {
           depth: 1 + inner.depth, workspace: inner.workspace };
         this.compareBounds(actual, body.exact, body.declared, `module/functions/${index}`);
         this.callableBounds.set(callableKey(module, index), actual);
+        const calls = this.calledFunctions(body.body.term);
+        const callDepth = 1 + calls.reduce((maximum, reference) => {
+          const ref = this.resolveFunction(module, reference, "module/call_depth");
+          return Math.max(maximum, this.callableDepth.get(callableKey(ref.module, ref.index)) ?? 0);
+        }, 0);
+        this.callableDepth.set(callableKey(module, index), callDepth);
+        if (callDepth > module.moduleBounds[6]) fail("0b08", `module/functions/${index}`);
       }
       for (let index = 0; index < module.kernels.length; ++index) {
         const body = module.kernels[index][1];
@@ -797,6 +874,11 @@ export class TypedCoreChecker {
         const actual = { steps: 1 + inner.steps, live: inner.live,
           depth: 1 + inner.depth, workspace: inner.workspace };
         this.compareBounds(actual, body.exact, body.declared, `module/kernels/${index}`);
+        const callDepth = 1 + this.calledFunctions(body.body).reduce((maximum, reference) => {
+          const ref = this.resolveFunction(module, reference, "module/call_depth");
+          return Math.max(maximum, this.callableDepth.get(callableKey(ref.module, ref.index)) ?? 0);
+        }, 0);
+        if (callDepth > module.moduleBounds[6]) fail("0b08", `module/kernels/${index}`);
       }
     }
     return true;

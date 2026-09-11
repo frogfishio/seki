@@ -556,8 +556,9 @@ The next tasks, in dependency order, are:
    Capacity-expanding traversal and workspace recurrence are also complete
    experimentally. Kernel-control coverage and the checked node audit are now
    complete, and all 69 tags now have positive evidence. Initial module/profile
-   tuple checks are implemented. Continue with structural module observations,
-   bundle graph ceilings, and checked-natural arithmetic.
+   tuple and structural module checks are implemented, and bundle graph ceilings
+   have constructive vectors. Continue with checked-natural arithmetic and type
+   well-formedness.
 9. Assemble the F0 review packet and request the exact scoped response.
 
 Tasks 3–8 are bootstrap/specification work and may proceed while F0 is open. No

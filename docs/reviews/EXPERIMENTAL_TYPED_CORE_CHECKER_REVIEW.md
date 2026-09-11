@@ -73,6 +73,12 @@ declaration counts cannot exceed the module tuple; and callable declared resourc
 tuples cannot exceed the module resource tuple. Four hostile cases distinguish
 module failure `0b06` from profile failure `0b07`.
 
+Module structural observation now counts local expression/kernel nodes, measures
+syntax-only nesting, and derives callable depth across exact imported functions.
+Candidate selection reconstructs 30 nodes at nesting seven; the import chain
+reconstructs callable depths one, two, and three. Three hostile cases cover the
+associated module and call-depth ceilings.
+
 ## Boundary of the result
 
 Most hostile cases deliberately mutate freshly decoded objects after structural
@@ -90,7 +96,6 @@ cost algebra is correct.
 ## Conclusion
 
 The current type identity and resource recurrence survive their first composed
-implementation tests. The next useful work is expression-node, nesting, and
-call-depth derivation plus bundle graph-ceiling vectors and checked-natural
-overflow, continuing to add byte-level hostile vectors before
+implementation tests. The next useful work is bundle graph-ceiling vectors and
+checked-natural overflow, continuing to add byte-level hostile vectors before
 translating frozen rules into Lean.
