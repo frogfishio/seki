@@ -76,17 +76,30 @@ Only the needed members are written and duplicates are invalid.
 `publication: eligible` additionally requires the `publication` claim and
 `publication_equivalence` theorem obligation.
 
-A qualified import binds an exact version and digest:
+A source import names an exact version and explicit local alias:
 
 ```seki
-use seki::bounded @ 1
-profile: c11_bounded @ 1
-digest: sha256:"0000000000000000000000000000000000000000000000000000000000000000".
+use seki::bounded @ 1 as bounded.
 ```
 
-Wildcard imports, version ranges, ambient search paths, cyclic imports, and
-multiple modules per file are invalid. The concrete digest literal encoding
-will be frozen with the typed-core wire encoding.
+Humans do not write import digests. Generated, committed `seki.lock` binds the
+module identity to its canonical typed-core digest. Locked builds receive the
+complete dependency bundle and refuse missing, stale, substituted, extra, cyclic,
+or profile-mismatched modules. The admission checker performs no filesystem or
+network lookup and all v0 modules in a bundle use the same semantic profile.
+
+Imported references are qualified through the source-only alias:
+
+```seki
+bounded::Counter
+bounded::increment value: counter
+```
+
+Aliases and imported module identities must each be unique. Wildcard or
+unqualified imports, version ranges, ambient search paths, re-exports, implicit
+preludes, cyclic imports, automatic upgrades, and multiple modules per file are
+invalid. The module and lock rules are detailed in
+`../modules/SEKI_MODULES_V0_DRAFT.md`.
 
 ## 4. Types
 
@@ -117,6 +130,11 @@ Decision[Accepted, Rejection]
 Primitive and composite constructor spellings are reserved built-ins and cannot
 be redeclared. `ArithmeticError` is the intrinsic checked-operation error type;
 its constructors and stable tags are defined by the typed core.
+
+These parameterized forms are a closed built-in set, not user-defined generics.
+V0 has no type parameters, generic declarations, polymorphic functions,
+constraints, traits, overloads, or inference variables. Every admitted use is a
+concrete type checked by one fixed rule.
 
 Aliases do not create identity. Nominal declarations do:
 
@@ -153,7 +171,7 @@ from v0.
 
 ## 5. Functions and kernels
 
-A pure internal function and an exported kernel use typed message-pattern heads:
+A pure function and an exported kernel use typed message-pattern heads:
 
 ```seki
 fn isCurrent candidate: Candidate epoch: Epoch
@@ -173,10 +191,24 @@ publication: none [
 ].
 ```
 
+Prefixing a pure function with `export` makes it available to direct importers:
+
+```seki
+export fn isCurrent candidate: Candidate epoch: Epoch
+-> Bool
+arithmetic: checked [
+  (candidate epoch) == epoch
+].
+```
+
 The external labels are part of function identity. Parameter locals use the
 same names as their labels in v0; Zing's distinct external-label/local-name form
 is not admitted. Overloading and user-defined receiver methods are excluded.
 Functions cannot recurse directly or through an import cycle.
+
+V0 data declarations are explicitly exported; pure functions are private unless
+prefixed with `export`. Exported kernels are host entry points and cannot be
+called through imports.
 
 Every function has an explicit result type. A body returns its final expression;
 `ret` does not exist. A kernel result is normally `Decision[A, R]`.
@@ -243,7 +275,7 @@ bounded combinators:
 ```
 
 Blocks capture visible values immutably. They cannot be named, returned, stored,
-compared, passed through generic functions, exported, or represented in the
+compared, passed through ordinary functions, exported, or represented in the
 canonical typed core as general closures.
 
 ## 8. Precedence and evaluation
@@ -453,7 +485,6 @@ The draft does not yet freeze:
 - declared-variant payload construction and pattern details;
 - checked arithmetic and conversion result syntax;
 - whether `countWhere:` should be added to the minimal combinator set;
-- generic function declarations, if any;
 - formatting width and canonical source formatting; or
 - diagnostics and source-location conventions.
 

@@ -26,6 +26,8 @@
 - Binder and rejection-precedence review completed; kernel control is tail-formed.
 - Arithmetic and resource-algebra review completed; mathematical operations and
   the canonical structural cost schedule are drafted.
+- V0 typing/module complexity ceiling recorded: monomorphic structural checking,
+  aliased exact-version imports, and generated locked core digests.
 - Conservative C11 engineering standard and `make check` entry point added.
 
 ## Active work
@@ -45,7 +47,7 @@ immediate execution queue in the delivery plan and record its owner here.
 | Item | Effect |
 | --- | --- |
 | Independent F0 case not selected | Global F0 cannot close. |
-| Canonical typed-core encoding not selected | Canonical bytes and verified decoder cannot freeze. |
+| Canonical typed-core/lock encoding not selected | Canonical bytes, verified decoding, and operational lock digests cannot freeze. |
 | Derivation witness normal form unspecified | Digest-bearing derivations cannot freeze. |
 | Exact runtime/output exception not adopted | Seki-owned runtime/templates cannot enter distributable customer output. |
 | CompCert rights/acquisition unresolved | F4/F5 distribution profile cannot freeze. |

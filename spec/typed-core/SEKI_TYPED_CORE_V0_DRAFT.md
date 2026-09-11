@@ -91,8 +91,7 @@ Module ::= {
 }
 
 ImportBody ::= {
-  digest: DigestId,
-  expected_profile: ProfileId
+  digest: DigestId
 }
 
 ExportSet ::= {
@@ -122,7 +121,11 @@ ClaimKind ::= semantic_evaluation
 
 Tables impose unique keys and canonical key order. Declaration bodies do not
 repeat the surrounding table key. Surface declaration order does not enter
-semantic identity. Imports form a finite acyclic digest-bound graph.
+semantic identity. Imports form a finite acyclic digest-bound graph, use the
+same semantic profile as the importing module, and are supplied as one complete
+bounded admission bundle. Admission performs no module search or resolution.
+The selected profile fixes maximum bundle modules, total canonical bytes, import
+edges, and dependency depth in addition to each module's own import ceiling.
 
 Export vectors contain unique local references in canonical index order. Theorem
 requirements and claims are closed, unique, canonically ordered sets. A claim not
@@ -148,7 +151,6 @@ FunctionRef ::= LocalFunctionRef(function_index)
               | ImportedFunctionRef(module, digest, function_index)
 
 KernelRef ::= LocalKernelRef(kernel_index)
-            | ImportedKernelRef(module, digest, kernel_index)
 
 DomainRef ::= LocalDomainRef(domain_index)
             | ImportedDomainRef(module, digest, domain_index)
@@ -181,6 +183,10 @@ ConstructorRef ::= {
 Indices address the canonically sorted declaration tables, never surface order.
 Admission verifies that each index is in range and that the indexed declaration
 has the expected kind.
+
+Every imported reference must name a direct import and one of that module's
+explicit exports. Transitive imports are not visible. Imported kernels are not
+referenced or callable in v0.
 
 Declared constructor tags come from the referenced variant declaration. Intrinsic
 sum tags are frozen as:
@@ -239,6 +245,11 @@ no payload has no `VariantPayload` value. `Declared` cannot reference an alias;
 aliases are expanded during elaboration and admission rechecks that normalization.
 Admission permits `VariantPayload` only where it is synthesized for a matching
 arm and its local projections; it cannot appear in declarations or public APIs.
+
+The parameterized forms in `Type` are closed intrinsic schema families. V0 has no
+type variables, user-defined generic declarations, polymorphic functions, or
+generic instantiation nodes. Every admitted type and function signature is fully
+concrete.
 
 ```text
 TypeDeclBody ::= AliasBody | NominalBody | RecordBody | VariantBody

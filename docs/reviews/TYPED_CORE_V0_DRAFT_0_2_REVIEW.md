@@ -41,8 +41,8 @@ These block a typed-core or language freeze, but not further bootstrap design:
    intrinsic basis.
 4. Freeze declared-variant construction and payload-pattern surface syntax.
 5. Freeze arithmetic conversion, shift, and result-propagation surface syntax.
-6. Specify export/import visibility, imported theorem reopening, and claim
-   compatibility rules in admission detail.
+6. Complete direct-import/export validation and module claim-compatibility rules;
+   source-level theorem imports are excluded from v0.
 7. Assign stable admission-reason tags only after the encoding schema is chosen.
 
 ## Review conclusion

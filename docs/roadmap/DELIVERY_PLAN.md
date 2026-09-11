@@ -214,6 +214,7 @@ and resource-bound foundation. F1 emits no qualified C backend.
 | F1-A06 | Deterministic evaluation and rejection precedence. |
 | F1-A07 | Step, live-value, control-depth, and workspace algebra; concrete storage mapping is deferred. |
 | F1-A08 | Explicit exclusions and profile ceilings. |
+| F1-A09 | Syntax-directed monomorphic typing and exact locked-module rules. |
 
 No concrete encoding is frozen until every admitted value has one defined schema
 shape and every field has a validation rule.
@@ -233,7 +234,7 @@ CBOR subset against:
 
 Record the decision in an ADR. Then deliver canonical encoder/decoder rules,
 positive vectors, noncanonical equivalents that must reject, truncated/oversized
-vectors, and digest vectors.
+vectors, module/lock encodings, and digest vectors.
 
 #### F1-C: Lean admission
 
@@ -242,6 +243,7 @@ Implement and prove:
 - canonical decoding or reopening of exact decoded structure;
 - schema/version/profile checks;
 - name, type, nominal-domain, and import checks;
+- closed-bundle digest, export, profile, and acyclic dependency checks;
 - duplicate and unknown-field rejection;
 - totality and bound-derivation validation;
 - accepted-module well-formedness; and

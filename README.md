@@ -14,6 +14,13 @@ Over time, eligible critical components can be rewritten in Seki and compiled
 back to C. Filesystem access, process control, diagnostics, and other application
 plumbing remain ordinary C; self-hosting is not a project goal by itself.
 
+V0 deliberately avoids a general generic or package system. Typing is
+syntax-directed over concrete monomorphic types; parameterized built-ins such as
+`Option[T]` and `BoundedVec[T,N]` are fixed language schemas. Source modules use
+exact versions and aliases, while generated committed `seki.lock` data binds the
+canonical-core digests. The admission checker receives the complete bundle and
+never searches a filesystem, registry, or network.
+
 ## Project lineage and ownership
 
 Gnosis and Kiku jointly specified Seki from a shared need for small decision

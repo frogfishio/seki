@@ -10,8 +10,7 @@ ModuleDecl      <- 'module' Sp ModulePath Sp '@' Sp Nat Sep
                    'claims:' Sp NameList Sep
                    'requires:' Sp NameList Dot
 UseDecl         <- 'use' Sp ModulePath Sp '@' Sp Nat Sep
-                   'profile:' Sp ProfileRef Sep
-                   'digest:' Sp DigestLiteral Dot
+                   'as' Sp ValueIdent Dot
 NameList        <- ValueIdent (Trivia Comma Trivia ValueIdent)*
 ProfileRef      <- ValueIdent Sp '@' Sp Nat
 
@@ -31,8 +30,9 @@ VariantBody     <- LBrack Trivia VariantCase (Trivia VariantCase)* Trivia RBrack
 VariantCase     <- TypeIdent VariantPayload? Trivia '@' Trivia Nat Dot
 VariantPayload  <- LParen Trivia FieldDecl (Trivia Comma Trivia FieldDecl)* Trivia RParen
 
-FunctionDecl    <- 'fn' Sp FunctionHead Sep FunctionTail
+FunctionDecl    <- ExportPrefix? 'fn' Sp FunctionHead Sep FunctionTail
                    (Sep Bounds)? Trivia Body Dot
+ExportPrefix    <- 'export' Sp
 KernelDecl      <- 'export' Sp 'kernel' Sp FunctionHead Sep FunctionTail
                    Sep Bounds Sep RejectsClause Sep PublicationClause Trivia Body Dot
 FunctionHead    <- ValueIdent (Sp ParamBinding)*
@@ -46,13 +46,17 @@ RejectsClause   <- 'rejects:' Sp VariantRef
                    (Trivia Comma Trivia VariantRef)*
 PublicationClause <- 'publication:' Sp ('none' / 'eligible')
 
-TypeRef         <- PrimitiveType / AppliedType / TypeIdent
+TypeRef         <- PrimitiveType / AppliedType / QualifiedType / TypeIdent
 PrimitiveType   <- ('Unit' / 'Bool' / 'U8' / 'U16' / 'U32' / 'U64'
                  / 'I8' / 'I16' / 'I32' / 'I64' / 'ArithmeticError')
                    !IdentRest
-AppliedType     <- TypeIdent LBrack Trivia TypeArg
+AppliedType     <- BuiltinTypeConstructor LBrack Trivia TypeArg
                    (Trivia Comma Trivia TypeArg)* Trivia RBrack
+BuiltinTypeConstructor <- ('Bytes' / 'Identity' / 'Digest' / 'Index'
+                          / 'Option' / 'Result' / 'Tuple' / 'Array'
+                          / 'BoundedVec' / 'Decision') !IdentRest
 TypeArg         <- TypeRef / TypeIdent / Nat
+QualifiedType   <- ValueIdent PathSep TypeIdent
 
 Body            <- LBrack Trivia BodySeq Trivia RBrack
 BodySeq         <- (BodyStmt Trivia Dot Trivia)* FinalExpr
@@ -78,16 +82,19 @@ UnarySelector   <- ValueIdent !Colon
 
 Primary         <- BoolLit / UnitLit / IntLit / DigestLiteral / RecordLiteral
                  / VariantRef / MatchExpr / PolicyExpr / Block / ParenExpr
-                 / ValueIdent / TypeIdent
+                 / QualifiedValue / ValueIdent / TypeIdent
 PolicyExpr      <- ArithmeticPolicy Colon Trivia Block
 ParenExpr       <- LParen Trivia Expr Trivia RParen
 Block           <- LBrack Trivia BlockParams? BodySeq Trivia RBrack
 BlockParams     <- BlockParam (Sp BlockParam)* Trivia Bar Trivia
 BlockParam      <- Colon ValueIdent
-RecordLiteral   <- TypeIdent Trivia LBrace Trivia RecordField
+RecordLiteral   <- NamedType Trivia LBrace Trivia RecordField
                    (Trivia Comma Trivia RecordField)* Trivia RBrace
+NamedType       <- QualifiedType / TypeIdent
 RecordField     <- ValueIdent Trivia Colon Trivia Expr
-VariantRef      <- TypeIdent PathSep TypeIdent
+VariantRef      <- QualifiedVariantRef / TypeIdent PathSep TypeIdent
+QualifiedVariantRef <- ValueIdent PathSep TypeIdent PathSep TypeIdent
+QualifiedValue  <- ValueIdent PathSep ValueIdent
 MatchExpr       <- 'match' Sp Expr Trivia LBrack Trivia MatchArm+
                    Trivia RBrack
 MatchArm        <- TypeIdent Colon Trivia Block Dot
@@ -103,7 +110,7 @@ TypeIdent       <- [A-Z] IdentRest*
 ValueIdent      <- !Keyword [a-z] IdentRest*
 IdentRest       <- [A-Za-z0-9_]
 Keyword         <- ('module' / 'profile' / 'use' / 'digest' / 'export'
-                 / 'claims' / 'requires' / 'domain' / 'type' / 'nominal'
+                 / 'as' / 'claims' / 'requires' / 'domain' / 'type' / 'nominal'
                  / 'record' / 'variant' / 'fn'
                  / 'kernel' / 'arithmetic' / 'bounded' / 'steps'
                  / 'liveBits' / 'controlDepth' / 'workspaceBits' / 'rejects'

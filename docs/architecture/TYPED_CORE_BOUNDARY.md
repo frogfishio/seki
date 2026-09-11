@@ -26,11 +26,17 @@ types, and backend-specific operations.
 
 ## Admission obligations
 
-An admitted module must bind its language and semantic-profile identities,
-imports and their digests, declarations, types, bounds, derivation witnesses,
-and exported kernels. Admission must reject unknown or duplicate fields,
-ill-typed terms, nominal-domain mismatches, cyclic imports, unsupported
+An admitted root bundle must bind its language and single semantic-profile
+identity, direct imports and their canonical-core digests, declarations, concrete
+types, bounds, derivation witnesses, and exported kernels. The complete finite
+dependency bundle is supplied to admission; the checker never resolves paths or
+packages. Admission must reject unknown or duplicate fields, ill-typed terms,
+nominal-domain mismatches, missing/extra/substituted/cyclic imports, unsupported
 constructs, and missing or invalid bounds.
+
+V0 typing is syntax-directed and monomorphic. Parameterized built-in types and
+intrinsics are closed schema families, not user-defined generics. Human source
+imports exact versions through aliases; generated `seki.lock` records digests.
 
 ## Serialization freeze criteria
 
@@ -46,4 +52,3 @@ can state and test:
 7. a feasible path to verified Lean decoding and encoding.
 
 Surface syntax must not be frozen before this boundary.
-

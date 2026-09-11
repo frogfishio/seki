@@ -5,17 +5,20 @@
 
 ## 1. Admission result
 
-Admission is total over every byte sequence within the selected input-size ceiling:
+Admission is total over every byte sequence within the selected bundle-size
+ceiling:
 
 ```text
-admit : CandidateBytes -> AdmissionResult
+admit : CandidateBundleBytes -> AdmissionResult
 
 AdmissionResult ::= Admitted(Module)
                   | Rejected(AdmissionReason, DiagnosticPath)
 ```
 
-Inputs exceeding the byte ceiling are rejected before allocation or structural
-decoding. No rejected input yields an executable semantic module.
+The candidate bundle contains one designated root module and every dependency
+module byte sequence. Inputs exceeding the envelope or per-module byte ceilings
+are rejected before allocation or structural decoding. No rejected input yields
+an executable semantic module.
 
 ## 2. Layered checks
 
@@ -29,7 +32,7 @@ table entries have been canonically ordered.
 | 1 | Canonical form | noncanonical integer/length, duplicate key, wrong key order |
 | 2 | Identity | wrong schema, language, module, or semantic profile |
 | 3 | Shape | unknown/missing field, wrong value kind, profile count exceeded |
-| 4 | Imports | bad digest, duplicate identity, unavailable exact import, cycle |
+| 4 | Imports | bad digest, duplicate identity, missing/extra module, profile mismatch, non-direct reference, cycle |
 | 5 | Declarations | invalid/duplicate name, table disorder, invalid stable tag, bad export |
 | 6 | Type formation | invalid bound, recursive type, unsupported type |
 | 7 | References | out-of-range or wrong-kind declaration/local reference |
@@ -62,10 +65,14 @@ Each layer requires at least one positive boundary vector and negative vectors f
 
 - empty, one-byte, truncated, and trailing-byte inputs;
 - maximum and maximum-plus-one lengths/counts/nesting;
+- maximum and maximum-plus-one bundle modules, total bytes, import edges, and
+  dependency depth;
 - duplicate, missing, unknown, reordered, and wrong-kind fields;
 - invalid UTF-8 wherever text is admitted;
 - noncanonical integer, length, tag, and identifier encodings;
 - substituted module, import, domain, type, function, field, and variant references;
+- missing, extra, reordered, profile-mismatched, and digest-substituted dependency
+  modules;
 - alias cycles, recursive records/variants, and call cycles;
 - local references at every binder-depth boundary;
 - nominally distinct but representation-equal values;
@@ -91,6 +98,7 @@ Each layer requires at least one positive boundary vector and negative vectors f
 The checker does not trust:
 
 - parser or elaborator success;
+- source paths, module search results, registries, or a generated lockfile;
 - ordering performed by the producer;
 - claimed expression types or bounds;
 - imported names without exact digest reopening;
@@ -98,5 +106,5 @@ The checker does not trust:
 - source locations or human diagnostics; or
 - successful execution of generated or handwritten C.
 
-An admitted result binds the exact canonical module digest and checker/profile
-identity needed by later stages.
+An admitted result binds the exact canonical root and dependency digests plus the
+checker/profile identity needed by later stages.
