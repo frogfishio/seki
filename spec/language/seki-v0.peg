@@ -1,5 +1,7 @@
 # Seki v0 candidate surface grammar
 # Status: informative bootstrap draft; incomplete where the surface spec says open
+# Blocks are parsed uniformly; elaboration enforces kernel-tail context and
+# constructor-specific binder arity as specified by the surface and typed core.
 # Start symbol: Module
 
 Module          <- Trivia ModuleDecl (Trivia UseDecl)* (Trivia TopDecl)* Trivia EOF

@@ -54,7 +54,7 @@ required theorems = [type_well_formed, totality, determinism,
 ## Abstract body
 
 ```text
-Let(
+KernelLet(
   value = FindUnique(
     collection = Project(Local[0 /* input */], Input.candidates),
     predicate = Block(Candidate -> Bool,
@@ -64,28 +64,28 @@ Let(
       )
     )
   ),
-  body = Match(Local[0 /* unique result */], [
+  body = KernelMatch(Local[0 /* unique result */], [
     Error(Unit) =>
-      Reject(Rejection.Duplicate, precedence_index = 1),
+      KernelReject(Rejection.Duplicate, precedence_index = 1),
 
     Ok(option) =>
-      Match(Local[0 /* option */], [
+      KernelMatch(Local[0 /* option */], [
         None =>
-          Reject(Rejection.Missing, precedence_index = 0),
+          KernelReject(Rejection.Missing, precedence_index = 0),
 
         Some(candidate) =>
-          Require(
+          KernelRequire(
             precedence_index = 2,
             condition = Equal(
               Project(Local[0 /* candidate */], Candidate.epoch),
               Project(Local[3 /* input */], Input.currentEpoch)
             ),
             rejection = Rejection.Stale,
-            continuation = Require(
+            continuation = KernelRequire(
               precedence_index = 3,
               condition = Project(Local[0 /* candidate */], Candidate.enabled),
               rejection = Rejection.Disabled,
-              continuation = Accept(Local[0 /* candidate */])
+              continuation = KernelAccept(Local[0 /* candidate */])
             )
           )
       ])
@@ -97,18 +97,18 @@ Let(
 `ConstructorRef` values. They are not declared `VariantRef` values.
 
 The first two rejection cases arise from mutually exclusive `FindUnique` result
-constructors rather than `Require` nodes. Every direct `Reject` and every
-`Require` carries the corresponding index in the declared total order.
+constructors rather than `KernelRequire` nodes. Every `KernelReject` and every
+`KernelRequire` carries the corresponding index in the declared total order.
 
 ## Required semantic cases
 
 | Case | Expected decision |
 | --- | --- |
-| One matching current enabled candidate | `Accept(candidate)` |
-| No matching identity | `Reject(Missing)` |
-| Two or more matching identities | `Reject(Duplicate)` |
-| One matching candidate with wrong epoch | `Reject(Stale)` |
-| One matching current disabled candidate | `Reject(Disabled)` |
+| One matching current enabled candidate | `Decision::Accept(candidate)` |
+| No matching identity | `Decision::Reject(Missing)` |
+| Two or more matching identities | `Decision::Reject(Duplicate)` |
+| One matching candidate with wrong epoch | `Decision::Reject(Stale)` |
+| One matching current disabled candidate | `Decision::Reject(Disabled)` |
 | Byte-equal identity from another nominal domain | admission/type rejection before evaluation |
 | Maximum logical vector length of 32 | defined decision within derived bounds |
 | Decoded vector length 33 | representation/admission rejection before evaluation |

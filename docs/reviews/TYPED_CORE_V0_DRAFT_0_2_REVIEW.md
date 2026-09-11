@@ -49,6 +49,7 @@ These block a typed-core or language freeze, but not further bootstrap design:
 
 No known contradiction remains among the module model, candidate-selection
 fixture, surface example, and admission ordering at this abstraction level. The
-next productive review is the F1-A04/F1-A06 binder and rejection pass, followed
-by the F1-A05/F1-A07 arithmetic and resource-algebra pass. Encoding comparison
-should use this draft but must not freeze it while the controlled findings remain.
+F1-A04/F1-A06 follow-up is recorded separately and introduces tail-formed kernel
+control. The next productive review is F1-A05/F1-A07 arithmetic and resource
+algebra. Encoding comparison should use this draft but must not freeze it while
+the controlled findings remain.

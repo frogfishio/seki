@@ -50,7 +50,7 @@ A diagnostic path addresses canonical structure, not source text:
 
 ```text
 module/types/3/record/fields/1/type
-module/kernels/0/body/require/continuation
+module/kernels/0/body/kernelRequire/continuation
 ```
 
 Source locations are recovered only through a digest-bound diagnostic sidecar.
@@ -75,7 +75,10 @@ Each layer requires at least one positive boundary vector and negative vectors f
 - invalid collection capacities and block signatures;
 - rejection-order omissions, duplicate constructors, bad site indices, and
   reason/index mismatches;
-- non-increasing nested requirement indices along one continuation path;
+- kernel-control nodes smuggled into pure value positions;
+- non-increasing rejection indices through lets, conditionals, matches, and
+  requirements along one continuation path;
+- wrong binder arity for nullary and payload-bearing match constructors;
 - mismatched exact steps, live-value bits, control depth, or workspace bits;
 - arithmetic overflow in bound calculation; and
 - valid core constructs unavailable in the selected backend profile.

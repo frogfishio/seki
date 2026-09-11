@@ -309,7 +309,7 @@ KernelBody ::= {
   parameter_types: Vec[Type],
   result: Decision(accepted: Type, rejection: Type),
   rejection_order: Vec[VariantRef],
-  body: Expr,
+  body: KernelExpr,
   declared_ceiling: ResourceBounds,
   exact_derived_bounds: ResourceBounds,
   publication_eligible: Bool
@@ -365,6 +365,10 @@ function/kernel body. Per-expression bound claims are omitted so an elaborator
 cannot create distinct authority roots by choosing arbitrary conservative claims.
 Each child sequence below is evaluated from left to right unless a node gives a
 more specific rule.
+
+`Expr` is pure value-producing syntax. Kernel acceptance, rejection, and ordered
+requirements are deliberately absent from `Term`; they inhabit the tail-formed
+`KernelExpr` grammar in section 8.7.
 
 ### 8.1 Values and bindings
 
@@ -483,6 +487,20 @@ not a producer-supplied flag, determines whether an arm receives a payload.
 Options, results, and decisions use equivalent intrinsic constructor identities
 for exhaustiveness even when their surface sugar differs.
 
+Payload binding is fixed by constructor kind:
+
+| Constructor | Arm binding |
+| --- | --- |
+| declared nullary case | none |
+| declared payload case | one `VariantPayload(case)` value |
+| `Option::None` | none |
+| `Option::Some` | one item value |
+| `Result::Ok` | one success value |
+| `Result::Error` | one error value |
+| `Decision::Accept` | one accepted value |
+| `Decision::Reject` | one rejection value |
+| any `ArithmeticError` case | none |
+
 Each match arm binds at most one value: the complete payload of the selected
 constructor. For a record-payload variant, that binding is the payload record and
 has type `VariantPayload(case)`; fields are projected through payload-owned
@@ -500,24 +518,47 @@ Calls resolve to one exact local or digest-bound imported function. Arguments
 match labels and types exactly and evaluate in declared order. Kernels cannot be
 called as functions in v0.
 
-### 8.7 Kernel rejection sequence
+### 8.7 Tail-formed kernel control and rejection sequence
 
 ```text
-Term ::= Require(
+KernelExpr ::= KernelAccept(value: Expr)
+             | KernelReject(reason: Expr, precedence_index: Nat)
+             | KernelRequire(
   condition: Expr,
   rejection: Expr,
-  continuation: Expr,
-  precedence_index: Nat
+  precedence_index: Nat,
+  continuation: KernelExpr
 )
-       | Accept(value: Expr)
-       | Reject(reason: Expr, precedence_index: Nat)
+             | KernelLet(value: Expr, body: KernelExpr)
+             | KernelIf(
+                 condition: Expr,
+                 when_true: KernelExpr,
+                 when_false: KernelExpr
+               )
+             | KernelMatch(
+                 scrutinee: Expr,
+                 arms: Table[ConstructorRef, KernelMatchArm]
+               )
+
+KernelMatchArm ::= {
+  body: KernelExpr
+}
 ```
 
-`Require` is legal only within a kernel returning `Decision[A, R]`. It evaluates
-its Boolean condition. False evaluates the rejection expression and produces
-the same result as `Reject`; true evaluates the continuation. `Accept` and
-`Reject` are likewise legal only within such a kernel and construct the
-corresponding `Decision` value.
+Every `KernelExpr` is checked in the enclosing kernel's `Decision[A, R]` context.
+`KernelAccept` evaluates an `A`; `KernelReject` evaluates an `R`.
+`KernelRequire` evaluates its Boolean condition. False evaluates its rejection
+expression and returns `Decision::Reject`; true evaluates its continuation.
+
+`KernelLet` evaluates a pure value and binds it at local index 0 for its body.
+`KernelIf` and `KernelMatch` evaluate exactly one tail branch. `KernelMatch` uses
+the same exhaustiveness, canonical arm ordering, and constructor-determined
+single-payload binder rule as pure `Match`.
+
+Kernel control is tail-formed by construction. A pure expression cannot hide a
+rejection inside an arithmetic operand, record field, call argument, collection
+block, or other value-producing position. Every kernel execution reaches exactly
+one terminal `KernelAccept` or `KernelReject`.
 
 Every rejection site carries the zero-based index of its reason constructor in
 the kernel's declared rejection order. Multiple sites may use the same index.
@@ -526,11 +567,24 @@ order vector itself contains every rejection constructor exactly once without
 gaps or duplicates.
 
 The reason expression at a rejection site has one statically known outer
-constructor; its payload may be computed. Precedence uses a deliberately simple
-syntactic rule: indices of nested `Require` nodes must strictly increase through
-each continuation. Separate match arms may begin at unrelated indices because
-only one arm executes. More permissive semantic analysis of mutually exclusive
-requirements is not part of v0 admission.
+constructor; its payload may be computed. Precedence is checked by
+`check_order(kernel_expr, floor)`, initially with `floor = 0`:
+
+```text
+KernelAccept                 succeeds
+KernelReject(_, i)           requires i >= floor
+KernelRequire(_, _, i, k)    requires i >= floor;
+                              checks k with floor = i + 1
+KernelLet(_, k)              checks k with the same floor
+KernelIf(_, yes, no)         checks both branches with the same floor
+KernelMatch(_, arms)         checks every arm with the same floor
+```
+
+The `i + 1` calculation is checked and cannot overflow the selected profile.
+Thus rejection indices strictly increase along every sequentially reachable
+continuation, including through intervening lets, conditionals, and matches.
+Mutually exclusive branches may begin at unrelated indices because only one
+executes. More permissive semantic analysis is not part of v0 admission.
 
 This node makes rejection precedence structural rather than an incidental property
 of generated control flow.
@@ -628,7 +682,7 @@ total:
 evaluate : AdmittedCallable × Values -> Value
 ```
 
-Semantic rejection is a `Reject` result. Checked arithmetic failures are
+Semantic rejection is a `Decision::Reject` result. Checked arithmetic failures are
 ordinary `ResultError` values that the program must handle. Malformed input,
 authentication failure, cancellation, host failure, and allocation failure occur
 outside pure typed-core evaluation and cannot be disguised as semantic acceptance.

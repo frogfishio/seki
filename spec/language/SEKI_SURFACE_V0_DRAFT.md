@@ -303,7 +303,10 @@ match value [
 ```
 
 Arms must be exhaustive, constructors cannot repeat, and every arm has the same
-result type. The exact payload-pattern grammar is still provisional.
+result type. A nullary constructor takes a zero-parameter block; a payload
+constructor takes exactly one block parameter for its complete payload. Nested
+destructuring requires a nested `match`. The precise declared-payload field
+pattern syntax remains provisional.
 
 A kernel may enforce ordered semantic rejection with `require`:
 
@@ -314,8 +317,9 @@ require count == 1 else: Rejection::Duplicate.
 
 `require condition else: reason` is legal only in a kernel returning
 `Decision[A, R]`; false immediately produces `Decision::Reject { reason: reason }`.
-Its written position determines rejection precedence. The final accepted value
-is explicit:
+Its position on each sequential control path determines rejection precedence.
+Bindings, conditionals, and matches cannot reset that order. The final accepted
+value is explicit:
 
 ```seki
 accept candidate
@@ -331,7 +335,13 @@ reject Rejection::Missing
 ```
 
 The elaborator assigns the constructor's index from `rejects:`. Direct rejection
-and failed `require` use the same typed-core `Reject` result.
+and failed `require` produce the same `Decision::Reject` semantic result.
+
+Kernel decision control is tail-only. `accept`, `reject`, and `require` cannot be
+used as record fields, call arguments, arithmetic operands, collection-block
+results, or stored values. Surface bindings elaborate to `KernelLet`; a final
+conditional or match elaborates to `KernelIf` or `KernelMatch`. This makes every
+kernel path end in exactly one acceptance or rejection.
 
 ## 11. Bounded collections
 
