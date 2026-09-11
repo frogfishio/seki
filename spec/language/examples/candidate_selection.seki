@@ -1,7 +1,11 @@
 module seki::examples::candidate_selection @ 1
-profile: c11_bounded_v1.
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: type_well_formed, totality, determinism, resource_bounds,
+  rejection_precedence.
 
-export nominal CandidateId := Identity[Candidate, 16].
+export domain CandidateIdentity.
+export nominal CandidateId := Identity[CandidateIdentity, 16].
 export nominal Epoch := U64.
 
 export record Candidate {
@@ -26,24 +30,30 @@ export variant Rejection [
 export kernel select input: Input
 -> Decision[Candidate, Rejection]
 arithmetic: checked
-bounded steps: 2048 stack: 512 workspace: 4096 [
-  matches := input candidates countWhere: [ :candidate |
+bounded steps: 2048 liveBits: 4096 controlDepth: 64 workspaceBits: 4096
+rejects: Rejection::Missing, Rejection::Duplicate, Rejection::Stale,
+  Rejection::Disabled
+publication: none [
+  selection := input candidates findUnique: [ :candidate |
     (candidate id) == (input wanted)
   ].
 
-  require matches != 0 else: Rejection::Missing.
-  require matches == 1 else: Rejection::Duplicate.
-
-  selected := input candidates findUnique: [ :candidate |
-    (candidate id) == (input wanted)
-  ].
-
-  candidate := selected requireSome: Rejection::Missing.
-
-  require (candidate epoch) == (input currentEpoch)
-    else: Rejection::Stale.
-  require candidate enabled else: Rejection::Disabled.
-
-  accept candidate
+  match selection [
+    Error: [ :duplicate |
+      reject Rejection::Duplicate
+    ].
+    Ok: [ :option |
+      match option [
+        None: [
+          reject Rejection::Missing
+        ].
+        Some: [ :candidate |
+          require (candidate epoch) == (input currentEpoch)
+            else: Rejection::Stale.
+          require candidate enabled else: Rejection::Disabled.
+          accept candidate
+        ].
+      ]
+    ].
+  ]
 ].
-

@@ -20,8 +20,8 @@ decoding. No rejected input yields an executable semantic module.
 ## 2. Layered checks
 
 Checks run in this fixed precedence. A layer completes before the next begins.
-Within a layer, the first error is the least canonical structural path after map
-keys and table entries have been canonically ordered.
+Within a layer, the first error is the least canonical structural path after
+table entries have been canonically ordered.
 
 | Order | Layer | Representative rejection |
 | --- | --- | --- |
@@ -30,12 +30,12 @@ keys and table entries have been canonically ordered.
 | 2 | Identity | wrong schema, language, module, or semantic profile |
 | 3 | Shape | unknown/missing field, wrong value kind, profile count exceeded |
 | 4 | Imports | bad digest, duplicate identity, unavailable exact import, cycle |
-| 5 | Declarations | invalid/duplicate name, table disorder, invalid stable tag |
+| 5 | Declarations | invalid/duplicate name, table disorder, invalid stable tag, bad export |
 | 6 | Type formation | invalid bound, recursive type, unsupported type |
 | 7 | References | out-of-range or wrong-kind declaration/local reference |
 | 8 | Static typing | operand, argument, field, branch, match, or result mismatch |
 | 9 | Totality | recursion, escaping block, unsupported call/intrinsic |
-| 10 | Kernel rules | invalid decision type, rejection order, require index, publication declaration |
+| 10 | Module/kernel rules | invalid theorem/claim ceiling, decision type, rejection order, require index, publication declaration |
 | 11 | Bounds | overflow, incorrect derivation, profile ceiling exceeded |
 | 12 | Backend/profile | construct unavailable in selected qualified projection |
 | 13 | Witness closure | missing, mismatched, or incomplete derivation witness |
@@ -70,12 +70,13 @@ Each layer requires at least one positive boundary vector and negative vectors f
 - local references at every binder-depth boundary;
 - nominally distinct but representation-equal values;
 - incomplete records and non-exhaustive or duplicate match arms;
-- mixed-width arithmetic and incorrect policy result types;
+- mixed-width arithmetic, invalid intrinsic constructor references, and incorrect
+  operation/policy result types;
 - invalid collection capacities and block signatures;
 - rejection-order omissions, duplicate constructors, bad site indices, and
   reason/index mismatches;
 - non-increasing nested requirement indices along one continuation path;
-- underclaimed steps, live values, stack, or workspace;
+- mismatched exact steps, live-value bits, control depth, or workspace bits;
 - arithmetic overflow in bound calculation; and
 - valid core constructs unavailable in the selected backend profile.
 

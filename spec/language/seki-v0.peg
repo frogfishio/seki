@@ -4,15 +4,21 @@
 
 Module          <- Trivia ModuleDecl (Trivia UseDecl)* (Trivia TopDecl)* Trivia EOF
 ModuleDecl      <- 'module' Sp ModulePath Sp '@' Sp Nat Sep
-                   'profile:' Sp ValueIdent Dot
+                   'profile:' Sp ProfileRef Sep
+                   'claims:' Sp NameList Sep
+                   'requires:' Sp NameList Dot
 UseDecl         <- 'use' Sp ModulePath Sp '@' Sp Nat Sep
+                   'profile:' Sp ProfileRef Sep
                    'digest:' Sp DigestLiteral Dot
+NameList        <- ValueIdent (Trivia Comma Trivia ValueIdent)*
+ProfileRef      <- ValueIdent Sp '@' Sp Nat
 
 ModulePath      <- ValueIdent (PathSep ValueIdent)*
 PathSep         <- '::'
 
-TopDecl         <- TypeAlias / NominalDecl / RecordDecl / VariantDecl
+TopDecl         <- DomainDecl / TypeAlias / NominalDecl / RecordDecl / VariantDecl
                  / FunctionDecl / KernelDecl
+DomainDecl      <- 'export' Sp 'domain' Sp TypeIdent Dot
 TypeAlias       <- 'export' Sp 'type' Sp TypeIdent Sp ':=' Sp TypeRef Dot
 NominalDecl     <- 'export' Sp 'nominal' Sp TypeIdent Sp ':=' Sp TypeRef Dot
 RecordDecl      <- 'export' Sp 'record' Sp TypeIdent Sp RecordBody Dot
@@ -26,18 +32,22 @@ VariantPayload  <- LParen Trivia FieldDecl (Trivia Comma Trivia FieldDecl)* Triv
 FunctionDecl    <- 'fn' Sp FunctionHead Sep FunctionTail
                    (Sep Bounds)? Trivia Body Dot
 KernelDecl      <- 'export' Sp 'kernel' Sp FunctionHead Sep FunctionTail
-                   Sep Bounds Trivia Body Dot
+                   Sep Bounds Sep RejectsClause Sep PublicationClause Trivia Body Dot
 FunctionHead    <- ValueIdent (Sp ParamBinding)*
 ParamBinding    <- ValueIdent Colon Trivia TypeRef
 FunctionTail    <- Arrow Trivia TypeRef Sep
                    'arithmetic:' Sp ArithmeticPolicy
 ArithmeticPolicy <- 'checked' / 'wrapping' / 'saturating'
-Bounds          <- 'bounded' Sp 'steps:' Sp Nat Sp 'stack:' Sp Nat Sp
-                   'workspace:' Sp Nat
+Bounds          <- 'bounded' Sp 'steps:' Sp Nat Sp 'liveBits:' Sp Nat Sp
+                   'controlDepth:' Sp Nat Sp 'workspaceBits:' Sp Nat
+RejectsClause   <- 'rejects:' Sp VariantRef
+                   (Trivia Comma Trivia VariantRef)*
+PublicationClause <- 'publication:' Sp ('none' / 'eligible')
 
 TypeRef         <- PrimitiveType / AppliedType / TypeIdent
-PrimitiveType   <- 'Unit' / 'Bool' / 'U8' / 'U16' / 'U32' / 'U64'
-                 / 'I8' / 'I16' / 'I32' / 'I64'
+PrimitiveType   <- ('Unit' / 'Bool' / 'U8' / 'U16' / 'U32' / 'U64'
+                 / 'I8' / 'I16' / 'I32' / 'I64' / 'ArithmeticError')
+                   !IdentRest
 AppliedType     <- TypeIdent LBrack Trivia TypeArg
                    (Trivia Comma Trivia TypeArg)* Trivia RBrack
 TypeArg         <- TypeRef / TypeIdent / Nat
@@ -47,8 +57,9 @@ BodySeq         <- (BodyStmt Trivia Dot Trivia)* FinalExpr
 BodyStmt        <- Binding / RequireStmt
 Binding         <- ValueIdent Trivia ':=' Trivia Expr
 RequireStmt     <- 'require' Sp Expr Sp 'else:' Sp Expr
-FinalExpr       <- AcceptExpr / Expr
+FinalExpr       <- AcceptExpr / RejectExpr / Expr
 AcceptExpr      <- 'accept' Sp Expr
+RejectExpr      <- 'reject' Sp Expr
 
 Expr            <- KeywordExpr
 KeywordExpr     <- OrExpr (Sp KeywordPart)+ / OrExpr
@@ -75,8 +86,7 @@ RecordField     <- ValueIdent Trivia Colon Trivia Expr
 VariantRef      <- TypeIdent PathSep TypeIdent
 MatchExpr       <- 'match' Sp Expr Trivia LBrack Trivia MatchArm+
                    Trivia RBrack
-MatchArm        <- TypeIdent MatchBinding? Colon Trivia Block Dot
-MatchBinding    <- Sp ValueIdent
+MatchArm        <- TypeIdent Colon Trivia Block Dot
 
 DigestLiteral   <- 'sha256:' StringLiteral
 BoolLit         <- 'true' !IdentRest / 'false' !IdentRest
@@ -88,10 +98,13 @@ TypeIdent       <- [A-Z] IdentRest*
 ValueIdent      <- !Keyword [a-z] IdentRest*
 IdentRest       <- [A-Za-z0-9_]
 Keyword         <- ('module' / 'profile' / 'use' / 'digest' / 'export'
-                 / 'type' / 'nominal' / 'record' / 'variant' / 'fn'
-                 / 'kernel' / 'arithmetic' / 'bounded' / 'steps' / 'stack'
-                 / 'workspace' / 'require' / 'else' / 'accept' / 'match'
-                 / 'true' / 'false' / 'unit') !IdentRest
+                 / 'claims' / 'requires' / 'domain' / 'type' / 'nominal'
+                 / 'record' / 'variant' / 'fn'
+                 / 'kernel' / 'arithmetic' / 'bounded' / 'steps'
+                 / 'liveBits' / 'controlDepth' / 'workspaceBits' / 'rejects'
+                 / 'publication' / 'none' / 'eligible' / 'require' / 'else'
+                 / 'accept' / 'reject' / 'match' / 'true' / 'false' / 'unit')
+                   !IdentRest
 
 StringLiteral   <- '"' HexDigit+ '"'
 HexDigit        <- [0-9A-Fa-f]

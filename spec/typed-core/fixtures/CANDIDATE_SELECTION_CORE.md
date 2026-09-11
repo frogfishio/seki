@@ -9,9 +9,9 @@ declaration references and de Bruijn local indices as defined by the model.
 ## Declarations
 
 ```text
-domain Candidate
+domain CandidateIdentity
 
-nominal CandidateId = Identity[Candidate, 16]
+nominal CandidateId = Identity[CandidateIdentity, 16]
 nominal Epoch       = U64
 
 record Candidate {
@@ -46,6 +46,9 @@ select input: Input
 rejection order = [Missing, Duplicate, Stale, Disabled]
 arithmetic policy = checked
 publication eligible = false
+claim ceiling = [semantic_evaluation]
+required theorems = [type_well_formed, totality, determinism,
+                     resource_bounds, rejection_precedence]
 ```
 
 ## Abstract body
@@ -89,6 +92,9 @@ Let(
   ])
 )
 ```
+
+`Error`, `Ok`, `None`, and `Some` above abbreviate fully instantiated intrinsic
+`ConstructorRef` values. They are not declared `VariantRef` values.
 
 The first two rejection cases arise from mutually exclusive `FindUnique` result
 constructors rather than `Require` nodes. Every direct `Reject` and every

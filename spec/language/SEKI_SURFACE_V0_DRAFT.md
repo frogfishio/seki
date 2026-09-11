@@ -51,15 +51,37 @@ Every source file begins with exactly one module declaration:
 
 ```seki
 module frogfish::examples::candidate_selection @ 1
-profile: c11_bounded_v1.
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: type_well_formed, totality, determinism, resource_bounds,
+  rejection_precedence.
 ```
 
-The module identity consists of its path, semantic version, and selected
-semantic profile. A qualified import binds an exact version and digest:
+The declared module identity consists of its path and semantic version. The
+selected semantic profile has its own name and version; both enter the canonical
+module and digest. `claims:` is the module's ceiling, not proof that the claims
+hold. `requires:` lists theorem obligations which later stages must discharge.
+The candidate closed set for this draft, in canonical order, is:
+
+```text
+claims: semantic_evaluation, lean_projection, representation_correspondence,
+        restricted_c_source, clight_refinement, certified_lean_equivalence,
+        installed_binary, publication
+
+requires: type_well_formed, totality, determinism, resource_bounds,
+          rejection_precedence, representation, publication_equivalence
+```
+
+Only the needed members are written and duplicates are invalid.
+`publication: eligible` additionally requires the `publication` claim and
+`publication_equivalence` theorem obligation.
+
+A qualified import binds an exact version and digest:
 
 ```seki
 use seki::bounded @ 1
-digest: sha256:"0123456789abcdef...".
+profile: c11_bounded @ 1
+digest: sha256:"0000000000000000000000000000000000000000000000000000000000000000".
 ```
 
 Wildcard imports, version ranges, ambient search paths, cyclic imports, and
@@ -74,6 +96,7 @@ The v0 primitive spellings follow the charter:
 Unit Bool
 U8 U16 U32 U64
 I8 I16 I32 I64
+ArithmeticError
 Bytes[N]
 Identity[Domain, N]
 Digest[Algorithm, N]
@@ -91,13 +114,21 @@ BoundedVec[T, N]
 Decision[Accepted, Rejection]
 ```
 
+Primitive and composite constructor spellings are reserved built-ins and cannot
+be redeclared. `ArithmeticError` is the intrinsic checked-operation error type;
+its constructors and stable tags are defined by the typed core.
+
 Aliases do not create identity. Nominal declarations do:
 
 ```seki
+export domain CandidateIdentity.
 export type Counter := U32.
-export nominal CandidateId := Identity[Candidate, 16].
+export nominal CandidateId := Identity[CandidateIdentity, 16].
 export nominal Epoch := U64.
 ```
+
+Domain names and type names occupy distinct namespaces, but v0 rejects reuse of
+one spelling across those namespaces to prevent visually ambiguous references.
 
 Records and variants use Zing-derived delimiters:
 
@@ -134,7 +165,10 @@ arithmetic: checked [
 export kernel select input: Input
 -> Decision[Candidate, Rejection]
 arithmetic: checked
-bounded steps: 2048 stack: 512 workspace: 4096 [
+bounded steps: 2048 liveBits: 4096 controlDepth: 64 workspaceBits: 4096
+rejects: Rejection::Missing, Rejection::Duplicate, Rejection::Stale,
+  Rejection::Disabled
+publication: none [
   ;; body
 ].
 ```
@@ -147,12 +181,21 @@ Functions cannot recurse directly or through an import cycle.
 Every function has an explicit result type. A body returns its final expression;
 `ret` does not exist. A kernel result is normally `Decision[A, R]`.
 
+Every typed-core function has an explicit resource ceiling. If a surface
+function omits `bounded`, elaboration inserts the selected profile's
+per-function ceiling. Kernels spell their ceiling explicitly in v0.
+
+`rejects:` declares every rejection constructor once, from highest to lowest
+precedence. Its type must be one declared variant, local or exact-digest imported.
+`publication:` is `none` or `eligible`; eligibility is an intended profile use
+and never grants publication authority.
+
 ## 6. Bindings and bodies
 
 `:=` introduces one fresh immutable binding:
 
 ```seki
-matches := input candidates countWhere: [ :candidate |
+selection := input candidates findUnique: [ :candidate |
   (candidate id) == (input wanted)
 ].
 ```
@@ -183,7 +226,6 @@ isCurrent candidate: candidate epoch: (input currentEpoch)
 Recognized operations on a value use keyword selectors:
 
 ```seki
-input candidates countWhere: [ :candidate | predicate ]
 input candidates findUnique: [ :candidate | predicate ]
 ```
 
@@ -255,7 +297,7 @@ Pattern matching is an expression:
 
 ```seki
 match value [
-  Some value: [ :item | use item ].
+  Some: [ :item | consume item ].
   None: [ fallback ].
 ]
 ```
@@ -282,6 +324,15 @@ accept candidate
 `accept` is legal only as the final expression of such a kernel. It constructs
 the accepting `Decision` value; it does not publish authority.
 
+A match arm or conditional branch may instead end with:
+
+```seki
+reject Rejection::Missing
+```
+
+The elaborator assigns the constructor's index from `rejects:`. Direct rejection
+and failed `require` use the same typed-core `Reject` result.
+
 ## 11. Bounded collections
 
 The admitted traversal selector set is closed and versioned:
@@ -293,7 +344,6 @@ collection all: [ :item | ... ]
 collection any: [ :item | ... ]
 collection mapBounded: [ :item | ... ]
 collection filterBounded: [ :item | ... ]
-collection countWhere: [ :item | ... ]
 ```
 
 These selectors elaborate to dedicated typed-core operations. They are not
@@ -306,9 +356,13 @@ General loops, recursion, `break`, `continue`, `goto`, and labels do not exist.
 
 ```seki
 module seki::examples::candidate_selection @ 1
-profile: c11_bounded_v1.
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: type_well_formed, totality, determinism, resource_bounds,
+  rejection_precedence.
 
-export nominal CandidateId := Identity[Candidate, 16].
+export domain CandidateIdentity.
+export nominal CandidateId := Identity[CandidateIdentity, 16].
 export nominal Epoch := U64.
 
 export record Candidate {
@@ -333,32 +387,38 @@ export variant Rejection [
 export kernel select input: Input
 -> Decision[Candidate, Rejection]
 arithmetic: checked
-bounded steps: 2048 stack: 512 workspace: 4096 [
-  matches := input candidates countWhere: [ :candidate |
+bounded steps: 2048 liveBits: 4096 controlDepth: 64 workspaceBits: 4096
+rejects: Rejection::Missing, Rejection::Duplicate, Rejection::Stale,
+  Rejection::Disabled
+publication: none [
+  selection := input candidates findUnique: [ :candidate |
     (candidate id) == (input wanted)
   ].
 
-  require matches != 0 else: Rejection::Missing.
-  require matches == 1 else: Rejection::Duplicate.
-
-  selected := input candidates findUnique: [ :candidate |
-    (candidate id) == (input wanted)
-  ].
-
-  candidate := selected requireSome: Rejection::Missing.
-
-  require (candidate epoch) == (input currentEpoch)
-    else: Rejection::Stale.
-  require candidate enabled else: Rejection::Disabled.
-
-  accept candidate
+  match selection [
+    Error: [ :duplicate |
+      reject Rejection::Duplicate
+    ].
+    Ok: [ :option |
+      match option [
+        None: [
+          reject Rejection::Missing
+        ].
+        Some: [ :candidate |
+          require (candidate epoch) == (input currentEpoch)
+            else: Rejection::Stale.
+          require candidate enabled else: Rejection::Disabled.
+          accept candidate
+        ].
+      ]
+    ].
+  ]
 ].
 ```
 
-The repeated missing case above is intentional: `findUnique:` returns an option
-or result rather than an unchecked value, and the admission checker does not use
-earlier facts unless a proof-producing refinement pass supplies the connection.
-The exact `findUnique:` result and `requireSome:` signatures remain to be frozen.
+`findUnique:` returns `Result[Option[T], Unit]`: error means duplicate, none means
+missing, and some carries the unique value. The complete collection is scanned so
+a later duplicate cannot be hidden by discovery order.
 
 ## 13. Deliberately open surface questions
 
@@ -367,10 +427,9 @@ The draft does not yet freeze:
 - canonical module and digest literal spelling;
 - byte and identity literals;
 - tuple construction and projection;
-- variant payload construction and pattern details;
+- declared-variant payload construction and pattern details;
 - checked arithmetic and conversion result syntax;
-- the exact result of `findUnique:`;
-- whether `countWhere:` belongs in the minimal combinator set;
+- whether `countWhere:` should be added to the minimal combinator set;
 - generic function declarations, if any;
 - formatting width and canonical source formatting; or
 - diagnostics and source-location conventions.
