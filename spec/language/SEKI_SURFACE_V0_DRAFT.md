@@ -218,9 +218,10 @@ From tightest to loosest, Seki parses:
 Arithmetic binary operators associate left. Comparisons do not chain. `&&` and
 `||` short-circuit. Parentheses group exactly one expression.
 
-Evaluation is deterministic: receiver before arguments; keyword arguments from
-left to right; record fields in written order. Record field order does not
-affect the resulting semantic value or its canonical serialization.
+Evaluation is deterministic: receiver before arguments and keyword arguments
+from left to right. Record fields evaluate in canonical ASCII-label order, not
+written order. Record field order therefore cannot affect the resulting value,
+failure selection, or canonical serialization.
 
 ## 9. Arithmetic
 

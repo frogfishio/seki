@@ -15,8 +15,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Verify frozen project seed
-        run: ./SEKI_V0_3_PROJECT_SEED/VERIFY.sh
-      - name: Enforce project claim ceiling
-        run: node tools/check_project_status.mjs
-
+      - name: Run bootstrap checks
+        run: make check

@@ -123,9 +123,9 @@ Create a reproducible project shell without claiming implementation authority.
 | B0-09 | W-REL | Bind exact Rocq 9.2.0 source/archive identity and license. | pending |
 | B0-10 | W-REL | Resolve CompCert 3.18 acquisition, use, and redistribution policy. | pending |
 | B0-11 | W-REL | Adopt reviewed Seki runtime/output exception text. | pending |
-| B0-12 | W-C | Write the C11 engineering standard and build/test matrix. | pending |
+| B0-12 | W-C | Write the C11 engineering standard and build/test matrix. | done; compiler matrix awaits code/toolchain pins |
 | B0-13 | W-TEST | Add clean-room CI with pinned container/image identity. | pending |
-| B0-14 | W-SPEC | Record provenance and permitted use of local `contrib` materials. | pending |
+| B0-14 | W-SPEC | Record treatment of local `contrib` materials. | done; transient ignored reference |
 
 ### Required artifacts
 
@@ -533,18 +533,16 @@ qualified work.
 
 The next tasks, in dependency order, are:
 
-1. **B0-14:** settle provenance/licensing treatment for the Zing contribution.
-2. **F0-01:** name the materially different consumer decision and reviewer.
-3. **F0-02/F0-03:** write its data, bound, and rejection inventory.
-4. **F1-A01 draft:** specify the typed-core type/declaration schema without
-   claiming F1 start.
-5. **F1-A02 draft:** specify expression and bounded-combinator nodes.
-6. **F1-A04/F1-A06 drafts:** freeze nominal identity and rejection order.
-7. **B0-12:** write the C11 engineering and test standard.
-8. **B0-08/B0-09:** bind Lean and Rocq exact sources and licenses.
-9. **B0-10:** resolve the CompCert acquisition/use profile.
-10. Assemble the F0 review packet and request the exact scoped response.
+1. **F0-01:** name the materially different consumer decision and reviewer.
+2. **F0-02/F0-03:** write its data, bound, and rejection inventory.
+3. **F1-A01/F1-A02 review:** review the initial typed-core declaration,
+   expression, admission, and fixture drafts without claiming F1 start.
+4. **F1-A04/F1-A06:** review the explicit single-payload binder rule and indexed
+   rejection-precedence model.
+5. **B0-08/B0-09:** bind Lean and Rocq exact sources and licenses.
+6. **B0-10:** resolve the CompCert acquisition/use profile.
+7. Compare canonical encoding candidates against the typed-core draft.
+8. Assemble the F0 review packet and request the exact scoped response.
 
-Tasks 1, 4–8 are bootstrap/specification work and may proceed while F0 is open.
-No F1 completion or authority claim may be made until task 10 closes the gate.
-
+Tasks 3–7 are bootstrap/specification work and may proceed while F0 is open. No
+F1 completion or authority claim may be made until task 8 closes the gate.

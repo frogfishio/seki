@@ -20,6 +20,9 @@
 - Zing contribution assessed as surface-language lineage.
 - Seki surface-language and candidate PEG drafts created.
 - Portable C11 bootstrap and selective dogfooding architecture accepted.
+- Local Zing contribution classified as transient, ignored bootstrap reference.
+- Initial typed-core, admission-rule, and candidate-selection fixture drafts created.
+- Conservative C11 engineering standard and `make check` entry point added.
 
 ## Active work
 
@@ -28,11 +31,11 @@ immediate execution queue in the delivery plan and record its owner here.
 
 ## Next unblocked tasks
 
-1. B0-14 — contributed-material provenance and license treatment.
-2. F0-01 — independent consumer decision and reviewer selection.
-3. F1-A01 draft — typed-core type and declaration schema.
-4. B0-12 — C11 engineering and test standard.
-5. B0-08/B0-09 — exact Lean and Rocq source locks.
+1. F0-01 — independent consumer decision and reviewer selection.
+2. F1-A01/F1-A02 review — review typed-core and admission drafts.
+3. F1-A04/F1-A06 — review pattern binders and rejection precedence.
+4. B0-08/B0-09 — exact Lean and Rocq source locks.
+5. B0-10 — CompCert acquisition and use profile.
 
 ## Open decisions and blockers
 
@@ -48,13 +51,10 @@ immediate execution queue in the delivery plan and record its owner here.
 ## Verification commands
 
 ```sh
-./SEKI_V0_3_PROJECT_SEED/VERIFY.sh
-node tools/check_project_status.mjs
-git diff --check
+make check
 ```
 
 ## Last verification
 
 Local seed, status, JSON, and whitespace checks passed on 2026-09-11. This is a
 bootstrap check, not clean-room or qualification evidence.
-

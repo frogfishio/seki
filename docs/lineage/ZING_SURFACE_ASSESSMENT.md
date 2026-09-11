@@ -21,7 +21,7 @@ semantics.
 | `Type { field: value }` construction | Adopt with complete, unique fields. |
 | Keyword selectors such as `findUnique:` | Adopt with static resolution only. |
 | Unary field-like reads such as `candidate epoch` | Adopt as statically resolved projection. |
-| Receiver-before-arguments, left-to-right evaluation | Adopt. |
+| Receiver-before-arguments, left-to-right message arguments | Adopt. Record fields instead use canonical label order. |
 | Strict Boolean conditions | Adopt. There is no truthiness. |
 | Nonescaping blocks | Adopt more narrowly: blocks are inline, immutable, and not first-class values. |
 
@@ -75,4 +75,3 @@ The main evidence used for this assessment is:
 - `contrib/spec/zing.peg`.
 
 Open or conflicting Zing behavior is never silently treated as a Seki rule.
-

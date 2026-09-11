@@ -11,3 +11,8 @@ The first project-owned surface-language work is:
 These are bootstrap drafts, not a frozen language or an F1 implementation
 claim.
 
+The first abstract typed-core definitions are:
+
+- [`typed-core/SEKI_TYPED_CORE_V0_DRAFT.md`](typed-core/SEKI_TYPED_CORE_V0_DRAFT.md)
+- [`typed-core/ADMISSION_RULES_V0_DRAFT.md`](typed-core/ADMISSION_RULES_V0_DRAFT.md)
+- [`typed-core/fixtures/CANDIDATE_SELECTION_CORE.md`](typed-core/fixtures/CANDIDATE_SELECTION_CORE.md)
