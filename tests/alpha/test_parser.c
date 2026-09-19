@@ -21,11 +21,11 @@ rejects_header(const char *source, const char *code)
 }
 
 static int
-rejects_prefix(const char *source, const char *code)
+rejects_module(const char *source, const char *code)
 {
     struct seki_module_prefix module;
     struct seki_parse_error error;
-    return !seki_parse_module_prefix((const unsigned char *)source,
+    return !seki_parse_module((const unsigned char *)source,
         strlen(source), &module, &error) && strcmp(error.code, code) == 0;
 }
 
@@ -52,7 +52,7 @@ main(void)
         header.claim_count != 2U || header.requirement_count != 2U) {
         return 2;
     }
-    if (!seki_parse_module_prefix((const unsigned char *)valid,
+    if (!seki_parse_module((const unsigned char *)valid,
         strlen(valid), &module, &error) || module.declaration_count != 1U ||
         module.declarations[0].kind != SEKI_DECL_RECORD ||
         !seki_name_is(&module.declarations[0].name, "Input") ||
@@ -76,7 +76,7 @@ main(void)
             "rejects: Result::Bad publication: none "
             "[ (receipt raw) == (receipt raw) "
             "ifTrue: [ accept unit ] ifFalse: [ reject Result::Bad ] ].";
-        if (!seki_parse_module_prefix((const unsigned char *)declarations,
+        if (!seki_parse_module((const unsigned char *)declarations,
             strlen(declarations), &module, &error) ||
             module.declaration_count != 4U ||
             module.declarations[0].kind != SEKI_DECL_ALIAS ||
@@ -132,7 +132,7 @@ main(void)
         static const char duplicate_field[] =
             "module a @ 1 profile: p @ 1 claims: c requires: r. "
             "export record R { x: U8, x: U16 }.";
-        if (seki_parse_module_prefix((const unsigned char *)duplicate_field,
+        if (seki_parse_module((const unsigned char *)duplicate_field,
             strlen(duplicate_field), &module, &error) ||
             strcmp(error.code, "A0-PARSE-0011") != 0) {
             return 9;
@@ -142,13 +142,13 @@ main(void)
         static const char duplicate_case[] =
             "module a @ 1 profile: p @ 1 claims: c requires: r. "
             "export variant V [ A @ 1. B @ 1. ].";
-        if (seki_parse_module_prefix((const unsigned char *)duplicate_case,
+        if (seki_parse_module((const unsigned char *)duplicate_case,
             strlen(duplicate_case), &module, &error) ||
             strcmp(error.code, "A0-PARSE-0015") != 0) {
             return 10;
         }
     }
-    if (!rejects_prefix(
+    if (!rejects_module(
         "module a @ 1 profile: p @ 1 claims: c requires: r. "
         "export variant R [ Bad @ 1. ]. "
         "export kernel k -> Decision[Unit, R] arithmetic: magical "
@@ -157,7 +157,7 @@ main(void)
         "A0-PARSE-0025")) {
         return 11;
     }
-    if (!rejects_prefix(
+    if (!rejects_module(
         "module a @ 1 profile: p @ 1 claims: c requires: r. "
         "export variant R [ Bad @ 1. ]. "
         "export kernel k -> Decision[Unit, R] arithmetic: checked "
@@ -165,6 +165,11 @@ main(void)
         "rejects: R::Bad publication: none [ accept ].",
         "A0-PARSE-0031")) {
         return 12;
+    }
+    if (!rejects_module(
+        "module a @ 1 profile: p @ 1 claims: c requires: r. trailing",
+        "A0-PARSE-0034")) {
+        return 13;
     }
     return 0;
 }

@@ -14,7 +14,7 @@ const sources = [
   "src/alpha/seki_lexer.c",
   "src/alpha/seki_parser.c",
   "src/alpha/seki_checker.c",
-  "src/alpha/e0_frontend_adapter.c",
+  "src/alpha/seki_core.c",
   "src/alpha/e0_backend_adapter.c",
 ];
 const strictFlags = [
@@ -39,7 +39,7 @@ try {
   assert.equal(version.status, 0);
   assert.equal(version.stderr, "");
   assert.equal(version.stdout,
-    "sekic 0.0.0-alpha.2 (provisional, authority=none)\n");
+    "sekic 0.0.0-alpha.3 (provisional, authority=none)\n");
 
   const help = run(["--help"]);
   assert.equal(help.status, 0);
@@ -69,6 +69,15 @@ try {
   assert.match(duplicate.stderr,
     /^A0-PARSE-0007:.*:\d+:\d+: duplicate header name\n$/u);
 
+  const unsupportedSource = path.join(temporary, "unsupported-shape.seki");
+  fs.writeFileSync(unsupportedSource,
+    fs.readFileSync(canonicalSource, "utf8").replace(
+      "minimum_age", "different_policy"));
+  const unsupported = run(["check", unsupportedSource]);
+  assert.equal(unsupported.status, 65);
+  assert.match(unsupported.stderr,
+    /^A0-CORE-0001:.*: module is outside the current core-emission slice\n$/u);
+
   const corePath = path.join(temporary, "minimum_age.scb0");
   const cPath = path.join(temporary, "minimum_age.c");
   const built = run([
@@ -81,11 +90,25 @@ try {
     Buffer.from(fs.readFileSync(recordedCore, "ascii").trim(), "hex"));
   assert.deepEqual(fs.readFileSync(cPath), fs.readFileSync(recordedC));
 
+  const variantSource = path.join(temporary, "minimum_age_19.seki");
+  const variantCore = path.join(temporary, "minimum_age_19.scb0");
+  const variantC = path.join(temporary, "minimum_age_19.c");
+  fs.writeFileSync(variantSource,
+    fs.readFileSync(canonicalSource, "utf8").replace("< 18", "< 19"));
+  const variant = run([
+    "build", "--core", variantCore, "--c", variantC, variantSource,
+  ]);
+  assert.equal(variant.status, 0, variant.stderr);
+  assert.notDeepEqual(fs.readFileSync(variantCore), fs.readFileSync(corePath));
+  assert.match(fs.readFileSync(variantC, "utf8"),
+    /applicant\.age < UINT8_C\(19\)/u);
+
   const inspected = run(["inspect", corePath]);
   assert.equal(inspected.status, 0, inspected.stderr);
   assert.equal(inspected.stderr, "");
   assert.equal(inspected.stdout,
-    "adapter=e0-vs1\n" +
+    "frontend=alpha-minimum-age\n" +
+    "backend=e0-vs1\n" +
     "profile=c11_bounded@1\n" +
     "threshold_u8=18\n" +
     "authority=none\n");
@@ -101,8 +124,8 @@ try {
   assert.match(bad.stderr, /^usage:\n/u);
 
   console.log(
-    "seki_alpha_cli=verified version=0.0.0-alpha.2 commands=4 connected=3 " +
-    "adapter=e0-vs1 overwrite=reject",
+    "seki_alpha_cli=verified version=0.0.0-alpha.3 commands=4 connected=3 " +
+    "frontend=alpha-minimum-age backend=e0-vs1 overwrite=reject",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

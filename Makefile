@@ -3,11 +3,11 @@
 .PHONY: alpha check verify-seed verify-status check-bootstrap-closure check-alpha-plan check-alpha-cli check-alpha-lexer check-alpha-parser check-alpha-checker check-f0-candidate check-foundation-lock check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-e0-lean check-encoding-vectors check-diff
 
 A0_CFLAGS = -std=c11 -pedantic -Wall -Wextra -Werror -Wconversion -Wsign-conversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wformat=2
-A0_SOURCES = src/alpha/sekic.c src/alpha/seki_lexer.c src/alpha/seki_parser.c src/alpha/seki_checker.c src/alpha/e0_frontend_adapter.c src/alpha/e0_backend_adapter.c
+A0_SOURCES = src/alpha/sekic.c src/alpha/seki_lexer.c src/alpha/seki_parser.c src/alpha/seki_checker.c src/alpha/seki_core.c src/alpha/e0_backend_adapter.c
 
 alpha: build/sekic
 
-build/sekic: $(A0_SOURCES) src/alpha/e0_adapter.h src/alpha/seki_lexer.h src/alpha/seki_parser.h src/alpha/seki_checker.h src/e0/sekic_e0.c src/e0/seki_e0_c_backend.c
+build/sekic: $(A0_SOURCES) src/alpha/e0_adapter.h src/alpha/seki_lexer.h src/alpha/seki_parser.h src/alpha/seki_checker.h src/alpha/seki_core.h src/e0/seki_e0_c_backend.c
 	mkdir -p build
 	$(CC) $(A0_CFLAGS) -Isrc/alpha $(A0_SOURCES) -o $@
 

@@ -25,17 +25,23 @@ expect(alpha.language_frozen === false && alpha.encoding_frozen === false,
 expect(alpha.authority_granted === false, "A0 granted authority");
 expect(alpha.development_assurance_model === "internal-self-attestation",
   "development assurance model drift");
-expect(alpha.cli_version === "0.0.0-alpha.2", "alpha CLI version drift");
+expect(alpha.cli_version === "0.0.0-alpha.3", "alpha CLI version drift");
 expect(alpha.connected_commands.join(",") === "check,build,inspect",
   "connected alpha commands drift");
-expect(alpha.compiler_core === "e0-regression-adapter",
+expect(alpha.compiler_core === "alpha-minimum-age-core+e0-backend-adapter",
   "unexpected provisional compiler core");
 expect(alpha.general_compiler_core_ready === false,
-  "A0-02 cannot close while the E0 adapter remains");
+  "A0-02 cannot close while the general core remains incomplete");
+expect(alpha.e0_frontend_adapter_active === false,
+  "E0 frontend remained active after alpha core integration");
+expect(alpha.e0_backend_adapter_active === true,
+  "backend adapter status drift");
 expect(alpha.general_lexer_ready === true,
   "general alpha lexer progress record lost");
 expect(alpha.general_header_parser_ready === true,
   "general module-header parser progress record lost");
+expect(alpha.complete_module_parse_required === true,
+  "live compiler no longer requires a complete module parse");
 expect(alpha.general_alias_nominal_parser_ready === true,
   "general alias/nominal parser progress record lost");
 expect(alpha.general_record_variant_parser_ready === true,
@@ -48,6 +54,8 @@ expect(alpha.minimum_age_tail_ast_ready === true,
   "minimum-age kernel-tail AST progress record lost");
 expect(alpha.minimum_age_semantic_checker_ready === true,
   "minimum-age semantic checker progress record lost");
+expect(alpha.minimum_age_core_emitter_ready === true,
+  "minimum-age core emitter progress record lost");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",

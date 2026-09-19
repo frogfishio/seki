@@ -19,7 +19,7 @@ check_source(const char *source, const char *expected_code)
     struct seki_module_prefix module;
     struct seki_parse_error parse_error;
     struct seki_check_error check_error;
-    if (!seki_parse_module_prefix((const unsigned char *)source,
+    if (!seki_parse_module((const unsigned char *)source,
         strlen(source), &module, &parse_error)) {
         return 0;
     }

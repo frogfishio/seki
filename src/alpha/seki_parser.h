@@ -199,7 +199,7 @@ struct seki_module_prefix {
 int seki_parse_module_header(const unsigned char *source, size_t length,
     struct seki_module_header *header, struct seki_parse_error *error);
 
-int seki_parse_module_prefix(const unsigned char *source, size_t length,
+int seki_parse_module(const unsigned char *source, size_t length,
     struct seki_module_prefix *module, struct seki_parse_error *error);
 
 int seki_name_equal(const struct seki_name *left,

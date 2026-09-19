@@ -16,12 +16,12 @@ a minimal restricted-C AST to deterministic C11. Neither defines a frozen
 compiler architecture or conformance boundary.
 
 The `alpha/` directory contains the provisional `sekic` CLI. Revision
-`0.0.0-alpha.2` wraps the immutable E0 frontend and backend behind the narrow
-API in `alpha/e0_adapter.h`, so `check`, `build`, and `inspect` run in one process
-while the closed E0 sources and artifacts remain byte-for-byte regression
-oracles. This is the first A0-02 integration increment, not its exit: the adapter
-still recognizes the E0 program shape and must be replaced by a declaration- and
-expression-driven compiler core.
+`0.0.0-alpha.3` runs the general lexer/parser and the minimum-age semantic checker
+before `alpha/seki_core.c` emits SCB-0 directly from the checked AST. The
+immutable E0 frontend is no longer linked into `sekic`; its exact 417-byte output
+remains a regression oracle. Restricted-C projection and inspection still use
+the E0 backend adapter. This is an A0-02 increment, not its exit: core emission
+still recognizes only the minimum-age semantic shape.
 
 `alpha/seki_lexer.c` is the first adapter-independent compiler component. It is
 allocation-free, contains no module or declaration names, and tokenizes the
@@ -29,10 +29,14 @@ complete candidate punctuation/operator vocabulary with checked `U32` literals
 and stable `A0-LEX-*` diagnostics.
 
 `alpha/seki_parser.c` consumes that lexer in the live CLI and constructs a
-fixed-capacity module prefix: the general header plus aliases, nominal types,
+fixed-capacity module AST: the general header plus aliases, nominal types,
 records, explicitly tagged variants, and exported kernel envelopes. Kernel bodies
 for the minimum-age slice become a fixed-capacity tail AST. The independent
 `alpha/seki_checker.c` resolves parameters and record fields, checks comparison
-and condition types, and checks terminal decisions before the E0 adapter runs.
-The rest of the expression language, typed-core construction, and C generation
-remain adapter-backed until the general compiler core exists.
+and condition types, and checks terminal decisions. `alpha/seki_core.c` maps that
+checked minimum-age AST to the exact established SCB-0 bytes, including a
+source-derived threshold and declared resource ceilings. The rest of the
+expression language and general typed-core construction remain open; C projection
+is still adapter-backed until the general backend exists.
+The live parser requires end-of-file after the supported module and rejects all
+unknown or trailing top-level syntax.

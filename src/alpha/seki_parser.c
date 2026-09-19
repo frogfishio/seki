@@ -761,7 +761,7 @@ seki_parse_module_header(const unsigned char *source, size_t length,
 }
 
 int
-seki_parse_module_prefix(const unsigned char *source, size_t length,
+seki_parse_module(const unsigned char *source, size_t length,
     struct seki_module_prefix *module, struct seki_parse_error *error)
 {
     struct parser parser;
@@ -821,6 +821,10 @@ seki_parse_module_prefix(const unsigned char *source, size_t length,
             break;
         }
         module->declarations[module->declaration_count++] = declaration;
+    }
+    if (!parser.failed && parser.current.kind != SEKI_TOKEN_EOF) {
+        parser_fail(&parser, "A0-PARSE-0034",
+            "unsupported or trailing top-level syntax");
     }
     return !parser.failed;
 }

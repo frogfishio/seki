@@ -2,8 +2,9 @@
  * Seki A0 command-line shell.
  *
  * Provisional bootstrap software with no implementation, proof, or production
- * authority. The connected compiler path is currently the E0 regression
- * adapter; A0-02 remains open until the general compiler core replaces it.
+ * authority. The connected frontend is the alpha minimum-age semantic slice;
+ * restricted-C projection still uses the E0 backend adapter. A0-02 remains
+ * open until the complete general compiler core replaces that narrow path.
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -11,9 +12,10 @@
 
 #include "e0_adapter.h"
 #include "seki_checker.h"
+#include "seki_core.h"
 #include "seki_parser.h"
 
-#define SEKI_A0_VERSION "0.0.0-alpha.2"
+#define SEKI_A0_VERSION "0.0.0-alpha.3"
 #define SEKI_A0_SOURCE_CAPACITY 65536U
 
 enum exit_status {
@@ -112,14 +114,14 @@ print_diagnostic(const char *path, const struct seki_e0_diagnostic *diagnostic)
 }
 
 static int
-compile_source(const char *path, unsigned char *core, size_t *core_length,
-    struct seki_e0_diagnostic *diagnostic)
+compile_source(const char *path, unsigned char *core, size_t *core_length)
 {
     unsigned char source[SEKI_A0_SOURCE_CAPACITY];
     size_t source_length = 0U;
     struct seki_module_prefix module;
     struct seki_parse_error parse_error;
     struct seki_check_error check_error;
+    struct seki_core_error core_error;
 
     if (!read_bounded(path, source, sizeof source, &source_length)) {
         (void)fprintf(stderr,
@@ -127,7 +129,7 @@ compile_source(const char *path, unsigned char *core, size_t *core_length,
             path, (unsigned)sizeof source);
         return EXIT_IO;
     }
-    if (!seki_parse_module_prefix(source, source_length, &module,
+    if (!seki_parse_module(source, source_length, &module,
         &parse_error)) {
         (void)fprintf(stderr, "%s:%s:%zu:%zu: %s\n", parse_error.code,
             path, parse_error.line, parse_error.column, parse_error.message);
@@ -138,9 +140,10 @@ compile_source(const char *path, unsigned char *core, size_t *core_length,
             check_error.message);
         return EXIT_DATA;
     }
-    if (!seki_e0_source_to_core(source, source_length, core,
-        SEKI_E0_CORE_CAPACITY, core_length, diagnostic)) {
-        print_diagnostic(path, diagnostic);
+    if (!seki_emit_core(&module, core, SEKI_CORE_CAPACITY, core_length,
+        &core_error)) {
+        (void)fprintf(stderr, "%s:%s: %s\n", core_error.code, path,
+            core_error.message);
         return EXIT_DATA;
     }
     return EXIT_OK;
@@ -151,9 +154,8 @@ check_command(const char *input_path)
 {
     unsigned char core[SEKI_E0_CORE_CAPACITY];
     size_t core_length = 0U;
-    struct seki_e0_diagnostic diagnostic;
 
-    return compile_source(input_path, core, &core_length, &diagnostic);
+    return compile_source(input_path, core, &core_length);
 }
 
 static int
@@ -173,7 +175,7 @@ build_command(const char *input_path, const char *core_path,
             "A0-IO-0002: output paths must be distinct and not already exist\n");
         return EXIT_IO;
     }
-    status = compile_source(input_path, core, &core_length, &diagnostic);
+    status = compile_source(input_path, core, &core_length);
     if (status != EXIT_OK) {
         return status;
     }
@@ -215,7 +217,8 @@ inspect_command(const char *input_path)
         return EXIT_DATA;
     }
     (void)printf(
-        "adapter=e0-vs1\n"
+        "frontend=alpha-minimum-age\n"
+        "backend=e0-vs1\n"
         "profile=c11_bounded@%u\n"
         "threshold_u8=%u\n"
         "authority=none\n",
