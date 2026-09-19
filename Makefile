@@ -1,8 +1,8 @@
 .DEFAULT_GOAL := check
 
-.PHONY: check verify-seed verify-status check-e0-vs1 check-e0-frontend check-e0-lean check-encoding-vectors check-diff
+.PHONY: check verify-seed verify-status check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-e0-lean check-encoding-vectors check-diff
 
-check: verify-seed verify-status check-e0-vs1 check-e0-frontend check-encoding-vectors check-diff
+check: verify-seed verify-status check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-encoding-vectors check-diff
 
 verify-seed:
 	./SEKI_V0_3_PROJECT_SEED/VERIFY.sh
@@ -16,6 +16,12 @@ check-e0-vs1:
 
 check-e0-frontend:
 	node tools/check_e0_frontend.mjs
+
+check-e0-backend:
+	node tools/check_e0_backend.mjs
+
+check-e0-manifest:
+	node tools/check_e0_manifest.mjs
 
 # Deliberately not part of `check` until the exact Lean 4.30.0 foundation is
 # bound. Local execution is experimental evidence only.

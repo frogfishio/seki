@@ -173,11 +173,11 @@ defines its claim ceiling.
 | E0-03 | W-LEAN | Prove that the exact experiment program cannot approve an applicant younger than 18. | done experimentally; full threshold policy and non-vacuity companion |
 | E0-04 | W-C | Implement the minimum C11 source parser and syntax-directed checker for the selected subset. | done experimentally; closed subset |
 | E0-05 | W-C | Emit the exact canonical typed-core candidate and bind its digest. | done experimentally; byte-identical independent reproduction |
-| E0-06 | W-C | Implement the restricted-C AST projection and canonical printer for the selected subset. | active |
-| E0-07 | W-TEST | Add positive, hostile, boundary, differential, strict-C11, and sanitizer evidence. | pending |
-| E0-08 | W-REPR | Bind source, typed core, theorem, generated C, compiler invocation, and result identities in one experimental manifest. | pending |
-| E0-09 | W-SPEC | Record every unproved arrow, trusted tool, and discrepancy exposed by the slice. | pending |
-| E0-10 | W-CUST | Review whether the completed slice justifies expansion, redesign, or termination. | pending |
+| E0-06 | W-C | Implement the restricted-C AST projection and canonical printer for the selected subset. | done experimentally; independent SCB reopen |
+| E0-07 | W-TEST | Add positive, hostile, boundary, differential, strict-C11, and sanitizer evidence. | done experimentally on local `cc`; toolchain unpinned |
+| E0-08 | W-REPR | Bind source, typed core, theorem, generated C, compiler invocation, and result identities in one experimental manifest. | done experimentally; machine-checked non-self-referential manifest |
+| E0-09 | W-SPEC | Record every unproved arrow, trusted tool, and discrepancy exposed by the slice. | done experimentally; explicit trust report |
+| E0-10 | W-CUST | Review whether the completed slice justifies expansion, redesign, or termination. | active |
 
 ### Exit gate
 

@@ -1,0 +1,151 @@
+{
+  "schema": "io.frogfish.seki/experimental-vertical-slice-manifest@0",
+  "experiment": "E0-VS1",
+  "authority": "experimental-only",
+  "created": "2026-09-19",
+  "self_identity": "intentionally-omitted-to-avoid-self-reference",
+  "artifacts": {
+    "contract": {
+      "path": "experiments/e0-vs1/CONTRACT.json",
+      "length": 1277,
+      "sha256": "ae5c424f5f99b89adb0d95fbc3a8de20f4fe53ddddbb4d2610783e78a3458056"
+    },
+    "source": {
+      "path": "experiments/e0-vs1/minimum_age.seki",
+      "length": 617,
+      "sha256": "359ab794bc27125e2eefb80c435df1e031d119c9cedf057749e30fd13cba0a0e"
+    },
+    "typed_core": {
+      "path": "experiments/e0-vs1/minimum_age.scb0.hex",
+      "encoded_file_length": 835,
+      "encoded_file_sha256": "7d5047a7544aa842862deb5953254d614dca839c37418b2eb66cf219d692f949",
+      "decoded_length": 417,
+      "decoded_sha256": "c8892c1607d5080bca35c92d36e11e36eaf33a67cc97172afcb819d3e8a4963d",
+      "digest_domain_ascii": "io.frogfish.seki/module/scb0/sha256",
+      "digest_domain_terminator_hex": "00",
+      "module_sha256": "0ff1f489e9a20e7c09e60b079db62971318586129399a3c6fb119e54e36ddc9b",
+      "exact_resource_bounds": {
+        "steps": 8,
+        "live_bits": 25,
+        "control_depth": 5,
+        "workspace_bits": 0
+      }
+    },
+    "lean_theorem": {
+      "path": "formal/lean/E0/MinimumAge.lean",
+      "length": 10434,
+      "sha256": "1dca9a9dd15e828f434ee0e0617cb47eb310750aff2c421a103e240de3c549f5",
+      "decoded_program_theorems": [
+        "decoded_program_satisfies_policy",
+        "decoded_program_noMinorApproved",
+        "decoded_program_adultApproved"
+      ]
+    },
+    "generated_c": {
+      "path": "experiments/e0-vs1/minimum_age.generated.c",
+      "length": 524,
+      "sha256": "5843e2df8f58719f74dd25a3fb32868881f54361ce5045dea9c8ff7ed5cbf201"
+    },
+    "trust_report": {
+      "path": "experiments/e0-vs1/TRUST_REPORT.md",
+      "length": 8709,
+      "sha256": "714f473921788d1f30a5503a8de820aad621f24b340eddb5e7ce646e10ca2f9d"
+    },
+    "implementation": [
+      {
+        "role": "closed-subset-source-frontend",
+        "path": "src/e0/sekic_e0.c",
+        "length": 22815,
+        "sha256": "4e70ecc43ff27643e08c2c7b755b307c60170d75c81be3f1a7b44d04f3362353"
+      },
+      {
+        "role": "closed-subset-restricted-c-backend",
+        "path": "src/e0/seki_e0_c_backend.c",
+        "length": 16228,
+        "sha256": "4cec47cbdb7189ebff805985288c4a806b80acbcaa792ff6a04ca70131804066"
+      }
+    ],
+    "evidence_programs": [
+      {
+        "role": "frontend-regeneration-and-hostile-checks",
+        "path": "tools/check_e0_frontend.mjs",
+        "length": 4451,
+        "sha256": "2fd08971a5226a645c21416fcfc860bf126055f62118bec4ac86165e4a20b512"
+      },
+      {
+        "role": "backend-regeneration-execution-and-sanitizers",
+        "path": "tools/check_e0_backend.mjs",
+        "length": 5067,
+        "sha256": "b097e008a69db26cd0a724f3ffc716e679f2bf1305b0cc5907d3d749e7286909"
+      }
+    ]
+  },
+  "invocations": {
+    "strict_c11_flags": [
+      "-std=c11",
+      "-pedantic",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-Wconversion",
+      "-Wsign-conversion",
+      "-Wshadow",
+      "-Wstrict-prototypes",
+      "-Wmissing-prototypes",
+      "-Wundef",
+      "-Wformat=2"
+    ],
+    "frontend": ["sekic-e0", "INPUT.seki", "OUTPUT.scb0"],
+    "backend": ["seki-e0-c-backend", "INPUT.scb0", "OUTPUT.c"],
+    "lean": ["lean", "formal/lean/E0/MinimumAge.lean"],
+    "checks": [
+      ["node", "tools/check_e0_vs1_contract.mjs"],
+      ["node", "tools/encoding/check_e0_minimum_age_vector.mjs"],
+      ["node", "tools/check_e0_frontend.mjs"],
+      ["node", "tools/check_e0_backend.mjs"]
+    ],
+    "sanitizer_flags": [
+      "-O1",
+      "-g",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer"
+    ]
+  },
+  "observed_environment": {
+    "qualification_bound": false,
+    "platform": "Darwin 24.5.0 arm64",
+    "cc": {
+      "command": "cc",
+      "identity": "Apple clang 17.0.0 (clang-1700.0.13.5), target arm64-apple-darwin24.5.0"
+    },
+    "node": {
+      "command": "node",
+      "identity": "v26.7.0"
+    },
+    "lean": {
+      "command": "lean",
+      "identity": "Lean 4.33.1, arm64-apple-darwin24.6.0, commit 819816b2e0a3bf405af45ae5c7af2491d8f5bee6"
+    }
+  },
+  "evidence": {
+    "frontend_positive_cases": 3,
+    "frontend_hostile_cases": 6,
+    "backend_hostile_cases": 3,
+    "admitted_input_values_executed": 256,
+    "threshold_variant_executed": true,
+    "address_sanitizer_executed": true,
+    "undefined_behavior_sanitizer_executed": true
+  },
+  "claims": {
+    "source_frontend_proved": false,
+    "lean_foundation_qualified": false,
+    "scb_to_c_refinement_proved": false,
+    "generated_c_certified": false,
+    "native_compiler_trusted_as_proof": false,
+    "native_binary_authority": false,
+    "implementation_authority": false,
+    "proof_authority": false,
+    "product_authority": false,
+    "production_authority": false
+  }
+}

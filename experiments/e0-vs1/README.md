@@ -186,5 +186,54 @@ This establishes deterministic experimental evidence for the source-to-SCB
 arrow. It does not prove the C frontend correct, establish general language
 conformance, or add the still-missing SCB-to-restricted-C refinement.
 
-The contract and this review record will receive complete artifact identities
-in the non-self-referential E0-08 manifest.
+## Experimental restricted-C backend
+
+`src/e0/seki_e0_c_backend.c` independently reads the SCB-0 artifact. It does
+not receive the source frontend's in-memory representation. Its closed-slice
+decoder validates the complete module structure, including identity, schema,
+types, kernel expression, branch results, declared and exact resource bounds,
+exports, claim ceiling, profile limits, and derivation order. It then projects
+the decoded kernel into a small versioned restricted-C AST and prints
+`minimum_age.generated.c` canonically.
+
+The recorded generated artifact is:
+
+```text
+C11 bytes 524
+raw SHA-256 5843e2df8f58719f74dd25a3fb32868881f54361ce5045dea9c8ff7ed5cbf201
+```
+
+The C representation is intentionally explicit: `Applicant.age`, the decision
+tag, and rejection reason are `uint8_t`; accept is tag/reason `0/0`; rejecting
+as `Underage` is `1/1`. These ABI choices are experimental and not frozen.
+There is no copied runtime or template license notice in this artifact; the
+output consists only of the customer-derived declarations and decision logic
+plus ordinary C syntax and the standard `<stdint.h>` interface.
+
+`make check-e0-backend` regenerates the SCB and C twice, compares the C bytes to
+the recorded artifact, carries a threshold-19 mutation through both compiler
+stages, rejects truncated, trailing, and structurally changed SCB inputs, and
+compiles the generated C with the strict warning set. Native comparison covers
+every admitted age `0..255`, including 17, 18, and 19, and repeats the canonical
+portfolio under AddressSanitizer and UndefinedBehaviorSanitizer.
+
+This is execution evidence, not a proof of the backend or generated C. The
+Lean theorem remains connected to the SCB semantics; no Rocq/Clight refinement
+yet connects those semantics to this C AST, C source, compiler, or executable.
+
+## Manifest and trust boundary
+
+`MANIFEST.json` binds the source, contract, encoded and decoded SCB identities,
+Lean theorem source, generated C, experimental compiler components, evidence
+programs, invocation shapes, and observed local tools. It deliberately omits
+its own digest to avoid self-reference. `make check-e0-manifest` validates the
+file identities, reopens and type-checks SCB-0, checks the Lean theorem linkage,
+and enforces that every authority claim remains false.
+
+`TRUST_REPORT.md` gives the E0-09 arrow-by-arrow accounting. It lists the
+handwritten and external components still trusted, records the Lean/platform
+version discrepancies, and identifies the absent SCB-to-Clight refinement as
+the principal proof gap. It is part of the manifest, not an informal footnote.
+
+E0-08 and E0-09 are complete experimentally. E0-10 must now make the explicit
+expand, redesign, or stop decision.

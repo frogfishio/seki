@@ -119,20 +119,35 @@
   independent JavaScript fixture emitter. A source threshold mutation changes
   exactly the encoded literal byte; six hostile source mutations are rejected
   before any output artifact is created.
+- E0-06/E0-07 add an independent closed-subset SCB-0 decoder, restricted-C AST,
+  and canonical printer. The backend validates the complete 417-byte module and
+  emits a stable 524-byte C11 translation unit with raw SHA-256
+  `5843e2df8f58719f74dd25a3fb32868881f54361ce5045dea9c8ff7ed5cbf201`.
+  The generated kernel agrees with the policy for all 256 admitted ages, runs
+  under AddressSanitizer and UndefinedBehaviorSanitizer, propagates a valid
+  threshold mutation, and rejects three structural SCB mutations.
+- E0-08 binds nine core/evidence artifacts plus the trust report in a
+  machine-checked, non-self-referential manifest. It separately records the
+  encoded hex-file identity, decoded SCB byte identity, domain-separated module
+  identity, exact C identity, invocation shapes, and unqualified local tool
+  observations.
+- E0-09 accounts for every pipeline arrow, trusted component, known discrepancy,
+  and prohibited claim. It records the missing SCB-to-Clight refinement as the
+  central proof gap and does not mistake exhaustive native `U8` execution for a
+  compiler-correctness proof.
 
 ## Active work
 
-`E0-VS1` is active. E0-01 through E0-05 are complete experimentally. E0-06 now
-owns the restricted-C AST projection and canonical printer. The experiment is
-disposable evidence and cannot freeze conformance while F0 is open.
+`E0-VS1` is active. E0-01 through E0-09 are complete experimentally. E0-10 now
+owns the explicit expand/redesign/stop review. The experiment is disposable
+evidence and cannot freeze conformance while F0 is open.
 
 ## Next unblocked tasks
 
-1. E0-06 through E0-09 — restricted C, execution evidence, manifest, and trust report.
-2. E0-07 — extend frontend evidence with sanitizers alongside backend boundary tests.
-3. F0-01 — independent consumer decision and reviewer selection.
-4. B0-08/B0-09 — exact Lean and Rocq source locks.
-5. B0-10 — CompCert acquisition and use profile.
+1. E0-10 — review whether the completed slice earned expansion or exposed redesign.
+2. F0-01 — independent consumer decision and reviewer selection.
+3. B0-08/B0-09 — exact Lean and Rocq source locks.
+4. B0-10 — CompCert acquisition and use profile.
 
 ## Open decisions and blockers
 
@@ -153,6 +168,8 @@ disposable evidence and cannot freeze conformance while F0 is open.
 make check
 make check-encoding-vectors
 make check-e0-frontend
+make check-e0-backend
+make check-e0-manifest
 make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 ```
 
