@@ -169,9 +169,9 @@ defines its claim ceiling.
 | ID | Workstream | Task | State |
 | --- | --- | --- | --- |
 | E0-01 | W-SPEC | Freeze only the experiment's source text, input/output schema, property statement, and exclusions. | done; experiment-only |
-| E0-02 | W-LEAN | Define the minimum experimental Seki AST/decoder/evaluator needed to state the property over the exact typed-core artifact. | active; typed evaluator checks, exact-byte decoder pending |
-| E0-03 | W-LEAN | Prove that the exact experiment program cannot approve an applicant younger than 18. | pending |
-| E0-04 | W-C | Implement the minimum C11 source parser and syntax-directed checker for the selected subset. | pending |
+| E0-02 | W-LEAN | Define the minimum experimental Seki AST/decoder/evaluator needed to state the property over the exact typed-core artifact. | done; fixture-bounded experiment |
+| E0-03 | W-LEAN | Prove that the exact experiment program cannot approve an applicant younger than 18. | done experimentally; full threshold policy and non-vacuity companion |
+| E0-04 | W-C | Implement the minimum C11 source parser and syntax-directed checker for the selected subset. | active |
 | E0-05 | W-C | Emit the exact canonical typed-core candidate and bind its digest. | pending |
 | E0-06 | W-C | Implement the restricted-C AST projection and canonical printer for the selected subset. | pending |
 | E0-07 | W-TEST | Add positive, hostile, boundary, differential, strict-C11, and sanitizer evidence. | pending |

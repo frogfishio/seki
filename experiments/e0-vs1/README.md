@@ -18,8 +18,10 @@ human-reviewed policy
   -> execution evidence
 ```
 
-Only the first two items are fixed by E0-01. Later E0 tasks must bind every
-arrow to exact artifacts and state which arrows remain unproved.
+E0-01 fixes the first two items. E0-02/E0-03 now bind the exact experimental
+typed-core bytes to the Lean evaluator and property proof. Later E0 tasks must
+bind the source frontend and restricted-C arrows and state which arrows remain
+unproved.
 
 ## Human policy
 
@@ -150,6 +152,18 @@ The E0-01 source identity is:
 ```text
 SHA-256 359ab794bc27125e2eefb80c435df1e031d119c9cedf057749e30fd13cba0a0e
 ```
+
+The current experimental typed-core identity is:
+
+```text
+SCB-0 bytes 417
+module SHA-256 0ff1f489e9a20e7c09e60b079db62971318586129399a3c6fb119e54e36ddc9b
+exact bounds 8 steps, 25 live bits, depth 5, workspace 0
+```
+
+The module digest is domain-separated according to the SCB-0 draft. The
+JavaScript emitter, generic JavaScript decoder/type checker, recorded hex bytes,
+vector manifest, and fixture-bounded Lean decoder agree on this artifact.
 
 The contract and this review record will receive complete artifact identities
 in the non-self-referential E0-08 manifest.

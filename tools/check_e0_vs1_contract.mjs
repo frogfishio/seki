@@ -19,6 +19,13 @@ expect(contract.schema ===
 expect(contract.experiment === "E0-VS1", "wrong experiment identity");
 expect(contract.authority === "experimental-only", "authority ceiling changed");
 expect(digest === contract.source.sha256, "source digest mismatch");
+expect(contract.typed_core.encoding === "SCB-0", "typed-core encoding changed");
+expect(contract.typed_core.path ===
+  "experiments/e0-vs1/minimum_age.scb0.hex", "typed-core path changed");
+expect(contract.typed_core.length === 417, "typed-core length changed");
+expect(contract.typed_core.module_sha256 ===
+  "0ff1f489e9a20e7c09e60b079db62971318586129399a3c6fb119e54e36ddc9b",
+  "typed-core module digest changed");
 
 expect(contract.input.type === "Applicant", "input type changed");
 expect(JSON.stringify(contract.input.fields) ===

@@ -6,6 +6,12 @@
     "path": "experiments/e0-vs1/minimum_age.seki",
     "sha256": "359ab794bc27125e2eefb80c435df1e031d119c9cedf057749e30fd13cba0a0e"
   },
+  "typed_core": {
+    "encoding": "SCB-0",
+    "path": "experiments/e0-vs1/minimum_age.scb0.hex",
+    "length": 417,
+    "module_sha256": "0ff1f489e9a20e7c09e60b079db62971318586129399a3c6fb119e54e36ddc9b"
+  },
   "input": {
     "type": "Applicant",
     "fields": [

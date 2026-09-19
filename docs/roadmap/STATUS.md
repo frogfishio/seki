@@ -104,23 +104,31 @@
   expression evaluator, and the candidate expression. Lean 4.33.1 checks the
   full policy plus `NoMinorApproved` and `AdultApproved`; this is experimental
   evidence only because the planned 4.30.0 identity is unbound and the exact
-  SCB-0 decoder/equality theorem is still missing.
+  foundation is not qualified.
+- E0-02/E0-03 now record a 417-byte SCB-0 module with domain-separated digest
+  `0ff1f489e9a20e7c09e60b079db62971318586129399a3c6fb119e54e36ddc9b`.
+  The existing JavaScript decoder/type checker reopens it with exact resource
+  bounds `(8,25,5,0)`. The fixture-bounded Lean decoder validates the complete
+  module, constructs its typed expression, proves decoder equality with Lean's
+  native decision procedure, and applies the full threshold policy to any
+  decoded program. This adds the local native evaluator to the experimental
+  trust report; it is not a qualified proof premise.
 
 ## Active work
 
-`E0-VS1` is active. E0-01 is complete; E0-02 now owns the minimum experimental
-Lean decoder necessary to bind the checked evaluator to the exact typed-core
-bytes. The experiment is disposable evidence and cannot freeze conformance
+`E0-VS1` is active. E0-01 through E0-03 are complete experimentally. E0-04 now
+owns the minimum C11 parser and syntax-directed checker that must derive the
+typed-core candidate from the exact Seki source rather than from a fixture
+emitter. The experiment is disposable evidence and cannot freeze conformance
 while F0 is open.
 
 ## Next unblocked tasks
 
-1. E0-02/E0-03 — minimum Lean decoder/evaluator and exact program-property proof.
-2. E0-04/E0-05 — minimum C11 frontend and deterministic typed-core reproduction.
-3. E0-06 through E0-09 — restricted C, execution evidence, manifest, and trust report.
-4. F0-01 — independent consumer decision and reviewer selection.
-5. B0-08/B0-09 — exact Lean and Rocq source locks.
-6. B0-10 — CompCert acquisition and use profile.
+1. E0-04/E0-05 — minimum C11 frontend and deterministic typed-core reproduction.
+2. E0-06 through E0-09 — restricted C, execution evidence, manifest, and trust report.
+3. F0-01 — independent consumer decision and reviewer selection.
+4. B0-08/B0-09 — exact Lean and Rocq source locks.
+5. B0-10 — CompCert acquisition and use profile.
 
 ## Open decisions and blockers
 

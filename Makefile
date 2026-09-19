@@ -12,6 +12,7 @@ verify-status:
 
 check-e0-vs1:
 	node tools/check_e0_vs1_contract.mjs
+	node tools/encoding/check_e0_minimum_age_vector.mjs
 
 # Deliberately not part of `check` until the exact Lean 4.30.0 foundation is
 # bound. Local execution is experimental evidence only.
