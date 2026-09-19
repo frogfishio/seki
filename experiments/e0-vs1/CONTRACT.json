@@ -1,0 +1,38 @@
+{
+  "schema": "io.frogfish.seki/experimental-vertical-slice-contract@0",
+  "experiment": "E0-VS1",
+  "authority": "experimental-only",
+  "source": {
+    "path": "experiments/e0-vs1/minimum_age.seki",
+    "sha256": "359ab794bc27125e2eefb80c435df1e031d119c9cedf057749e30fd13cba0a0e"
+  },
+  "input": {
+    "type": "Applicant",
+    "fields": [
+      {
+        "name": "age",
+        "type": "U8"
+      }
+    ]
+  },
+  "result": "Decision[Unit,Rejection]",
+  "policy": {
+    "threshold": 18,
+    "below_threshold": "Reject(Rejection::Underage)",
+    "at_or_above_threshold": "Accept(Unit)"
+  },
+  "boundary_examples": [
+    { "age": 0, "result": "Reject(Rejection::Underage)" },
+    { "age": 17, "result": "Reject(Rejection::Underage)" },
+    { "age": 18, "result": "Accept(Unit)" },
+    { "age": 19, "result": "Accept(Unit)" },
+    { "age": 255, "result": "Accept(Unit)" }
+  ],
+  "claims": {
+    "implementation_authority": false,
+    "proof_authority": false,
+    "generated_c_certified": false,
+    "native_binary_authority": false,
+    "product_authority": false
+  }
+}

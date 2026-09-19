@@ -1,7 +1,7 @@
 # Seki controlled delivery plan
 
-- Plan version: 0.1
-- Date: 2026-09-11
+- Plan version: 0.2
+- Date: 2026-09-19
 - Status: active bootstrap plan
 - Language identity: `io.frogfish.seki/language@0`
 - Governing design input: Seki v0.3 project seed
@@ -43,6 +43,10 @@ cannot silently expand a phase's authority.
    malformed, duplicate, ambiguous, oversized, substituted, and truncated cases.
 10. **Handoff at every milestone.** A person unfamiliar with the preceding work
     must be able to reproduce the result from committed artifacts and commands.
+11. **Experiments may cross future phase boundaries without crossing their claim
+    boundaries.** An explicitly authorized bootstrap experiment may exercise a
+    later architecture while an earlier gate is open, but it cannot freeze the
+    exercised interfaces or inherit the later phase's authority vocabulary.
 
 ## 3. Authority vocabulary
 
@@ -142,6 +146,46 @@ pinned clean-room environment, and no foundational dependency or contributed
 input has an unknown use boundary.
 
 B0 completion does not close F0 or authorize F1.
+
+## 6A. Bootstrap experiment E0 — first end-to-end vertical slice
+
+### Purpose
+
+Test Seki's complete value proposition on one tiny decision before expanding
+the specification: human-written source, exact typed core, an independently
+stated Lean property, restricted C output, and executable integration evidence.
+
+This is bootstrap implementation pressure, not the start of F1 or F3. ADR 0020
+defines its claim ceiling.
+
+### Entry criteria
+
+- The candidate surface and typed-core drafts can express the selected policy.
+- `make check` passes before the experiment begins.
+- Project status names `E0-VS1` while retaining every authority field as false.
+
+### Work
+
+| ID | Workstream | Task | State |
+| --- | --- | --- | --- |
+| E0-01 | W-SPEC | Freeze only the experiment's source text, input/output schema, property statement, and exclusions. | done; experiment-only |
+| E0-02 | W-LEAN | Define the minimum experimental Seki AST/decoder/evaluator needed to state the property over the exact typed-core artifact. | active; typed evaluator checks, exact-byte decoder pending |
+| E0-03 | W-LEAN | Prove that the exact experiment program cannot approve an applicant younger than 18. | pending |
+| E0-04 | W-C | Implement the minimum C11 source parser and syntax-directed checker for the selected subset. | pending |
+| E0-05 | W-C | Emit the exact canonical typed-core candidate and bind its digest. | pending |
+| E0-06 | W-C | Implement the restricted-C AST projection and canonical printer for the selected subset. | pending |
+| E0-07 | W-TEST | Add positive, hostile, boundary, differential, strict-C11, and sanitizer evidence. | pending |
+| E0-08 | W-REPR | Bind source, typed core, theorem, generated C, compiler invocation, and result identities in one experimental manifest. | pending |
+| E0-09 | W-SPEC | Record every unproved arrow, trusted tool, and discrepancy exposed by the slice. | pending |
+| E0-10 | W-CUST | Review whether the completed slice justifies expansion, redesign, or termination. | pending |
+
+### Exit gate
+
+The experiment closes only when all required artifacts regenerate
+deterministically, Lean checks the property against the exact decoded program,
+the restricted C executes the boundary portfolio as expected, and the review
+states precisely what remains unproved. Completion grants no qualification or
+release authority and does not close F0.
 
 ## 7. Phase F0 — Charter and independent-consumer freeze
 
@@ -539,26 +583,35 @@ qualified work.
 
 The next tasks, in dependency order, are:
 
-1. **F0-01:** name the materially different consumer decision and reviewer.
-2. **F0-02/F0-03:** write its data, bound, and rejection inventory.
-3. **F1-A01/F1-A02 review:** review the initial typed-core declaration,
+1. **E0-01:** record the exact vertical-slice policy, schema, source, property,
+   and exclusions.
+2. **E0-02/E0-03:** build the minimum Lean semantic nucleus and prove the
+   property against the exact decoded program.
+3. **E0-04/E0-05:** implement the minimum C11 frontend and reproduce the exact
+   typed-core candidate.
+4. **E0-06 through E0-09:** emit restricted C, exercise it, bind the artifacts,
+   and record the remaining trust boundary.
+5. **F0-01:** name the materially different consumer decision and reviewer.
+6. **F0-02/F0-03:** write its data, bound, and rejection inventory.
+7. **F1-A01/F1-A02 review:** review the initial typed-core declaration,
    expression, admission, and fixture drafts without claiming F1 start.
-4. **F1-A04/F1-A06:** review the explicit single-payload binder rule and indexed
+8. **F1-A04/F1-A06:** review the explicit single-payload binder rule and indexed
    rejection-precedence model.
-5. **B0-08/B0-09:** bind Lean and Rocq exact sources and licenses.
-6. **B0-10:** resolve the CompCert acquisition/use profile.
-7. **Completed experimentally:** add a separate syntax-directed checker that
+9. **B0-08/B0-09:** bind Lean and Rocq exact sources and licenses.
+10. **B0-10:** resolve the CompCert acquisition/use profile.
+11. **Completed experimentally:** add a separate syntax-directed checker that
    reopens imported signatures, expression types, kernel decisions, and exact
    resource tuples over the three current positive fixtures and eight isolated
    semantic hostile cases.
-8. **Semantic bootstrap slices completed experimentally.** Record/payload,
+12. **Semantic bootstrap slices completed experimentally.** Record/payload,
    arithmetic/control, construction/access, array traversal, workspace,
    kernel-control, and the checked node audit are complete; all 65 tags have
    positive evidence. Module/profile and bundle-graph ceilings, checked `U32`
    bound arithmetic, fixed type formation/equality, empty-form policy, source-byte
    authority, and publication coupling now have explicit rules and executable
    checks. This is fixture evidence, not a proof or admission freeze.
-9. Assemble the F0 review packet and request the exact scoped response.
+13. Assemble the F0 review packet and request the exact scoped response.
 
-Tasks 3–8 are bootstrap/specification work and may proceed while F0 is open. No
-F1 completion or authority claim may be made until task 9 closes the gate.
+E0 and tasks 7–12 are bootstrap/specification work and may proceed while F0 is
+open. No F1 completion or authority claim may be made until task 13 closes the
+gate.

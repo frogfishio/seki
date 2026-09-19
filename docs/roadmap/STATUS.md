@@ -1,9 +1,11 @@
 # Seki execution status
 
-- Updated: 2026-09-11
-- Plan: `docs/roadmap/DELIVERY_PLAN.md` version 0.1
+- Updated: 2026-09-19
+- Plan: `docs/roadmap/DELIVERY_PLAN.md` version 0.2
 - Current stage: B0 bootstrap
 - Current gate: global F0 open
+- Active work package: E0-VS1 experimental vertical slice
+- Experimental work authorized: yes
 - F1 authorized: no
 - Implementation authority: none
 - Proof authority: none
@@ -90,17 +92,35 @@
   publication-equivalence theorem obligation. Two independent hostile cases
   exercise the coupling, and the enumerated semantic rule-gap ledger is empty.
 - Conservative C11 engineering standard and `make check` entry point added.
+- ADR 0020 authorizes one end-to-end bootstrap experiment connecting exact Seki
+  source, typed core, a Lean program-property proof, restricted C, and execution
+  evidence without granting implementation, proof, or product authority.
+- E0-01 fixes the experimental minimum-age policy, `Applicant(age: U8)` schema,
+  complete threshold behavior, boundary observations, exact Seki source digest,
+  independent Lean-property shape, and deliberate exclusions. The companion
+  adult-approval property prevents a reject-everything implementation from
+  satisfying the safety theorem vacuously.
+- The first E0 Lean nucleus defines the independent property, a minimum typed
+  expression evaluator, and the candidate expression. Lean 4.33.1 checks the
+  full policy plus `NoMinorApproved` and `AdultApproved`; this is experimental
+  evidence only because the planned 4.30.0 identity is unbound and the exact
+  SCB-0 decoder/equality theorem is still missing.
 
 ## Active work
 
-No task is currently marked active. Select the first unblocked item from the
-immediate execution queue in the delivery plan and record its owner here.
+`E0-VS1` is active. E0-01 is complete; E0-02 now owns the minimum experimental
+Lean decoder necessary to bind the checked evaluator to the exact typed-core
+bytes. The experiment is disposable evidence and cannot freeze conformance
+while F0 is open.
 
 ## Next unblocked tasks
 
-1. F0-01 — independent consumer decision and reviewer selection.
-2. B0-08/B0-09 — exact Lean and Rocq source locks.
-3. B0-10 — CompCert acquisition and use profile.
+1. E0-02/E0-03 — minimum Lean decoder/evaluator and exact program-property proof.
+2. E0-04/E0-05 — minimum C11 frontend and deterministic typed-core reproduction.
+3. E0-06 through E0-09 — restricted C, execution evidence, manifest, and trust report.
+4. F0-01 — independent consumer decision and reviewer selection.
+5. B0-08/B0-09 — exact Lean and Rocq source locks.
+6. B0-10 — CompCert acquisition and use profile.
 
 ## Open decisions and blockers
 
@@ -113,15 +133,18 @@ immediate execution queue in the delivery plan and record its owner here.
 | CompCert rights/acquisition unresolved | F4/F5 distribution profile cannot freeze. |
 | Exact toolchain source identities unbound | Formal and clean-room results cannot qualify. |
 | Several surface forms remain provisional | Parser work may experiment but cannot freeze conformance. |
+| E0 has no Clight refinement | Its Lean proof does not prove generated C or native behavior. |
 
 ## Verification commands
 
 ```sh
 make check
 make check-encoding-vectors
+make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 ```
 
 ## Last verification
 
-Local seed, status, JSON, and whitespace checks passed on 2026-09-11. This is a
-bootstrap check, not clean-room or qualification evidence.
+Local seed, status, JSON, encoding-vector, semantic-coverage, and whitespace
+checks passed on 2026-09-19. This remains a bootstrap check, not clean-room or
+qualification evidence.

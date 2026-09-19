@@ -37,6 +37,12 @@ does not yet contain a verified compiler or grant implementation, proof,
 native-binary, product, or production authority. Start with
 [`SEKI_V0_3_PROJECT_SEED/START_HERE.md`](SEKI_V0_3_PROJECT_SEED/START_HERE.md).
 
+Bootstrap experiment `E0-VS1` is now authorized to exercise one complete
+source-to-Lean-property-to-restricted-C path. It is explicitly experimental:
+global F0 remains open, F1 is not authorized, and successful execution does not
+certify the generated C. See
+[`ADR 0020`](docs/decisions/0020-experimental-end-to-end-vertical-slice.md).
+
 Current bootstrap records:
 
 - [`PLAN.md`](PLAN.md) — controlled delivery plan and handoff entry point

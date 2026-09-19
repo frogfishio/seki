@@ -1,14 +1,22 @@
 .DEFAULT_GOAL := check
 
-.PHONY: check verify-seed verify-status check-encoding-vectors check-diff
+.PHONY: check verify-seed verify-status check-e0-vs1 check-e0-lean check-encoding-vectors check-diff
 
-check: verify-seed verify-status check-encoding-vectors check-diff
+check: verify-seed verify-status check-e0-vs1 check-encoding-vectors check-diff
 
 verify-seed:
 	./SEKI_V0_3_PROJECT_SEED/VERIFY.sh
 
 verify-status:
 	node tools/check_project_status.mjs
+
+check-e0-vs1:
+	node tools/check_e0_vs1_contract.mjs
+
+# Deliberately not part of `check` until the exact Lean 4.30.0 foundation is
+# bound. Local execution is experimental evidence only.
+check-e0-lean:
+	lean formal/lean/E0/MinimumAge.lean
 
 check-encoding-vectors:
 	./tools/encoding/check_minimal_vector.sh

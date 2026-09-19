@@ -12,10 +12,12 @@ expect(status.schema === "io.frogfish.seki/project-status@1",
 expect(status.language_identity === "io.frogfish.seki/language@0",
   "language identity drift");
 expect(status.charter_revision === "0.3", "charter revision drift");
-expect(status.delivery_plan_version === "0.1", "delivery plan version drift");
+expect(status.delivery_plan_version === "0.2", "delivery plan version drift");
 expect(status.current_stage === "B0", "unexpected current stage");
-expect(status.active_work_package === null,
-  "machine status names active work not reflected by this bootstrap gate");
+expect(status.active_work_package === "E0-VS1",
+  "unexpected active bootstrap experiment");
+expect(status.experimental_work_authorized === true,
+  "active bootstrap experiment is not explicitly authorized");
 expect(status.license === "GPL-3.0-or-later", "license drift");
 expect(status.generated_artifact_policy === "customer-controlled",
   "generated-artifact policy drift");
@@ -36,6 +38,13 @@ if (status.global_f0 === "open") {
   ]) expect(status[claim] === false, `${claim} granted while F0 is open`);
 } else {
   expect(status.global_f0 === "closed", "global_f0 must be open or closed");
+}
+
+if (status.active_work_package === "E0-VS1") {
+  expect(status.current_stage === "B0",
+    "E0-VS1 is authorized only as bootstrap experimentation");
+  expect(status.f1_implementation_authorized === false,
+    "E0-VS1 must not silently authorize F1");
 }
 
 expect(plan.includes(`Plan version: ${status.delivery_plan_version}`),
