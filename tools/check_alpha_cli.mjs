@@ -13,6 +13,7 @@ const sources = [
   "src/alpha/sekic.c",
   "src/alpha/seki_lexer.c",
   "src/alpha/seki_parser.c",
+  "src/alpha/seki_checker.c",
   "src/alpha/e0_frontend_adapter.c",
   "src/alpha/e0_backend_adapter.c",
 ];
@@ -56,7 +57,7 @@ try {
   const hostile = run(["check", hostileSource]);
   assert.equal(hostile.status, 65);
   assert.match(hostile.stderr,
-    /^A0-SOURCE-0001:.*:\d+:\d+: minimum-age literal does not fit U8\n$/u);
+    /^A0-CHECK-0004:.*: comparison operands are incompatible\n$/u);
 
   const duplicateHeader = path.join(temporary, "duplicate-header.seki");
   fs.writeFileSync(duplicateHeader,

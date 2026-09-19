@@ -36,8 +36,20 @@ expect(alpha.general_lexer_ready === true,
   "general alpha lexer progress record lost");
 expect(alpha.general_header_parser_ready === true,
   "general module-header parser progress record lost");
+expect(alpha.general_alias_nominal_parser_ready === true,
+  "general alias/nominal parser progress record lost");
+expect(alpha.general_record_variant_parser_ready === true,
+  "general record/variant parser progress record lost");
+expect(alpha.general_kernel_envelope_parser_ready === true,
+  "general kernel-envelope parser progress record lost");
+expect(alpha.general_expression_parser_ready === false,
+  "expression parser claimed ready before implementation");
+expect(alpha.minimum_age_tail_ast_ready === true,
+  "minimum-age kernel-tail AST progress record lost");
+expect(alpha.minimum_age_semantic_checker_ready === true,
+  "minimum-age semantic checker progress record lost");
 expect(alpha.general_declaration_parser_ready === false,
-  "declaration parser claimed ready before implementation");
+  "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",
   "project status lost internal assurance model");
 expect(status.internal_certification_status === "not-ready",

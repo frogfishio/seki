@@ -190,7 +190,20 @@
 - The live CLI now parses module paths, module/profile versions, claims, and
   theorem obligations through the general lexer/parser before invoking the E0
   adapter. Fixed capacities and duplicate rejection have independent positive
-  and hostile coverage. General declaration and expression parsing remains open.
+  and hostile coverage.
+- The general parser now accepts aliases, nominal types, non-recursive records,
+  and explicitly tagged variants with optional payload fields. It rejects
+  duplicate declaration, record-field, variant-name, and variant-tag identities.
+  It also parses exported kernel envelopes through parameters, applied result
+  types, policy, resource bounds, rejection order, publication mode, and balanced
+  body extent.
+- The minimum-age kernel tail now becomes a fixed-capacity AST rather than an
+  opaque token span. An independent checker resolves parameters and record
+  fields, enforces comparison and condition types, and checks `accept`/`reject`
+  against the declared `Decision` and rejection inventory. The live CLI runs
+  this checker before its E0 regression adapter. The remaining expression forms,
+  pure functions, domains, full declaration semantics, typed-core construction,
+  and general emission remain open, so A0-02 is still active.
 
 ## Active work
 

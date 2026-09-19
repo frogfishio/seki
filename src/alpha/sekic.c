@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "e0_adapter.h"
+#include "seki_checker.h"
 #include "seki_parser.h"
 
 #define SEKI_A0_VERSION "0.0.0-alpha.2"
@@ -116,8 +117,9 @@ compile_source(const char *path, unsigned char *core, size_t *core_length,
 {
     unsigned char source[SEKI_A0_SOURCE_CAPACITY];
     size_t source_length = 0U;
-    struct seki_module_header header;
+    struct seki_module_prefix module;
     struct seki_parse_error parse_error;
+    struct seki_check_error check_error;
 
     if (!read_bounded(path, source, sizeof source, &source_length)) {
         (void)fprintf(stderr,
@@ -125,13 +127,17 @@ compile_source(const char *path, unsigned char *core, size_t *core_length,
             path, (unsigned)sizeof source);
         return EXIT_IO;
     }
-    if (!seki_parse_module_header(source, source_length, &header,
+    if (!seki_parse_module_prefix(source, source_length, &module,
         &parse_error)) {
         (void)fprintf(stderr, "%s:%s:%zu:%zu: %s\n", parse_error.code,
             path, parse_error.line, parse_error.column, parse_error.message);
         return EXIT_DATA;
     }
-    (void)header;
+    if (!seki_check_module(&module, &check_error)) {
+        (void)fprintf(stderr, "%s:%s: %s\n", check_error.code, path,
+            check_error.message);
+        return EXIT_DATA;
+    }
     if (!seki_e0_source_to_core(source, source_length, core,
         SEKI_E0_CORE_CAPACITY, core_length, diagnostic)) {
         print_diagnostic(path, diagnostic);

@@ -20,6 +20,12 @@
   "general_compiler_core_ready": false,
   "general_lexer_ready": true,
   "general_header_parser_ready": true,
+  "general_alias_nominal_parser_ready": true,
+  "general_record_variant_parser_ready": true,
+  "general_kernel_envelope_parser_ready": true,
+  "general_expression_parser_ready": false,
+  "minimum_age_tail_ast_ready": true,
+  "minimum_age_semantic_checker_ready": true,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

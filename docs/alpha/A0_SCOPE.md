@@ -82,9 +82,20 @@ this lexer directly.
 `src/alpha/seki_parser.c` now uses that lexer on the live `check` and `build`
 paths. It parses arbitrary lower-case module paths, module/profile versions,
 claim ceilings, and theorem-obligation lists into fixed-capacity borrowed slices,
-rejecting duplicate names and excessive path/list shapes. The declaration and
-expression parser remains the next A0-02 boundary; successful headers still pass
-to the visibly labelled E0 adapter.
+rejecting duplicate names and excessive path/list shapes. It also parses the
+candidate `type`, `nominal`, `record`, and `variant` declarations, including
+bounded byte and digest types, record fields, variant payload fields, explicit
+tags, and duplicate rejection. The parser also recognizes an exported kernel's
+complete envelope: labelled parameters, applied result type, arithmetic policy,
+four resource ceilings, ordered rejection references, publication mode, and a
+kernel body. The first tail-expression AST covers names, natural and Boolean
+literals, `unit`, record-field projection, comparisons, `ifTrue:/ifFalse:`, and
+terminal `accept`/`reject`. A separate allocation-free checker resolves kernel
+parameters and record fields, checks comparison operands and Boolean conditions,
+and relates terminal values and rejection constructors to `Decision[A, R]` and
+the ordered rejection inventory. This is enough to check the minimum-age
+semantic slice independently before the visibly labelled E0 adapter performs
+typed-core and C generation; it is not yet the complete A0 expression language.
 
 Build and exercise the current increment with:
 

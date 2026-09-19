@@ -3,8 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "seki-a0-parser-"));
-const executable = path.join(temporary, "test-parser");
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "seki-a0-checker-"));
+const executable = path.join(temporary, "test-checker");
 const flags = [
   "-std=c11", "-pedantic", "-Wall", "-Wextra", "-Werror",
   "-Wconversion", "-Wsign-conversion", "-Wshadow", "-Wstrict-prototypes",
@@ -16,14 +16,13 @@ try {
     ...flags,
     "src/alpha/seki_lexer.c",
     "src/alpha/seki_parser.c",
-    "tests/alpha/test_parser.c",
+    "src/alpha/seki_checker.c",
+    "tests/alpha/test_checker.c",
     "-o", executable,
   ], { stdio: "inherit" });
   execFileSync(executable, [], { stdio: "inherit" });
   console.log(
-    "seki_alpha_parser=verified header=general " +
-    "declarations=alias,nominal,record,variant " +
-    "kernel=envelope,tail-ast positive=3 hostile=8",
+    "seki_alpha_checker=verified slice=minimum-age positive=1 hostile=5",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

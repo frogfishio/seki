@@ -28,7 +28,11 @@ allocation-free, contains no module or declaration names, and tokenizes the
 complete candidate punctuation/operator vocabulary with checked `U32` literals
 and stable `A0-LEX-*` diagnostics.
 
-`alpha/seki_parser.c` consumes that lexer in the live CLI and constructs the
-general fixed-capacity module-header model. It deliberately stops at the header;
-declarations and expressions still pass to the E0 adapter until their general
-AST and checks exist.
+`alpha/seki_parser.c` consumes that lexer in the live CLI and constructs a
+fixed-capacity module prefix: the general header plus aliases, nominal types,
+records, explicitly tagged variants, and exported kernel envelopes. Kernel bodies
+for the minimum-age slice become a fixed-capacity tail AST. The independent
+`alpha/seki_checker.c` resolves parameters and record fields, checks comparison
+and condition types, and checks terminal decisions before the E0 adapter runs.
+The rest of the expression language, typed-core construction, and C generation
+remain adapter-backed until the general compiler core exists.
