@@ -177,11 +177,11 @@
 - A0-01 fixes the alpha subset, CLI intent, usability test, six-package work
   ledger, and claim ceiling. It requires both the minimum-age and Grit Stage 1
   publication kernels to pass through one general compiler.
-- A0-02 now has a strictly compiled `sekic 0.0.0-alpha.4` vertical. `check`,
+- A0-02 now has a strictly compiled `sekic 0.0.0-alpha.5` vertical. `check`,
   `build`, and `inspect` execute through an in-process C API; `build` reproduces
   the exact E0 typed-core and restricted-C bytes and rejects existing or aliased
-  outputs. Inspection exposes `frontend=alpha-minimum-age` and
-  `backend=alpha-minimum-age`.
+  outputs. Inspection exposes `frontend=alpha-u8-decision` and
+  `backend=alpha-u8-decision`.
 - The first adapter-independent A0-02 component is complete: a name-agnostic,
   allocation-free lexer covers the candidate grammar's identifiers, checked
   `U32` numbers, hexadecimal strings, comments, newlines, delimiters, and
@@ -209,9 +209,14 @@
   regression artifact; changing the threshold to 19 changes both the core and
   generated C. Core emission remains shape-limited.
 - The live compiler no longer links the E0 backend adapter. Its alpha backend
-  independently validates the complete SCB-0 minimum-age slice, reconstructs a
+  independently validates the complete SCB-0 U8-decision slice, reconstructs a
   restricted-C model, and prints the exact 524-byte regression output. Bad
   magic and payload-length mutations reject before inspection or C generation.
+- The frontend, core emitter, decoder, and C printer no longer require the
+  minimum-age program's identifiers. A renamed `gate_policy` module with renamed
+  data, field, rejection, kernel, and parameter names, tag 7, and threshold 42
+  passes end to end and its emitted C compiles strictly. The minimum-age C ABI is
+  retained only as a byte-regression compatibility case.
 - Complete-module parsing is now mandatory on the live path. Unsupported
   declarations and trailing source reject instead of disappearing beyond a
   parsed prefix, closing a dependency that had previously been covered by the

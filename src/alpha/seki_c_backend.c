@@ -8,16 +8,31 @@ enum restricted_decision {
     RESTRICTED_REJECT_UNDERAGE
 };
 
+#define DECODED_NAME_CAPACITY 64U
+
+struct decoded_name {
+    char bytes[DECODED_NAME_CAPACITY];
+    size_t length;
+};
+
 struct restricted_kernel {
     uint32_t parameter_index;
     uint32_t field_index;
     uint8_t threshold;
+    uint8_t rejection_tag;
+    struct decoded_name name;
+    struct decoded_name parameter_name;
     enum restricted_decision if_true;
     enum restricted_decision if_false;
 };
 
 struct restricted_module {
     uint32_t profile_version;
+    struct decoded_name module_name;
+    struct decoded_name record_name;
+    struct decoded_name field_name;
+    struct decoded_name variant_name;
+    struct decoded_name case_name;
     struct restricted_kernel kernel;
 };
 
@@ -112,6 +127,35 @@ expect_name(struct reader *reader, const char *expected)
 }
 
 static void
+read_name(struct reader *reader, struct decoded_name *name)
+{
+    const uint32_t encoded_length = read_u32(reader);
+    size_t index;
+    if (reader->failed) {
+        return;
+    }
+    if (encoded_length == 0U || encoded_length >= DECODED_NAME_CAPACITY ||
+        (size_t)encoded_length > reader->length - reader->offset) {
+        reader_fail(reader, "SCB-0 name exceeds backend capacity");
+        return;
+    }
+    name->length = (size_t)encoded_length;
+    for (index = 0U; index < name->length; index += 1U) {
+        const unsigned char value = reader->bytes[reader->offset + index];
+        if (!((value >= (unsigned char)'a' && value <= (unsigned char)'z') ||
+            (value >= (unsigned char)'A' && value <= (unsigned char)'Z') ||
+            (value >= (unsigned char)'0' && value <= (unsigned char)'9') ||
+            value == (unsigned char)'_')) {
+            reader_fail(reader, "SCB-0 name contains a non-identifier byte");
+            return;
+        }
+        name->bytes[index] = (char)value;
+    }
+    name->bytes[name->length] = '\0';
+    reader->offset += name->length;
+}
+
+static void
 expect_local_type(struct reader *reader, uint32_t index)
 {
     expect_u8(reader, 0U, "expected local type reference");
@@ -139,6 +183,9 @@ static void
 decode_header(struct reader *reader, struct restricted_module *module)
 {
     static const unsigned char magic[4] = {'S', 'E', 'K', 'I'};
+    uint32_t path_count;
+    uint32_t path_index;
+    uint32_t rejection_tag;
     const uint32_t payload_length_expected =
         reader->length >= 13U ? (uint32_t)(reader->length - 13U) : 0U;
     expect_raw(reader, magic, sizeof magic, "bad SCB-0 magic");
@@ -146,11 +193,15 @@ decode_header(struct reader *reader, struct restricted_module *module)
     expect_u8(reader, 0U, "expected SCB-0 module object");
     expect_u32(reader, payload_length_expected, "SCB-0 payload length mismatch");
     expect_u32(reader, 0U, "unsupported typed-core schema");
-    expect_u32(reader, 3U, "unexpected module path length");
-    expect_name(reader, "seki");
-    expect_name(reader, "experiments");
-    expect_name(reader, "minimum_age");
-    expect_u32(reader, 1U, "unexpected module version");
+    path_count = read_u32(reader);
+    if (!reader->failed && (path_count == 0U || path_count > 8U)) {
+        reader_fail(reader, "module path is outside backend capacity");
+    }
+    for (path_index = 0U; path_index < path_count && !reader->failed;
+        path_index += 1U) {
+        read_name(reader, &module->module_name);
+    }
+    (void)read_u32(reader);
     expect_name(reader, "c11_bounded");
     module->profile_version = read_u32(reader);
     if (!reader->failed && module->profile_version != 1U) {
@@ -158,18 +209,22 @@ decode_header(struct reader *reader, struct restricted_module *module)
     }
     expect_u32(reader, 0U, "imports must be empty");
     expect_u32(reader, 0U, "domains must be empty");
-    expect_u32(reader, 2U, "minimum-age slice requires two declarations");
-    expect_name(reader, "Applicant");
-    expect_u8(reader, 2U, "Applicant must be a record");
-    expect_u32(reader, 1U, "Applicant must have one field");
-    expect_name(reader, "age");
-    expect_u8(reader, 2U, "Applicant.age must be U8");
-    expect_name(reader, "Rejection");
-    expect_u8(reader, 3U, "Rejection must be a variant");
-    expect_u32(reader, 1U, "Rejection must have one case");
-    expect_u32(reader, 1U, "Underage tag must be one");
-    expect_name(reader, "Underage");
-    expect_u8(reader, 0U, "Underage must have no payload");
+    expect_u32(reader, 2U, "U8-decision slice requires two declarations");
+    read_name(reader, &module->record_name);
+    expect_u8(reader, 2U, "first declaration must be a record");
+    expect_u32(reader, 1U, "input record must have one field");
+    read_name(reader, &module->field_name);
+    expect_u8(reader, 2U, "input field must be U8");
+    read_name(reader, &module->variant_name);
+    expect_u8(reader, 3U, "second declaration must be a variant");
+    expect_u32(reader, 1U, "rejection variant must have one case");
+    rejection_tag = read_u32(reader);
+    if (!reader->failed && rejection_tag > UINT8_MAX) {
+        reader_fail(reader, "rejection tag exceeds C representation");
+    }
+    module->kernel.rejection_tag = (uint8_t)rejection_tag;
+    read_name(reader, &module->case_name);
+    expect_u8(reader, 0U, "rejection case must have no payload");
     expect_u32(reader, 0U, "functions must be empty");
 }
 
@@ -180,18 +235,19 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
     uint32_t declared_live;
     uint32_t declared_depth;
 
-    expect_u32(reader, 1U, "minimum-age slice requires one kernel");
-    expect_name(reader, "decide");
-    expect_u32(reader, 1U, "decide requires one parameter label");
-    expect_name(reader, "applicant");
-    expect_u32(reader, 1U, "decide requires one parameter type");
+    expect_u32(reader, 1U, "U8-decision slice requires one kernel");
+    read_name(reader, &module->kernel.name);
+    expect_u32(reader, 1U, "kernel requires one parameter label");
+    read_name(reader, &module->kernel.parameter_name);
+    expect_u32(reader, 1U, "kernel requires one parameter type");
     expect_declared_type(reader, 0U);
     expect_u8(reader, 19U, "decide result must be Decision");
     expect_u8(reader, 0U, "accepted result must be Unit");
     expect_declared_type(reader, 1U);
     expect_u32(reader, 1U, "decide requires one rejection-order entry");
     expect_local_type(reader, 1U);
-    expect_u32(reader, 1U, "unexpected rejection tag");
+    expect_u32(reader, module->kernel.rejection_tag,
+        "unexpected rejection tag");
 
     expect_u8(reader, 4U, "kernel body must be If");
     expect_u8(reader, 1U, "If condition must claim Bool");
@@ -214,7 +270,8 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
     expect_declared_type(reader, 1U);
     expect_u8(reader, 8U, "rejection value must construct a variant");
     expect_local_type(reader, 1U);
-    expect_u32(reader, 1U, "true branch must construct Underage");
+    expect_u32(reader, module->kernel.rejection_tag,
+        "true branch constructs wrong rejection");
     expect_u32(reader, 0U, "Underage must have no arguments");
     expect_u32(reader, 0U, "unexpected rejection precedence index");
     module->kernel.if_true = RESTRICTED_REJECT_UNDERAGE;
@@ -323,13 +380,86 @@ text_put_u8(struct text_buffer *buffer, uint8_t value)
     }
 }
 
+static int
+decoded_name_is(const struct decoded_name *name, const char *text)
+{
+    const size_t length = strlen(text);
+    return name->length == length && memcmp(name->bytes, text, length) == 0;
+}
+
 static void
-print_decision(struct text_buffer *output, enum restricted_decision decision)
+text_put_name(struct text_buffer *buffer, const struct decoded_name *name,
+    int lower_case)
+{
+    size_t index;
+    for (index = 0U; index < name->length; index += 1U) {
+        char character = name->bytes[index];
+        if (lower_case && character >= 'A' && character <= 'Z') {
+            character = (char)(character - 'A' + 'a');
+        }
+        if (buffer->failed || buffer->length == buffer->capacity) {
+            buffer->failed = 1;
+            return;
+        }
+        buffer->bytes[buffer->length++] = character;
+    }
+}
+
+static int
+uses_e0_compatibility_abi(const struct restricted_module *module)
+{
+    return decoded_name_is(&module->module_name, "minimum_age") &&
+        decoded_name_is(&module->record_name, "Applicant") &&
+        decoded_name_is(&module->field_name, "age") &&
+        decoded_name_is(&module->variant_name, "Rejection") &&
+        decoded_name_is(&module->case_name, "Underage") &&
+        decoded_name_is(&module->kernel.name, "decide") &&
+        decoded_name_is(&module->kernel.parameter_name, "applicant") &&
+        module->kernel.rejection_tag == 1U;
+}
+
+static void
+text_put_prefix(struct text_buffer *buffer,
+    const struct restricted_module *module)
+{
+    if (uses_e0_compatibility_abi(module)) {
+        text_put(buffer, "seki_e0");
+    } else {
+        text_put(buffer, "seki_a0_");
+        text_put_name(buffer, &module->module_name, 1);
+    }
+}
+
+static void
+text_put_field_identifier(struct text_buffer *buffer,
+    const struct restricted_module *module)
+{
+    if (!uses_e0_compatibility_abi(module)) {
+        text_put(buffer, "seki_f_");
+    }
+    text_put_name(buffer, &module->field_name, 0);
+}
+
+static void
+text_put_parameter_identifier(struct text_buffer *buffer,
+    const struct restricted_module *module)
+{
+    if (!uses_e0_compatibility_abi(module)) {
+        text_put(buffer, "seki_p_");
+    }
+    text_put_name(buffer, &module->kernel.parameter_name, 0);
+}
+
+static void
+print_decision(struct text_buffer *output, enum restricted_decision decision,
+    uint8_t rejection_tag)
 {
     if (decision == RESTRICTED_REJECT_UNDERAGE) {
         text_put(output,
             "        result.tag = UINT8_C(1);\n"
-            "        result.reason = UINT8_C(1);\n");
+            "        result.reason = UINT8_C(");
+        text_put_u8(output, rejection_tag);
+        text_put(output, ");\n");
     } else {
         text_put(output,
             "        result.tag = UINT8_C(0);\n"
@@ -346,26 +476,58 @@ print_module(const struct restricted_module *module, char *c_source,
         "#include <stdint.h>\n"
         "\n"
         "typedef struct {\n"
-        "    uint8_t age;\n"
-        "} seki_e0_applicant;\n"
+        "    uint8_t ");
+    text_put_field_identifier(&output, module);
+    text_put(&output, ";\n} ");
+    text_put_prefix(&output, module);
+    text_put(&output, "_");
+    text_put_name(&output, &module->record_name, 1);
+    text_put(&output,
+        ";\n"
         "\n"
         "typedef struct {\n"
         "    uint8_t tag;\n"
         "    uint8_t reason;\n"
-        "} seki_e0_decision;\n"
-        "\n"
-        "seki_e0_decision seki_e0_decide(seki_e0_applicant applicant);\n"
-        "\n"
-        "seki_e0_decision\n"
-        "seki_e0_decide(seki_e0_applicant applicant)\n"
-        "{\n"
-        "    seki_e0_decision result;\n"
-        "    if (applicant.age < UINT8_C(");
+        "} ");
+    text_put_prefix(&output, module);
+    text_put(&output, "_decision;\n\n");
+    text_put_prefix(&output, module);
+    text_put(&output, "_decision ");
+    text_put_prefix(&output, module);
+    text_put(&output, "_");
+    text_put_name(&output, &module->kernel.name, 0);
+    text_put(&output, "(");
+    text_put_prefix(&output, module);
+    text_put(&output, "_");
+    text_put_name(&output, &module->record_name, 1);
+    text_put(&output, " ");
+    text_put_parameter_identifier(&output, module);
+    text_put(&output, ");\n\n");
+    text_put_prefix(&output, module);
+    text_put(&output, "_decision\n");
+    text_put_prefix(&output, module);
+    text_put(&output, "_");
+    text_put_name(&output, &module->kernel.name, 0);
+    text_put(&output, "(");
+    text_put_prefix(&output, module);
+    text_put(&output, "_");
+    text_put_name(&output, &module->record_name, 1);
+    text_put(&output, " ");
+    text_put_parameter_identifier(&output, module);
+    text_put(&output, ")\n{\n    ");
+    text_put_prefix(&output, module);
+    text_put(&output, "_decision result;\n    if (");
+    text_put_parameter_identifier(&output, module);
+    text_put(&output, ".");
+    text_put_field_identifier(&output, module);
+    text_put(&output, " < UINT8_C(");
     text_put_u8(&output, module->kernel.threshold);
     text_put(&output, ")) {\n");
-    print_decision(&output, module->kernel.if_true);
+    print_decision(&output, module->kernel.if_true,
+        module->kernel.rejection_tag);
     text_put(&output, "    } else {\n");
-    print_decision(&output, module->kernel.if_false);
+    print_decision(&output, module->kernel.if_false,
+        module->kernel.rejection_tag);
     text_put(&output,
         "    }\n"
         "    return result;\n"

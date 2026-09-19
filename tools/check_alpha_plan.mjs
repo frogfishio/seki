@@ -25,10 +25,10 @@ expect(alpha.language_frozen === false && alpha.encoding_frozen === false,
 expect(alpha.authority_granted === false, "A0 granted authority");
 expect(alpha.development_assurance_model === "internal-self-attestation",
   "development assurance model drift");
-expect(alpha.cli_version === "0.0.0-alpha.4", "alpha CLI version drift");
+expect(alpha.cli_version === "0.0.0-alpha.5", "alpha CLI version drift");
 expect(alpha.connected_commands.join(",") === "check,build,inspect",
   "connected alpha commands drift");
-expect(alpha.compiler_core === "alpha-minimum-age-frontend+backend",
+expect(alpha.compiler_core === "alpha-u8-decision-frontend+backend",
   "unexpected provisional compiler core");
 expect(alpha.general_compiler_core_ready === false,
   "A0-02 cannot close while the general core remains incomplete");
@@ -50,16 +50,18 @@ expect(alpha.general_kernel_envelope_parser_ready === true,
   "general kernel-envelope parser progress record lost");
 expect(alpha.general_expression_parser_ready === false,
   "expression parser claimed ready before implementation");
-expect(alpha.minimum_age_tail_ast_ready === true,
-  "minimum-age kernel-tail AST progress record lost");
-expect(alpha.minimum_age_semantic_checker_ready === true,
-  "minimum-age semantic checker progress record lost");
-expect(alpha.minimum_age_core_emitter_ready === true,
-  "minimum-age core emitter progress record lost");
-expect(alpha.minimum_age_independent_core_decoder_ready === true,
-  "minimum-age independent core decoder progress record lost");
-expect(alpha.minimum_age_c_backend_ready === true,
-  "minimum-age C backend progress record lost");
+expect(alpha.u8_decision_tail_ast_ready === true,
+  "U8-decision kernel-tail AST progress record lost");
+expect(alpha.u8_decision_semantic_checker_ready === true,
+  "U8-decision semantic checker progress record lost");
+expect(alpha.u8_decision_core_emitter_ready === true,
+  "U8-decision core emitter progress record lost");
+expect(alpha.u8_decision_independent_core_decoder_ready === true,
+  "U8-decision independent core decoder progress record lost");
+expect(alpha.u8_decision_c_backend_ready === true,
+  "U8-decision C backend progress record lost");
+expect(alpha.u8_decision_identity_independent === true,
+  "U8-decision slice regained program-identity assumptions");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",

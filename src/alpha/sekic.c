@@ -15,7 +15,7 @@
 #include "seki_core.h"
 #include "seki_parser.h"
 
-#define SEKI_A0_VERSION "0.0.0-alpha.4"
+#define SEKI_A0_VERSION "0.0.0-alpha.5"
 #define SEKI_A0_SOURCE_CAPACITY 65536U
 
 enum exit_status {
@@ -213,8 +213,8 @@ inspect_command(const char *input_path)
         return EXIT_DATA;
     }
     (void)printf(
-        "frontend=alpha-minimum-age\n"
-        "backend=alpha-minimum-age\n"
+        "frontend=alpha-u8-decision\n"
+        "backend=alpha-u8-decision\n"
         "profile=c11_bounded@%u\n"
         "threshold_u8=%u\n"
         "authority=none\n",

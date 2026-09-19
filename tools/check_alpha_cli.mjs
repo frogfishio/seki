@@ -39,7 +39,7 @@ try {
   assert.equal(version.status, 0);
   assert.equal(version.stderr, "");
   assert.equal(version.stdout,
-    "sekic 0.0.0-alpha.4 (provisional, authority=none)\n");
+    "sekic 0.0.0-alpha.5 (provisional, authority=none)\n");
 
   const help = run(["--help"]);
   assert.equal(help.status, 0);
@@ -69,14 +69,20 @@ try {
   assert.match(duplicate.stderr,
     /^A0-PARSE-0007:.*:\d+:\d+: duplicate header name\n$/u);
 
-  const unsupportedSource = path.join(temporary, "unsupported-shape.seki");
-  fs.writeFileSync(unsupportedSource,
-    fs.readFileSync(canonicalSource, "utf8").replace(
-      "minimum_age", "different_policy"));
-  const unsupported = run(["check", unsupportedSource]);
-  assert.equal(unsupported.status, 65);
-  assert.match(unsupported.stderr,
-    /^A0-CORE-0001:.*: module is outside the current core-emission slice\n$/u);
+  const renamedSource = path.join(temporary, "gate_policy.seki");
+  const renamedCore = path.join(temporary, "gate_policy.scb0");
+  const renamedC = path.join(temporary, "gate_policy.c");
+  const renamedText = fs.readFileSync(canonicalSource, "utf8")
+    .replace("minimum_age", "gate_policy")
+    .replaceAll("Applicant", "Signal")
+    .replaceAll("Rejection", "Denial")
+    .replaceAll("Underage", "Below")
+    .replaceAll("decide", "screen")
+    .replaceAll("applicant", "signal")
+    .replaceAll("age", "level")
+    .replace("Below @ 1.", "Below @ 7.")
+    .replace("< 18", "< 42");
+  fs.writeFileSync(renamedSource, renamedText);
 
   const corePath = path.join(temporary, "minimum_age.scb0");
   const cPath = path.join(temporary, "minimum_age.c");
@@ -89,6 +95,27 @@ try {
   assert.deepEqual(fs.readFileSync(corePath),
     Buffer.from(fs.readFileSync(recordedCore, "ascii").trim(), "hex"));
   assert.deepEqual(fs.readFileSync(cPath), fs.readFileSync(recordedC));
+
+  const renamed = run([
+    "build", "--core", renamedCore, "--c", renamedC, renamedSource,
+  ]);
+  assert.equal(renamed.status, 0, renamed.stderr);
+  const renamedCText = fs.readFileSync(renamedC, "utf8");
+  assert.match(renamedCText, /seki_a0_gate_policy_signal/u);
+  assert.match(renamedCText, /seki_a0_gate_policy_screen/u);
+  assert.match(renamedCText,
+    /seki_p_signal\.seki_f_level < UINT8_C\(42\)/u);
+  assert.match(renamedCText, /result\.reason = UINT8_C\(7\)/u);
+  execFileSync("cc", [...strictFlags, "-c", renamedC, "-o",
+    path.join(temporary, "gate_policy.o")], { stdio: "inherit" });
+
+  const outsideSliceSource = path.join(temporary, "outside-slice.seki");
+  fs.writeFileSync(outsideSliceSource,
+    fs.readFileSync(canonicalSource, "utf8").replace("< 18", "> 18"));
+  const outsideSlice = run(["check", outsideSliceSource]);
+  assert.equal(outsideSlice.status, 65);
+  assert.match(outsideSlice.stderr,
+    /^A0-CORE-0001:.*: module is outside the U8-decision core slice\n$/u);
 
   const variantSource = path.join(temporary, "minimum_age_19.seki");
   const variantCore = path.join(temporary, "minimum_age_19.scb0");
@@ -107,8 +134,8 @@ try {
   assert.equal(inspected.status, 0, inspected.stderr);
   assert.equal(inspected.stderr, "");
   assert.equal(inspected.stdout,
-    "frontend=alpha-minimum-age\n" +
-    "backend=alpha-minimum-age\n" +
+    "frontend=alpha-u8-decision\n" +
+    "backend=alpha-u8-decision\n" +
     "profile=c11_bounded@1\n" +
     "threshold_u8=18\n" +
     "authority=none\n");
@@ -141,8 +168,8 @@ try {
   assert.match(bad.stderr, /^usage:\n/u);
 
   console.log(
-    "seki_alpha_cli=verified version=0.0.0-alpha.4 commands=4 connected=3 " +
-    "frontend=alpha-minimum-age backend=alpha-minimum-age overwrite=reject",
+    "seki_alpha_cli=verified version=0.0.0-alpha.5 commands=4 connected=3 " +
+    "slice=u8-decision renamed=yes overwrite=reject",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

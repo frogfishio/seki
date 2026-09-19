@@ -22,7 +22,7 @@ try {
   ], { stdio: "inherit" });
   execFileSync(executable, [], { stdio: "inherit" });
   console.log(
-    "seki_alpha_checker=verified slice=minimum-age positive=1 hostile=5",
+    "seki_alpha_checker=verified slice=u8-decision positive=1 hostile=5",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

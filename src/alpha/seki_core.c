@@ -49,15 +49,6 @@ put_name(struct core_buffer *buffer, const struct seki_name *name)
 }
 
 static void
-put_text(struct core_buffer *buffer, const char *text)
-{
-    struct seki_name name;
-    name.bytes = (const unsigned char *)text;
-    name.length = strlen(text);
-    put_name(buffer, &name);
-}
-
-static void
 put_local_type_ref(struct core_buffer *buffer, uint32_t index)
 {
     put_u8(buffer, 0U);
@@ -71,8 +62,8 @@ put_declared(struct core_buffer *buffer, uint32_t index)
     put_local_type_ref(buffer, index);
 }
 
-static void put_applicant(struct core_buffer *buffer) { put_declared(buffer, 0U); }
-static void put_rejection(struct core_buffer *buffer) { put_declared(buffer, 1U); }
+static void put_input_record(struct core_buffer *buffer) { put_declared(buffer, 0U); }
+static void put_rejection_type(struct core_buffer *buffer) { put_declared(buffer, 1U); }
 static void put_unit(struct core_buffer *buffer) { put_u8(buffer, 0U); }
 static void put_bool(struct core_buffer *buffer) { put_u8(buffer, 1U); }
 static void put_type_u8(struct core_buffer *buffer) { put_u8(buffer, 2U); }
@@ -112,7 +103,7 @@ has_names(const struct seki_name *names, size_t count,
 }
 
 static int
-extract_minimum_age(const struct seki_module_prefix *module,
+extract_u8_decision(const struct seki_module_prefix *module,
     uint32_t *threshold)
 {
     static const char *const claims[] = {
@@ -132,11 +123,7 @@ extract_minimum_age(const struct seki_module_prefix *module,
     const struct seki_expression *if_false;
     const struct seki_expression *accepted;
 
-    if (module->header.path_count != 3U ||
-        !seki_name_is(&module->header.path[0], "seki") ||
-        !seki_name_is(&module->header.path[1], "experiments") ||
-        !seki_name_is(&module->header.path[2], "minimum_age") ||
-        module->header.module_version != 1U ||
+    if (module->header.path_count == 0U ||
         !seki_name_is(&module->header.profile, "c11_bounded") ||
         module->header.profile_version != 1U ||
         !has_names(module->header.claims, module->header.claim_count, claims,
@@ -148,37 +135,35 @@ extract_minimum_age(const struct seki_module_prefix *module,
         return 0;
     }
     if (module->declarations[0].kind != SEKI_DECL_RECORD ||
-        !seki_name_is(&module->declarations[0].name, "Applicant") ||
         module->declarations[0].value.record.field_count != 1U ||
-        !seki_name_is(&module->declarations[0].value.record.fields[0].name,
-            "age") ||
+        module->declarations[0].value.record.fields[0].type.kind !=
+            SEKI_TYPE_NAMED ||
         !seki_name_is(&module->declarations[0].value.record.fields[0].type.name,
             "U8") || module->declarations[1].kind != SEKI_DECL_VARIANT ||
-        !seki_name_is(&module->declarations[1].name, "Rejection") ||
         module->declarations[1].value.variant.case_count != 1U ||
-        !seki_name_is(&module->declarations[1].value.variant.cases[0].name,
-            "Underage") ||
-        module->declarations[1].value.variant.cases[0].tag != 1U ||
+        module->declarations[1].value.variant.cases[0].tag > UINT8_MAX ||
         module->declarations[1].value.variant.cases[0].payload_count != 0U) {
         return 0;
     }
     kernel = &module->kernels[0];
-    if (!seki_name_is(&kernel->name, "decide") ||
-        kernel->parameter_count != 1U ||
-        !seki_name_is(&kernel->parameters[0].label, "applicant") ||
+    if (kernel->parameter_count != 1U ||
         kernel->parameters[0].type.kind != SEKI_TYPE_NAMED ||
-        !seki_name_is(&kernel->parameters[0].type.name, "Applicant") ||
+        !seki_name_equal(&kernel->parameters[0].type.name,
+            &module->declarations[0].name) ||
         kernel->result.kind != SEKI_TYPE_APPLIED ||
         !seki_name_is(&kernel->result.name, "Decision") ||
         kernel->result.argument_count != 2U ||
         kernel->result.arguments[0].kind != SEKI_TYPE_ARG_TYPE_NAME ||
         !seki_name_is(&kernel->result.arguments[0].name, "Unit") ||
         kernel->result.arguments[1].kind != SEKI_TYPE_ARG_TYPE_NAME ||
-        !seki_name_is(&kernel->result.arguments[1].name, "Rejection") ||
+        !seki_name_equal(&kernel->result.arguments[1].name,
+            &module->declarations[1].name) ||
         !seki_name_is(&kernel->arithmetic_policy, "checked") ||
         kernel->rejection_count != 1U ||
-        !seki_name_is(&kernel->rejections[0].owner, "Rejection") ||
-        !seki_name_is(&kernel->rejections[0].item, "Underage") ||
+        !seki_name_equal(&kernel->rejections[0].owner,
+            &module->declarations[1].name) ||
+        !seki_name_equal(&kernel->rejections[0].item,
+            &module->declarations[1].value.variant.cases[0].name) ||
         kernel->publication_eligible != 0 ||
         kernel->bounds.steps < 8U || kernel->bounds.live_bits < 25U ||
         kernel->bounds.control_depth < 5U ||
@@ -198,8 +183,10 @@ extract_minimum_age(const struct seki_module_prefix *module,
     if (condition->kind != SEKI_EXPR_COMPARE ||
         condition->value.compare.operator != SEKI_COMPARE_LESS ||
         if_true->kind != SEKI_EXPR_REJECT ||
-        !seki_name_is(&if_true->value.rejection.owner, "Rejection") ||
-        !seki_name_is(&if_true->value.rejection.item, "Underage") ||
+        !seki_name_equal(&if_true->value.rejection.owner,
+            &module->declarations[1].name) ||
+        !seki_name_equal(&if_true->value.rejection.item,
+            &module->declarations[1].value.variant.cases[0].name) ||
         if_false->kind != SEKI_EXPR_ACCEPT ||
         (size_t)condition->value.compare.left >= kernel->expression_count ||
         (size_t)condition->value.compare.right >= kernel->expression_count ||
@@ -210,7 +197,8 @@ extract_minimum_age(const struct seki_module_prefix *module,
     right = &kernel->expressions[condition->value.compare.right];
     accepted = &kernel->expressions[if_false->value.accept.value];
     if (left->kind != SEKI_EXPR_FIELD ||
-        !seki_name_is(&left->value.field.field, "age") ||
+        !seki_name_equal(&left->value.field.field,
+            &module->declarations[0].value.record.fields[0].name) ||
         (size_t)left->value.field.receiver >= kernel->expression_count ||
         right->kind != SEKI_EXPR_NATURAL || right->value.natural > UINT8_MAX ||
         accepted->kind != SEKI_EXPR_UNIT) {
@@ -218,7 +206,8 @@ extract_minimum_age(const struct seki_module_prefix *module,
     }
     receiver = &kernel->expressions[left->value.field.receiver];
     if (receiver->kind != SEKI_EXPR_VALUE_NAME ||
-        !seki_name_is(&receiver->value.name, "applicant")) {
+        !seki_name_equal(&receiver->value.name,
+            &kernel->parameters[0].label)) {
         return 0;
     }
     *threshold = right->value.natural;
@@ -227,19 +216,19 @@ extract_minimum_age(const struct seki_module_prefix *module,
 
 static void
 put_kernel(struct core_buffer *buffer, const struct seki_kernel_decl *kernel,
-    uint32_t threshold)
+    uint32_t threshold, uint32_t rejection_tag)
 {
     put_name(buffer, &kernel->name);
     put_u32(buffer, 1U);
     put_name(buffer, &kernel->parameters[0].label);
     put_u32(buffer, 1U);
-    put_applicant(buffer);
+    put_input_record(buffer);
     put_u8(buffer, 19U);
     put_unit(buffer);
-    put_rejection(buffer);
+    put_rejection_type(buffer);
     put_u32(buffer, 1U);
     put_local_type_ref(buffer, 1U);
-    put_u32(buffer, 1U);
+    put_u32(buffer, rejection_tag);
 
     put_u8(buffer, 4U);
     put_bool(buffer);
@@ -247,7 +236,7 @@ put_kernel(struct core_buffer *buffer, const struct seki_kernel_decl *kernel,
     put_u8(buffer, 0U);
     put_type_u8(buffer);
     put_u8(buffer, 7U);
-    put_applicant(buffer);
+    put_input_record(buffer);
     put_u8(buffer, 4U);
     put_u32(buffer, 0U);
     put_u8(buffer, 0U);
@@ -259,10 +248,10 @@ put_kernel(struct core_buffer *buffer, const struct seki_kernel_decl *kernel,
     put_u8(buffer, (uint8_t)threshold);
 
     put_u8(buffer, 1U);
-    put_rejection(buffer);
+    put_rejection_type(buffer);
     put_u8(buffer, 8U);
     put_local_type_ref(buffer, 1U);
-    put_u32(buffer, 1U);
+    put_u32(buffer, rejection_tag);
     put_u32(buffer, 0U);
     put_u32(buffer, 0U);
     put_u8(buffer, 0U);
@@ -276,7 +265,7 @@ put_kernel(struct core_buffer *buffer, const struct seki_kernel_decl *kernel,
 }
 
 static int
-encode_minimum_age(const struct seki_module_prefix *module,
+encode_u8_decision(const struct seki_module_prefix *module,
     unsigned char *output, size_t capacity, size_t *output_length,
     uint32_t threshold)
 {
@@ -299,20 +288,24 @@ encode_minimum_age(const struct seki_module_prefix *module,
     put_u32(&payload, 0U);
     put_u32(&payload, 0U);
     put_u32(&payload, 2U);
-    put_text(&payload, "Applicant");
+    put_name(&payload, &module->declarations[0].name);
     put_u8(&payload, 2U);
     put_u32(&payload, 1U);
-    put_text(&payload, "age");
+    put_name(&payload,
+        &module->declarations[0].value.record.fields[0].name);
     put_type_u8(&payload);
-    put_text(&payload, "Rejection");
+    put_name(&payload, &module->declarations[1].name);
     put_u8(&payload, 3U);
     put_u32(&payload, 1U);
-    put_u32(&payload, 1U);
-    put_text(&payload, "Underage");
+    put_u32(&payload,
+        module->declarations[1].value.variant.cases[0].tag);
+    put_name(&payload,
+        &module->declarations[1].value.variant.cases[0].name);
     put_u8(&payload, 0U);
     put_u32(&payload, 0U);
     put_u32(&payload, 1U);
-    put_kernel(&payload, &module->kernels[0], threshold);
+    put_kernel(&payload, &module->kernels[0], threshold,
+        module->declarations[1].value.variant.cases[0].tag);
     put_u32(&payload, 0U);
     put_u32(&payload, 2U);
     put_u32(&payload, 0U);
@@ -370,12 +363,12 @@ seki_emit_core(const struct seki_module_prefix *module,
     }
     error->code = "A0-CORE-0000";
     error->message = "invalid core-emitter state";
-    if (!extract_minimum_age(module, &threshold)) {
+    if (!extract_u8_decision(module, &threshold)) {
         error->code = "A0-CORE-0001";
-        error->message = "module is outside the current core-emission slice";
+        error->message = "module is outside the U8-decision core slice";
         return 0;
     }
-    if (!encode_minimum_age(module, output, capacity, output_length,
+    if (!encode_u8_decision(module, output, capacity, output_length,
         threshold)) {
         error->code = "A0-CORE-0002";
         error->message = "candidate typed-core output exceeds capacity";
