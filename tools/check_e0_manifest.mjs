@@ -29,6 +29,7 @@ checkFile(manifest.artifacts.source);
 checkFile(manifest.artifacts.lean_theorem);
 checkFile(manifest.artifacts.generated_c);
 checkFile(manifest.artifacts.trust_report);
+checkFile(manifest.artifacts.closeout_review);
 for (const entry of manifest.artifacts.implementation) checkFile(entry);
 for (const entry of manifest.artifacts.evidence_programs) checkFile(entry);
 
@@ -74,6 +75,10 @@ assert.match(trustReport, /There is no theorem connecting the Lean semantics/u);
 assert.match(trustReport, /CompCert 3\.18 was neither acquired nor invoked/u);
 assert.match(trustReport, /does not support “Seki is proved,”/u);
 
+const closeout = fs.readFileSync(manifest.artifacts.closeout_review.path, "utf8");
+assert.match(closeout, /continue the architecture; do not expand the language surface yet/u);
+assert.match(closeout, /Close E0-VS1 and resume at F0-01/u);
+
 assert.equal(manifest.observed_environment.qualification_bound, false);
 for (const value of Object.values(manifest.claims)) assert.equal(value, false);
 assert.equal(manifest.evidence.admitted_input_values_executed, 256);
@@ -88,6 +93,7 @@ const paths = [
   manifest.artifacts.lean_theorem.path,
   manifest.artifacts.generated_c.path,
   manifest.artifacts.trust_report.path,
+  manifest.artifacts.closeout_review.path,
   ...manifest.artifacts.implementation.map(entry => entry.path),
   ...manifest.artifacts.evidence_programs.map(entry => entry.path),
 ];

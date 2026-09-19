@@ -1,11 +1,15 @@
 # Seki execution status
 
 - Updated: 2026-09-19
-- Plan: `docs/roadmap/DELIVERY_PLAN.md` version 0.2
+- Plan: `docs/roadmap/DELIVERY_PLAN.md` version 0.3
 - Current stage: B0 bootstrap
 - Current gate: global F0 open
-- Active work package: E0-VS1 experimental vertical slice
-- Experimental work authorized: yes
+- Active work package: A0-02 reusable C11 compiler core and `sekic` CLI
+- E0-VS1 experimental work: complete
+- A0 provisional alpha: active; no authority
+- Internal certification: not ready
+- Customer field validation: deferred until release candidate
+- Live eligibility: no
 - F1 authorized: no
 - Implementation authority: none
 - Proof authority: none
@@ -126,7 +130,7 @@
   The generated kernel agrees with the policy for all 256 admitted ages, runs
   under AddressSanitizer and UndefinedBehaviorSanitizer, propagates a valid
   threshold mutation, and rejects three structural SCB mutations.
-- E0-08 binds nine core/evidence artifacts plus the trust report in a
+- E0-08 binds nine core/evidence artifacts plus the trust report and closeout in a
   machine-checked, non-self-referential manifest. It separately records the
   encoded hex-file identity, decoded SCB byte identity, domain-separated module
   identity, exact C identity, invocation shapes, and unqualified local tool
@@ -135,30 +139,64 @@
   and prohibited claim. It records the missing SCB-to-Clight refinement as the
   central proof gap and does not mistake exhaustive native `U8` execution for a
   compiler-correctness proof.
+- E0-10 closes the slice with the decision to continue the typed-core checkpoint
+  architecture without expanding the language surface. The next program-level
+  pressure must come from the materially different F0 consumer case.
+- F0-01 now has a concrete candidate: Grit Stage 1 handoff publication. The
+  proposed kernel coordinates eight nominal authenticated evidence receipts and
+  exact artifact/pack/vocabulary identities into one publication permit or a
+  deterministic rejection with zero publication. The candidate is materially
+  different from the Arena decision and requires no customer-specific core
+  primitive. Its field-validator role is fixed, while identity and acceptance
+  are deliberately deferred until the release candidate exists.
+- B0-08/B0-09 bind the exact Lean 4.30.0 and Rocq 9.2.0 upstream tags,
+  resolved commits, source-archive sizes and SHA-256 identities, and license
+  identities. The archives are not vendored, and neither tool is installed or
+  qualified from the locked source yet.
+- B0-10 adopts a user-supplied CompCert policy: Seki will not vendor or
+  redistribute the full public distribution; commercial use requires the
+  operator's lawful AbsInt agreement or a separately audited permissive proof
+  closure. The official `v3.18` archive is bound, with a controlled finding that
+  its root `VERSION` file still reports `3.17`.
+- ADRs 0021 and 0022 resolve the sequencing problem: Seki develops autonomously
+  through a checksum-bound, internally certified release candidate, then Gnosis,
+  Kiku, and Grit use those exact bytes in anger before any live decision. Internal
+  certification is a self-attestation, not independent certification.
+- A0-01 fixes the alpha subset, CLI intent, usability test, ten-package work
+  ledger, and claim ceiling. It requires both the minimum-age and Grit Stage 1
+  publication kernels to pass through one general compiler.
+- A0-02 has begun with a strictly compiled `sekic 0.0.0-alpha.1` command shell.
+  Help and version reporting work; `check`, `build`, and `inspect` fail closed
+  with a stable diagnostic until reusable compiler paths replace the E0-shaped
+  implementations.
 
 ## Active work
 
-`E0-VS1` is active. E0-01 through E0-09 are complete experimentally. E0-10 now
-owns the explicit expand/redesign/stop review. The experiment is disposable
-evidence and cannot freeze conformance while F0 is open.
+`E0-VS1` is complete experimentally. A0-02 is active: extract its program-shaped
+C code into a reusable compiler core and general `sekic` CLI. F0 remains open;
+the Grit Stage 1 publication decision remains the selected independent case.
+External field validation begins only after internal release-candidate
+certification. All current alpha work is replaceable and cannot freeze
+conformance.
 
 ## Next unblocked tasks
 
-1. E0-10 — review whether the completed slice earned expansion or exposed redesign.
-2. F0-01 — independent consumer decision and reviewer selection.
-3. B0-08/B0-09 — exact Lean and Rocq source locks.
-4. B0-10 — CompCert acquisition and use profile.
+1. A0-02 — extract the reusable compiler core and `sekic` CLI.
+2. A0-03 — implement and test the fixed alpha subset.
+3. A0-04 — add the runnable Grit publication kernel.
+4. B0-11 — adopt reviewed runtime/output exception text.
+5. B0-13 — build the locked foundations in a pinned clean-room environment.
 
 ## Open decisions and blockers
 
 | Item | Effect |
 | --- | --- |
-| Independent F0 case not selected | Global F0 cannot close. |
+| Grit field-validator identity and acceptance absent | Expected during development; F0 and live eligibility remain open until post-candidate field validation. |
 | SCB-0 field/tag ledger and vectors incomplete | Canonical bytes, verified decoding, and operational lock digests cannot freeze. |
 | Reconstruction witness rules unproved | Digest-bearing derivations cannot freeze. |
 | Exact runtime/output exception not adopted | Seki-owned runtime/templates cannot enter distributable customer output. |
-| CompCert rights/acquisition unresolved | F4/F5 distribution profile cannot freeze. |
-| Exact toolchain source identities unbound | Formal and clean-room results cannot qualify. |
+| No lawful qualified CompCert installation selected | F4/F5 cannot execute or qualify. |
+| Locked foundation sources not clean-room built | Formal results cannot qualify. |
 | Several surface forms remain provisional | Parser work may experiment but cannot freeze conformance. |
 | E0 has no Clight refinement | Its Lean proof does not prove generated C or native behavior. |
 
@@ -167,6 +205,7 @@ evidence and cannot freeze conformance while F0 is open.
 ```sh
 make check
 make check-encoding-vectors
+make check-foundation-lock
 make check-e0-frontend
 make check-e0-backend
 make check-e0-manifest

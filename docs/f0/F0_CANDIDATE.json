@@ -1,0 +1,77 @@
+{
+  "schema": "io.frogfish.seki/f0-independent-candidate@0",
+  "status": "candidate-selected-field-validation-deferred",
+  "consumer": "Grit 3 Stage 1",
+  "decision_id": "io.frogfish.grit/stage1-handoff-publication@candidate-1",
+  "decision": "admit exactly one identity-bound Stage 1 semantic handoff for publication or reject with zero publication",
+  "packet": "docs/f0/GRIT_STAGE1_PUBLICATION_CANDIDATE.md",
+  "reviewer": {
+    "role": "Grit Stage 1 authority-chain maintainer",
+    "identity": null,
+    "acceptance": null
+  },
+  "material_difference": {
+    "founding_case": "Kiku Arena causal-provider decision",
+    "candidate_case": "compiler semantic-artifact publication admission",
+    "customer_specific_core_primitive_required": false
+  },
+  "proposed_bounds": {
+    "digest_bytes": 32,
+    "evidence_receipts": 8,
+    "variable_length_collections": 0,
+    "maximum_semantic_steps": 512,
+    "maximum_live_bits": 8192,
+    "maximum_control_depth": 32,
+    "maximum_workspace_bits": 0,
+    "maximum_internal_call_depth": 0,
+    "exact_costs_accepted": false
+  },
+  "required_core_operations": [
+    "nominal-records-and-variants",
+    "fixed-array-u8-32",
+    "exact-fixed-value-equality",
+    "fixed-width-integer-equality",
+    "tail-formed-conditionals",
+    "deterministic-rejection-precedence",
+    "decision"
+  ],
+  "source_observation": {
+    "repository": "/Users/rumpelstiltskin/Code/Frogfish/grit-gritc",
+    "git_head": "d76f294f123f682d6f6d2b5e886b9a15e8d0064e",
+    "worktree_was_clean": false,
+    "files": [
+      {
+        "path": "README.md",
+        "sha256": "704c159b125755440d1ecfc27ba3e052a150ff0100c8283b895f3cc888a0b56b"
+      },
+      {
+        "path": "METHODS.md",
+        "sha256": "7b3f1054e4a68efd90dea324bc45bf5d7158e0bc169763ca259d1ec642011b4d"
+      },
+      {
+        "path": "TODO.md",
+        "sha256": "c2ed1affeb850580e30a13cbcf82500fc4dba4170c4086e9396a1dedd421aa1b"
+      },
+      {
+        "path": "docs/STAGE1_HANDOFF.md",
+        "sha256": "f5cf37b2374e3d353ba97ce14431c1953b54fb516eac227a585f20e85819f082"
+      },
+      {
+        "path": "docs/INTEGRATION_CERTIFICATION_POLICY.md",
+        "sha256": "7cd276f2de73cc4e96ae28b2422bd6e44ad93235b81250c7f8028471240db4e6"
+      },
+      {
+        "path": "requirements/G5_CERTIFIED_PACK_AUDIT.tsv",
+        "sha256": "827a421a313532c2d756c561498bec4c146ca6041cd6b5cb25794afde0e013f6"
+      }
+    ]
+  },
+  "claims": {
+    "consumer_accepted": false,
+    "global_f0_closed": false,
+    "f1_authorized": false,
+    "implementation_authority": false,
+    "proof_authority": false,
+    "product_authority": false
+  }
+}

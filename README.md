@@ -37,18 +37,35 @@ does not yet contain a verified compiler or grant implementation, proof,
 native-binary, product, or production authority. Start with
 [`SEKI_V0_3_PROJECT_SEED/START_HERE.md`](SEKI_V0_3_PROJECT_SEED/START_HERE.md).
 
-Bootstrap experiment `E0-VS1` is now authorized to exercise one complete
-source-to-Lean-property-to-restricted-C path. It is explicitly experimental:
-global F0 remains open, F1 is not authorized, and successful execution does not
-certify the generated C. See
+Bootstrap experiment `E0-VS1` exercised one complete
+source-to-Lean-property-to-restricted-C path and is now closed as successful
+feasibility evidence. It remains explicitly experimental: global F0 is open,
+F1 is not authorized, and successful execution does not certify the generated C. See
 [`ADR 0020`](docs/decisions/0020-experimental-end-to-end-vertical-slice.md).
+
+The project is now building `A0`, a provisional usable alpha. Development and
+evidence gathering proceed autonomously through a checksum-bound internal
+release-candidate attestation. Gnosis, Kiku, and Grit then use those exact bytes
+on representative real work before any live decision. This internal certification
+is a self-attestation, never an independent-certification claim. A0 must compile
+both the minimum-age and Grit publication kernels through one general `sekic`
+CLI, but it does not freeze the language, authorize F1, or carry production
+authority. See
+[`A0 scope`](docs/alpha/A0_SCOPE.md) and
+[`ADR 0021`](docs/decisions/0021-build-usable-alpha-before-f0-review.md) and
+[`ADR 0022`](docs/decisions/0022-internal-certification-before-field-validation.md).
 
 Current bootstrap records:
 
 - [`PLAN.md`](PLAN.md) — controlled delivery plan and handoff entry point
+- [`alpha/ALPHA_PLAN.json`](alpha/ALPHA_PLAN.json) — checked A0 work ledger
 - [`PROJECT_STATUS.json`](PROJECT_STATUS.json) — machine-enforced claim ceiling
 - [`docs/architecture/TYPED_CORE_BOUNDARY.md`](docs/architecture/TYPED_CORE_BOUNDARY.md)
   — first semantic slice and serialization freeze criteria
+- [`foundations/FOUNDATION_LOCK.json`](foundations/FOUNDATION_LOCK.json)
+  — exact Lean, Rocq, and CompCert source/archive and license identities
+- [`docs/foundations/FORMAL_FOUNDATION_ACQUISITION.md`](docs/foundations/FORMAL_FOUNDATION_ACQUISITION.md)
+  — non-vendoring acquisition policy and qualification limits
 - [`spec/encoding/SEKI_CANONICAL_BINARY_V0_DRAFT.md`](spec/encoding/SEKI_CANONICAL_BINARY_V0_DRAFT.md)
   — provisional authority-bearing binary direction; bytes are not frozen
 - [`spec/encoding/SCB0_SCHEMA_LEDGER.md`](spec/encoding/SCB0_SCHEMA_LEDGER.md)
@@ -75,6 +92,8 @@ Current bootstrap records:
   — first fixture-bounded type and exact-resource reconstruction pass
 - [`docs/f0/INDEPENDENT_USE_CASE_REQUEST.md`](docs/f0/INDEPENDENT_USE_CASE_REQUEST.md)
   — materially different use-case review
+- [`docs/f0/GRIT_STAGE1_PUBLICATION_CANDIDATE.md`](docs/f0/GRIT_STAGE1_PUBLICATION_CANDIDATE.md)
+  — selected F0 candidate; field validation deferred until release candidate
 - [`docs/governance/PROJECT_CHARTER.md`](docs/governance/PROJECT_CHARTER.md)
   — independence and customer relationship
 

@@ -1,14 +1,26 @@
 .DEFAULT_GOAL := check
 
-.PHONY: check verify-seed verify-status check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-e0-lean check-encoding-vectors check-diff
+.PHONY: check verify-seed verify-status check-alpha-plan check-alpha-cli check-f0-candidate check-foundation-lock check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-e0-lean check-encoding-vectors check-diff
 
-check: verify-seed verify-status check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-encoding-vectors check-diff
+check: verify-seed verify-status check-alpha-plan check-alpha-cli check-f0-candidate check-foundation-lock check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-encoding-vectors check-diff
 
 verify-seed:
 	./SEKI_V0_3_PROJECT_SEED/VERIFY.sh
 
 verify-status:
 	node tools/check_project_status.mjs
+
+check-alpha-plan:
+	node tools/check_alpha_plan.mjs
+
+check-alpha-cli:
+	node tools/check_alpha_cli.mjs
+
+check-f0-candidate:
+	node tools/check_f0_candidate.mjs
+
+check-foundation-lock:
+	node tools/check_foundation_lock.mjs
 
 check-e0-vs1:
 	node tools/check_e0_vs1_contract.mjs

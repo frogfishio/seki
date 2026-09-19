@@ -235,5 +235,7 @@ handwritten and external components still trusted, records the Lean/platform
 version discrepancies, and identifies the absent SCB-to-Clight refinement as
 the principal proof gap. It is part of the manifest, not an informal footnote.
 
-E0-08 and E0-09 are complete experimentally. E0-10 must now make the explicit
-expand, redesign, or stop decision.
+`REVIEW.md` closes E0-10. Its decision is to continue the architecture without
+expanding the language surface: preserve the independently consumed typed-core
+checkpoint, return active work to F0-01, and obtain the next program-level
+pressure from the materially different consumer case.

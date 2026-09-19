@@ -1,0 +1,41 @@
+{
+  "schema": "io.frogfish.seki/alpha-plan@1",
+  "track": "A0",
+  "status": "active",
+  "current_work_package": "A0-02",
+  "claim_class": "provisional-bootstrap-alpha",
+  "f0_may_remain_open": true,
+  "f1_authorized": false,
+  "language_frozen": false,
+  "encoding_frozen": false,
+  "authority_granted": false,
+  "development_assurance_model": "internal-self-attestation",
+  "internal_certification_target": "release-candidate",
+  "field_validation_before_live": true,
+  "field_validation_projects": [
+    "Gnosis",
+    "Kiku",
+    "Grit"
+  ],
+  "required_examples": [
+    "minimum-age",
+    "grit-stage1-publication"
+  ],
+  "required_outputs": [
+    "candidate-typed-core",
+    "restricted-c11",
+    "diagnostics"
+  ],
+  "work_packages": [
+    { "id": "A0-01", "state": "done", "title": "Fix alpha scope and claim ceiling" },
+    { "id": "A0-02", "state": "active", "title": "Extract a reusable C11 compiler core and sekic CLI" },
+    { "id": "A0-03", "state": "pending", "title": "Implement the documented monomorphic alpha subset" },
+    { "id": "A0-04", "state": "pending", "title": "Compile and exercise the Grit publication kernel" },
+    { "id": "A0-05", "state": "pending", "title": "Make deterministic build and artifact bundles" },
+    { "id": "A0-06", "state": "pending", "title": "Write consumer quickstart and diagnostics guide" },
+    { "id": "A0-07", "state": "pending", "title": "Issue the exact internal release-candidate attestation" },
+    { "id": "A0-08", "state": "pending", "title": "Run customer field validation on real workloads" },
+    { "id": "A0-09", "state": "pending", "title": "Resolve findings and re-attest changed candidates" },
+    { "id": "A0-10", "state": "pending", "title": "Record F0 evidence and the separate go-live decision" }
+  ]
+}

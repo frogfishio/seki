@@ -1,6 +1,6 @@
 # Seki controlled delivery plan
 
-- Plan version: 0.2
+- Plan version: 0.3
 - Date: 2026-09-19
 - Status: active bootstrap plan
 - Language identity: `io.frogfish.seki/language@0`
@@ -47,6 +47,9 @@ cannot silently expand a phase's authority.
     boundaries.** An explicitly authorized bootstrap experiment may exercise a
     later architecture while an earlier gate is open, but it cannot freeze the
     exercised interfaces or inherit the later phase's authority vocabulary.
+12. **Usability precedes consumer acceptance.** A provisional bootstrap alpha
+    may be built while F0 is open so consumers have a real artifact to evaluate.
+    It cannot freeze the language, satisfy an F1 gate, or carry authority.
 
 ## 3. Authority vocabulary
 
@@ -123,9 +126,9 @@ Create a reproducible project shell without claiming implementation authority.
 | B0-05 | W-REL | Add contribution, security, status, and CI scaffolding. | done |
 | B0-06 | W-SPEC | Assess Zing contribution and draft Seki surface syntax. | done; draft only |
 | B0-07 | W-C | Adopt portable C11 bootstrap architecture. | done |
-| B0-08 | W-REL | Bind exact Lean 4.30.0 source/archive identity and license. | pending |
-| B0-09 | W-REL | Bind exact Rocq 9.2.0 source/archive identity and license. | pending |
-| B0-10 | W-REL | Resolve CompCert 3.18 acquisition, use, and redistribution policy. | pending |
+| B0-08 | W-REL | Bind exact Lean 4.30.0 source/archive identity and license. | done; source bound, installation/qualification pending |
+| B0-09 | W-REL | Bind exact Rocq 9.2.0 source/archive identity and license. | done; source bound, installation/qualification pending |
+| B0-10 | W-REL | Resolve CompCert 3.18 acquisition, use, and redistribution policy. | done; user-supplied, no full redistribution |
 | B0-11 | W-REL | Adopt reviewed Seki runtime/output exception text. | pending |
 | B0-12 | W-C | Write the C11 engineering standard and build/test matrix. | done; compiler matrix awaits code/toolchain pins |
 | B0-13 | W-TEST | Add clean-room CI with pinned container/image identity. | pending |
@@ -177,7 +180,7 @@ defines its claim ceiling.
 | E0-07 | W-TEST | Add positive, hostile, boundary, differential, strict-C11, and sanitizer evidence. | done experimentally on local `cc`; toolchain unpinned |
 | E0-08 | W-REPR | Bind source, typed core, theorem, generated C, compiler invocation, and result identities in one experimental manifest. | done experimentally; machine-checked non-self-referential manifest |
 | E0-09 | W-SPEC | Record every unproved arrow, trusted tool, and discrepancy exposed by the slice. | done experimentally; explicit trust report |
-| E0-10 | W-CUST | Review whether the completed slice justifies expansion, redesign, or termination. | active |
+| E0-10 | W-CUST | Review whether the completed slice justifies expansion, redesign, or termination. | done; continue architecture without language expansion |
 
 ### Exit gate
 
@@ -186,6 +189,54 @@ deterministically, Lean checks the property against the exact decoded program,
 the restricted C executes the boundary portfolio as expected, and the review
 states precisely what remains unproved. Completion grants no qualification or
 release authority and does not close F0.
+
+## 6B. Bootstrap alpha A0 — first usable compiler
+
+### Purpose
+
+Turn the E0 feasibility slice into a compiler a prospective consumer can build,
+run, and criticize. A0 resolves the circular dependency in which F0 requested
+consumer acceptance before the project supplied anything usable. ADRs 0021 and
+0022 and `docs/alpha/A0_SCOPE.md` define its limits and pre-live sequence.
+
+A0 remains B0 bootstrap work. It is not F1, does not freeze conformance, and
+grants no implementation, proof, native-binary, product, or production authority.
+
+### Entry criteria
+
+- E0-VS1 is complete with its trust report and closeout review.
+- Exact upstream source identities for Lean, Rocq, and CompCert are bound.
+- Project status explicitly authorizes the provisional alpha while keeping F0
+  open, F1 unauthorized, and every authority field false.
+
+### Work
+
+| ID | Workstream | Task | State |
+| --- | --- | --- | --- |
+| A0-01 | W-SPEC | Fix the alpha subset, CLI intent, usability test, and claim ceiling. | done |
+| A0-02 | W-C | Extract E0 into a reusable C11 compiler core and general `sekic` CLI. | active |
+| A0-03 | W-C/W-TEST | Implement and test every form in the documented monomorphic alpha subset. | pending |
+| A0-04 | W-CUST/W-TEST | Compile and exercise the Grit Stage 1 publication coordinator. | pending |
+| A0-05 | W-REL | Produce deterministic, manifest-bound build and artifact bundles. | pending |
+| A0-06 | W-CUST | Write a clean-checkout consumer quickstart and diagnostics guide. | pending |
+| A0-07 | W-REL | Internally certify the exact release candidate with a checksum-bound self-attestation. | pending |
+| A0-08 | W-CUST | Have Gnosis, Kiku, and Grit use the exact candidate on representative real workloads. | pending |
+| A0-09 | W-C/W-TEST | Resolve field findings and re-attest every affected candidate. | pending |
+| A0-10 | W-CUST/W-REL | Bind F0 field evidence and record the separate go-live eligibility decision. | pending |
+
+### Exit gate
+
+One compiler must handle both the minimum-age and Grit publication kernels, emit
+deterministic candidate typed-core and restricted-C11 artifacts, reject the
+hostile portfolio, and pass the clean-checkout consumer quickstart. Every
+unproved arrow remains explicit.
+
+The project develops without external review until these engineering and
+evidence requirements yield an internally certified release candidate. That
+self-attestation is not independent certification and does not make Seki live.
+The exact candidate must then survive customer field use, finding closure, and
+a separate pre-live decision. A0 completion alone neither closes F0 nor
+authorizes F1.
 
 ## 7. Phase F0 — Charter and independent-consumer freeze
 
@@ -212,6 +263,12 @@ without importing Kiku/Arena semantics into the core.
 | F0-07 | W-SPEC | Resolve every controlled finding through a charter revision or rejection. |
 | F0-08 | W-REL | Bind acceptance to exact charter bytes and reviewer identity. |
 | F0-09 | W-REL | Update project status and record `seki_f1_implementation_authorized`. |
+
+Current F0 candidate: Grit Stage 1's sole semantic-handoff publication boundary.
+The draft packet fixes the decision shape and future field-validator role.
+Identity and consumer confirmation are intentionally deferred until A0 has an
+internally certified release candidate. F0-02 through F0-05 are proposals to be
+tested and corrected through actual field use, not accepted customer facts.
 
 ### Review packet
 
@@ -537,10 +594,12 @@ Every implementation-bearing phase must include:
 - exact commands and expected summaries; and
 - clean-room reproduction.
 
-### Review
+### Review and attestation
 
-- at least one reviewer not responsible for the implementation;
-- claim-language review separate from code correctness;
+- development gates may use documented project self-review and self-attestation;
+- the internally certified release candidate must receive pre-live field
+  validation from consumers not responsible for its implementation;
+- claim-language assessment remains separate from code correctness;
 - dependency/license review for new third-party material; and
 - recorded findings with owners and closure evidence.
 
@@ -583,18 +642,16 @@ qualified work.
 
 The next tasks, in dependency order, are:
 
-1. **E0-01:** record the exact vertical-slice policy, schema, source, property,
-   and exclusions.
-2. **E0-02/E0-03:** build the minimum Lean semantic nucleus and prove the
-   property against the exact decoded program.
-3. **E0-04/E0-05 completed experimentally:** the closed-subset C11 frontend
-   parses and checks the source, reproduces the exact typed-core candidate, and
-   agrees byte-for-byte with the independent fixture emitter.
-4. **E0-06 through E0-09:** emit restricted C, exercise it, bind the artifacts,
-   and record the remaining trust boundary.
-5. **F0-01:** name the materially different consumer decision and reviewer.
-6. **F0-02/F0-03:** write its data, bound, and rejection inventory.
-7. **F1-A01/F1-A02 review:** review the initial typed-core declaration,
+1. **A0-02:** extract a reusable C11 compiler core and general `sekic` CLI from
+   the E0 implementation without preserving its program-shaped assumptions.
+2. **A0-03:** implement the exact alpha subset and its positive/hostile suite.
+3. **A0-04:** compile and execute the proposed Grit publication kernel.
+4. **A0-05/A0-06:** make the result reproducible and usable from a clean checkout.
+5. **A0-07:** complete the internal evidence ledger and attest the exact release
+   candidate without claiming independent certification.
+6. **A0-08/F0:** have Gnosis, Kiku, and Grit use the exact candidate in anger;
+   capture corrections to the data, bounds, rejection inventory, and tooling.
+7. **F1-A01/F1-A02 draft review:** review the initial typed-core declaration,
    expression, admission, and fixture drafts without claiming F1 start.
 8. **F1-A04/F1-A06:** review the explicit single-payload binder rule and indexed
    rejection-precedence model.
@@ -611,8 +668,9 @@ The next tasks, in dependency order, are:
    bound arithmetic, fixed type formation/equality, empty-form policy, source-byte
    authority, and publication coupling now have explicit rules and executable
    checks. This is fixture evidence, not a proof or admission freeze.
-13. Assemble the F0 review packet and request the exact scoped response.
+13. Close field findings, re-attest changed bytes, assemble the final F0 record,
+    and make the separate pre-live decision.
 
-E0 and tasks 7–12 are bootstrap/specification work and may proceed while F0 is
-open. No F1 completion or authority claim may be made until task 13 closes the
-gate.
+E0, A0, and tasks 7–12 are bootstrap/specification work and may proceed while
+F0 is open. No F1 start, completion, or authority claim may be made until task
+13 closes the gate.

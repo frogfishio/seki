@@ -1,6 +1,6 @@
 # Independent F0 use-case request
 
-Status: seeking a materially different bounded decision
+Status: Grit Stage 1 candidate selected; review deferred until field validation
 
 Seki already has Gnosis and Kiku as founding customers. Global F0 nevertheless
 requires a use case materially different from the Kiku Arena causal-provider
@@ -24,6 +24,13 @@ submission is one or two pages and answers:
 
 Promising shapes include bounded control-flow validation, deterministic
 source/target correspondence, protocol-state admission, and capability-policy
-evaluation. The F0 response is a charter review, not an implementation or
-product acceptance.
+evaluation. The F0 response will be grounded in field use of the internally
+certified release candidate, not a speculative pre-implementation charter
+review. It is still scoped evidence rather than governance authority over Seki.
 
+The current candidate is recorded in
+[`GRIT_STAGE1_PUBLICATION_CANDIDATE.md`](GRIT_STAGE1_PUBLICATION_CANDIDATE.md)
+and machine-bound by [`F0_CANDIDATE.json`](F0_CANDIDATE.json). It proposes the
+Grit Stage 1 handoff publication coordinator. Reviewer identity and acceptance
+will be recorded when the release candidate enters field validation; neither is
+required during autonomous implementation.

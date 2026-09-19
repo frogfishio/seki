@@ -51,6 +51,11 @@
       "length": 8709,
       "sha256": "714f473921788d1f30a5503a8de820aad621f24b340eddb5e7ce646e10ca2f9d"
     },
+    "closeout_review": {
+      "path": "experiments/e0-vs1/REVIEW.md",
+      "length": 4754,
+      "sha256": "5311bb853fb72cd82be6ca5fe268f7a5b3febd4ae3338e07ade2a785be3cdc7c"
+    },
     "implementation": [
       {
         "role": "closed-subset-source-frontend",

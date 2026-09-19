@@ -1,0 +1,71 @@
+{
+  "schema": "io.frogfish.seki/formal-foundation-lock@0",
+  "status": "bootstrap-source-identities-bound",
+  "recorded": "2026-09-19",
+  "archives_vendored": false,
+  "foundations": {
+    "lean": {
+      "version": "4.30.0",
+      "repository": "https://github.com/leanprover/lean4.git",
+      "tag": "v4.30.0",
+      "tag_kind": "lightweight-or-direct",
+      "commit": "d024af099ca4bf2c86f649261ebf59565dc8c622",
+      "archive_url": "https://codeload.github.com/leanprover/lean4/tar.gz/refs/tags/v4.30.0",
+      "archive_length": 70389698,
+      "archive_sha256": "c11edd040d77be85865e41b4a37a77d14f824c07d8642434eb3561163f2afa5d",
+      "archive_root": "lean4-4.30.0/",
+      "primary_license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "license_sha256": "8b28515ffffc5c0fe2807d8ae3735b00b324d9b7ce807dd63ff6ac8922fbce7e",
+      "installed_for_qualification": false,
+      "observed_local_version": "4.33.1",
+      "qualification_status": "source-bound-not-installed"
+    },
+    "rocq": {
+      "version": "9.2.0",
+      "repository": "https://github.com/rocq-prover/rocq.git",
+      "tag": "V9.2.0",
+      "annotated_tag_object": "f4392b61e195f1554260589b8778eec39c4834ac",
+      "commit": "adfbf1855c348766beb4b790dcc8ebc02f908f63",
+      "archive_url": "https://github.com/rocq-prover/rocq/releases/download/V9.2.0/rocq-9.2.0.tar.gz",
+      "archive_length": 6559931,
+      "archive_sha256": "a45280ab4fbaac7540b136a6b073b4a6db15739ec1e149bded43fa6f4fc25f20",
+      "archive_root": "rocq-9.2.0/",
+      "primary_license": "LGPL-2.1-only",
+      "license_path": "LICENSE",
+      "license_sha256": "d4594b82f4d50840df6a7e9d14132a8c0a3cc05d0ac46d15310a264a1f75447e",
+      "bundled_component_licenses_present": true,
+      "installed_for_qualification": false,
+      "observed_local_version": null,
+      "qualification_status": "source-bound-not-installed"
+    },
+    "compcert": {
+      "version": "3.18",
+      "repository": "https://github.com/AbsInt/CompCert.git",
+      "tag": "v3.18",
+      "tag_kind": "lightweight-or-direct",
+      "commit": "14d616046360a0b2611ebdfc2f98368af402e1f7",
+      "archive_url": "https://codeload.github.com/AbsInt/CompCert/tar.gz/refs/tags/v3.18",
+      "archive_length": 1917028,
+      "archive_sha256": "564b312b3ed3162f02605f0108feb555bd28fe7a80b97ea269c546bcc60c1cf0",
+      "archive_root": "CompCert-3.18/",
+      "license_path": "LICENSE",
+      "license_sha256": "40e8151cb26269a4e051309a958714191a706b5dfc7aaec00a61137cb338a648",
+      "full_distribution_license": "INRIA-NonCommercial-or-separate-AbsInt-agreement",
+      "file_specific_dual_licenses_present": true,
+      "archive_version_file": "3.17",
+      "archive_version_discrepancy": true,
+      "installed_for_qualification": false,
+      "observed_local_version": null,
+      "qualification_status": "source-bound-use-policy-fixed-not-installed"
+    }
+  },
+  "claims": {
+    "toolchains_installed": false,
+    "toolchains_built": false,
+    "toolchains_qualified": false,
+    "compcert_redistribution_authorized": false,
+    "commercial_compcert_use_authorized": false,
+    "formal_foundation_authority": false
+  }
+}
