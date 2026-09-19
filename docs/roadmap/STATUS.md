@@ -113,19 +113,23 @@
   native decision procedure, and applies the full threshold policy to any
   decoded program. This adds the local native evaluator to the experimental
   trust report; it is not a qualified proof premise.
+- E0-04/E0-05 add a strict-C11, closed-subset source frontend. It lexes, parses,
+  and shape/type-checks the exact experiment source, rejects declarations below
+  the derived resource bounds, and emits the same 417 SCB-0 bytes as the
+  independent JavaScript fixture emitter. A source threshold mutation changes
+  exactly the encoded literal byte; six hostile source mutations are rejected
+  before any output artifact is created.
 
 ## Active work
 
-`E0-VS1` is active. E0-01 through E0-03 are complete experimentally. E0-04 now
-owns the minimum C11 parser and syntax-directed checker that must derive the
-typed-core candidate from the exact Seki source rather than from a fixture
-emitter. The experiment is disposable evidence and cannot freeze conformance
-while F0 is open.
+`E0-VS1` is active. E0-01 through E0-05 are complete experimentally. E0-06 now
+owns the restricted-C AST projection and canonical printer. The experiment is
+disposable evidence and cannot freeze conformance while F0 is open.
 
 ## Next unblocked tasks
 
-1. E0-04/E0-05 — minimum C11 frontend and deterministic typed-core reproduction.
-2. E0-06 through E0-09 — restricted C, execution evidence, manifest, and trust report.
+1. E0-06 through E0-09 — restricted C, execution evidence, manifest, and trust report.
+2. E0-07 — extend frontend evidence with sanitizers alongside backend boundary tests.
 3. F0-01 — independent consumer decision and reviewer selection.
 4. B0-08/B0-09 — exact Lean and Rocq source locks.
 5. B0-10 — CompCert acquisition and use profile.
@@ -148,6 +152,7 @@ while F0 is open.
 ```sh
 make check
 make check-encoding-vectors
+make check-e0-frontend
 make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 ```
 

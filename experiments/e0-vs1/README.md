@@ -18,10 +18,10 @@ human-reviewed policy
   -> execution evidence
 ```
 
-E0-01 fixes the first two items. E0-02/E0-03 now bind the exact experimental
-typed-core bytes to the Lean evaluator and property proof. Later E0 tasks must
-bind the source frontend and restricted-C arrows and state which arrows remain
-unproved.
+E0-01 fixes the first two items. E0-02/E0-03 bind the exact experimental
+typed-core bytes to the Lean evaluator and property proof. E0-04/E0-05 bind the
+source text to those same bytes through a closed-subset C11 frontend. Later E0
+tasks must bind the restricted-C arrow and state which arrows remain unproved.
 
 ## Human policy
 
@@ -164,6 +164,27 @@ exact bounds 8 steps, 25 live bits, depth 5, workspace 0
 The module digest is domain-separated according to the SCB-0 draft. The
 JavaScript emitter, generic JavaScript decoder/type checker, recorded hex bytes,
 vector manifest, and fixture-bounded Lean decoder agree on this artifact.
+
+## Experimental source frontend
+
+`src/e0/sekic_e0.c` is a deliberately disposable C11 frontend for this closed
+slice. It is not a claim that the Seki grammar or compiler architecture is
+frozen. It accepts the exact experiment schema and kernel forms, checks the
+`U8` threshold and declared resource ceilings, then emits SCB-0 from the parsed
+values. The emitted bytes are not selected by source-file digest or copied from
+the recorded fixture.
+
+`make check-e0-frontend` compiles the frontend under the project's strict C11
+warning set, reproduces the artifact twice, compares it byte-for-byte with both
+the recorded vector and the independent JavaScript emitter, reopens it through
+the generic decoder/type checker, and exercises a source-derived threshold
+change. It also rejects six hostile mutations: an out-of-range threshold, wrong
+field type, insufficient step bound, wrong true branch, trailing declaration,
+and unsupported character. Failed parses create no output file.
+
+This establishes deterministic experimental evidence for the source-to-SCB
+arrow. It does not prove the C frontend correct, establish general language
+conformance, or add the still-missing SCB-to-restricted-C refinement.
 
 The contract and this review record will receive complete artifact identities
 in the non-self-referential E0-08 manifest.

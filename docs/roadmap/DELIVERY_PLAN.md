@@ -171,9 +171,9 @@ defines its claim ceiling.
 | E0-01 | W-SPEC | Freeze only the experiment's source text, input/output schema, property statement, and exclusions. | done; experiment-only |
 | E0-02 | W-LEAN | Define the minimum experimental Seki AST/decoder/evaluator needed to state the property over the exact typed-core artifact. | done; fixture-bounded experiment |
 | E0-03 | W-LEAN | Prove that the exact experiment program cannot approve an applicant younger than 18. | done experimentally; full threshold policy and non-vacuity companion |
-| E0-04 | W-C | Implement the minimum C11 source parser and syntax-directed checker for the selected subset. | active |
-| E0-05 | W-C | Emit the exact canonical typed-core candidate and bind its digest. | pending |
-| E0-06 | W-C | Implement the restricted-C AST projection and canonical printer for the selected subset. | pending |
+| E0-04 | W-C | Implement the minimum C11 source parser and syntax-directed checker for the selected subset. | done experimentally; closed subset |
+| E0-05 | W-C | Emit the exact canonical typed-core candidate and bind its digest. | done experimentally; byte-identical independent reproduction |
+| E0-06 | W-C | Implement the restricted-C AST projection and canonical printer for the selected subset. | active |
 | E0-07 | W-TEST | Add positive, hostile, boundary, differential, strict-C11, and sanitizer evidence. | pending |
 | E0-08 | W-REPR | Bind source, typed core, theorem, generated C, compiler invocation, and result identities in one experimental manifest. | pending |
 | E0-09 | W-SPEC | Record every unproved arrow, trusted tool, and discrepancy exposed by the slice. | pending |
@@ -587,8 +587,9 @@ The next tasks, in dependency order, are:
    and exclusions.
 2. **E0-02/E0-03:** build the minimum Lean semantic nucleus and prove the
    property against the exact decoded program.
-3. **E0-04/E0-05:** implement the minimum C11 frontend and reproduce the exact
-   typed-core candidate.
+3. **E0-04/E0-05 completed experimentally:** the closed-subset C11 frontend
+   parses and checks the source, reproduces the exact typed-core candidate, and
+   agrees byte-for-byte with the independent fixture emitter.
 4. **E0-06 through E0-09:** emit restricted C, exercise it, bind the artifacts,
    and record the remaining trust boundary.
 5. **F0-01:** name the materially different consumer decision and reviewer.
