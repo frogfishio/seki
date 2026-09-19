@@ -15,7 +15,7 @@
 #include "seki_core.h"
 #include "seki_parser.h"
 
-#define SEKI_A0_VERSION "0.0.0-alpha.5"
+#define SEKI_A0_VERSION "0.0.0-alpha.6"
 #define SEKI_A0_SOURCE_CAPACITY 65536U
 
 enum exit_status {

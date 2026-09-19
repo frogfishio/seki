@@ -16,7 +16,7 @@ a minimal restricted-C AST to deterministic C11. Neither defines a frozen
 compiler architecture or conformance boundary.
 
 The `alpha/` directory contains the provisional `sekic` CLI. Revision
-`0.0.0-alpha.5` runs the general lexer/parser and the U8-decision semantic checker
+`0.0.0-alpha.6` runs the general lexer/parser and the U8-decision semantic checker
 before `alpha/seki_core.c` emits SCB-0 directly from the checked AST. The
 immutable E0 frontend is no longer linked into `sekic`; its exact 417-byte output
 remains a regression oracle. `alpha/seki_c_backend.c` independently reopens the
@@ -24,8 +24,9 @@ SCB-0 bytes into a restricted-C model, validates the complete slice, and emits
 the exact established C. Neither E0 adapter is linked into `sekic`. Both
 directions now derive module, type, field, variant, case, kernel, parameter,
 literal, and rejection-tag identities from the program. This is an A0-02
-increment, not its exit: the structural slice is still one U8 record field, one
-payload-free rejection, and one less-than decision.
+increment, not its exit: the structural slice now permits canonically ordered U8
+record fields and payload-free rejection cases, but still only one less-than
+decision over a selected field.
 
 `alpha/seki_lexer.c` is the first adapter-independent compiler component. It is
 allocation-free, contains no module or declaration names, and tokenizes the
@@ -45,5 +46,8 @@ is now independent but remains limited to the same structural slice. The origina
 minimum-age program retains its `seki_e0_*` C ABI solely as a byte-regression
 compatibility case; other modules receive deterministic `seki_a0_<module>_*`
 names.
+The emitter derives field, constructor, and rejection-precedence indices and the
+exact live-value bound from the AST. Alpha checks independently decode and
+semantically reconstruct the nontrivial two-field/two-rejection artifact.
 The live parser requires end-of-file after the supported module and rejects all
 unknown or trailing top-level syntax.

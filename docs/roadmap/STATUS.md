@@ -177,7 +177,7 @@
 - A0-01 fixes the alpha subset, CLI intent, usability test, six-package work
   ledger, and claim ceiling. It requires both the minimum-age and Grit Stage 1
   publication kernels to pass through one general compiler.
-- A0-02 now has a strictly compiled `sekic 0.0.0-alpha.5` vertical. `check`,
+- A0-02 now has a strictly compiled `sekic 0.0.0-alpha.6` vertical. `check`,
   `build`, and `inspect` execute through an in-process C API; `build` reproduces
   the exact E0 typed-core and restricted-C bytes and rejects existing or aliased
   outputs. Inspection exposes `frontend=alpha-u8-decision` and
@@ -217,6 +217,11 @@
   data, field, rejection, kernel, and parameter names, tag 7, and threshold 42
   passes end to end and its emitted C compiles strictly. The minimum-age C ABI is
   retained only as a byte-regression compatibility case.
+- The U8-decision slice now admits multiple canonically ordered input fields and
+  payload-free rejection cases. The emitter derives field index, constructor
+  tag, precedence index, and exact live-value bounds. The renamed two-field,
+  two-rejection artifact is independently reopened by the general JavaScript SCB
+  decoder and semantic/resource checker; its exact live bound is 40 bits.
 - Complete-module parsing is now mandatory on the live path. Unsupported
   declarations and trailing source reject instead of disappearing beyond a
   parsed prefix, closing a dependency that had previously been covered by the

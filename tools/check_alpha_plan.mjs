@@ -25,7 +25,7 @@ expect(alpha.language_frozen === false && alpha.encoding_frozen === false,
 expect(alpha.authority_granted === false, "A0 granted authority");
 expect(alpha.development_assurance_model === "internal-self-attestation",
   "development assurance model drift");
-expect(alpha.cli_version === "0.0.0-alpha.5", "alpha CLI version drift");
+expect(alpha.cli_version === "0.0.0-alpha.6", "alpha CLI version drift");
 expect(alpha.connected_commands.join(",") === "check,build,inspect",
   "connected alpha commands drift");
 expect(alpha.compiler_core === "alpha-u8-decision-frontend+backend",
@@ -62,6 +62,12 @@ expect(alpha.u8_decision_c_backend_ready === true,
   "U8-decision C backend progress record lost");
 expect(alpha.u8_decision_identity_independent === true,
   "U8-decision slice regained program-identity assumptions");
+expect(alpha.u8_decision_multiple_fields === true,
+  "U8-decision multi-field progress record lost");
+expect(alpha.u8_decision_multiple_rejections === true,
+  "U8-decision rejection-inventory progress record lost");
+expect(alpha.u8_decision_independent_semantic_recheck === true,
+  "U8-decision lost independent semantic rechecking");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",

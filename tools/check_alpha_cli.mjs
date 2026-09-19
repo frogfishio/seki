@@ -3,6 +3,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { decodeModule } from "./encoding/decode_scb0.mjs";
+import { checkTypedCore } from "./encoding/check_typed_core.mjs";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "seki-a0-cli-"));
 const compiler = path.join(temporary, "sekic");
@@ -39,7 +41,7 @@ try {
   assert.equal(version.status, 0);
   assert.equal(version.stderr, "");
   assert.equal(version.stdout,
-    "sekic 0.0.0-alpha.5 (provisional, authority=none)\n");
+    "sekic 0.0.0-alpha.6 (provisional, authority=none)\n");
 
   const help = run(["--help"]);
   assert.equal(help.status, 0);
@@ -74,13 +76,17 @@ try {
   const renamedC = path.join(temporary, "gate_policy.c");
   const renamedText = fs.readFileSync(canonicalSource, "utf8")
     .replace("minimum_age", "gate_policy")
-    .replaceAll("Applicant", "Signal")
+    .replaceAll("Applicant", "Datum")
     .replaceAll("Rejection", "Denial")
     .replaceAll("Underage", "Below")
     .replaceAll("decide", "screen")
     .replaceAll("applicant", "signal")
     .replaceAll("age", "level")
     .replace("Below @ 1.", "Below @ 7.")
+    .replace("  level: U8\n}.", "  code: U8,\n  level: U8\n}.")
+    .replace("  Below @ 7.\n].", "  Other @ 3.\n  Below @ 7.\n].")
+    .replace("rejects: Denial::Below",
+      "rejects: Denial::Other, Denial::Below")
     .replace("< 18", "< 42");
   fs.writeFileSync(renamedSource, renamedText);
 
@@ -101,11 +107,14 @@ try {
   ]);
   assert.equal(renamed.status, 0, renamed.stderr);
   const renamedCText = fs.readFileSync(renamedC, "utf8");
-  assert.match(renamedCText, /seki_a0_gate_policy_signal/u);
+  assert.match(renamedCText, /seki_a0_gate_policy_datum/u);
   assert.match(renamedCText, /seki_a0_gate_policy_screen/u);
+  assert.match(renamedCText, /uint8_t seki_f_code;/u);
+  assert.match(renamedCText, /uint8_t seki_f_level;/u);
   assert.match(renamedCText,
     /seki_p_signal\.seki_f_level < UINT8_C\(42\)/u);
   assert.match(renamedCText, /result\.reason = UINT8_C\(7\)/u);
+  checkTypedCore(decodeModule(fs.readFileSync(renamedCore)));
   execFileSync("cc", [...strictFlags, "-c", renamedC, "-o",
     path.join(temporary, "gate_policy.o")], { stdio: "inherit" });
 
@@ -168,8 +177,8 @@ try {
   assert.match(bad.stderr, /^usage:\n/u);
 
   console.log(
-    "seki_alpha_cli=verified version=0.0.0-alpha.5 commands=4 connected=3 " +
-    "slice=u8-decision renamed=yes overwrite=reject",
+    "seki_alpha_cli=verified version=0.0.0-alpha.6 commands=4 connected=3 " +
+    "slice=u8-decision fields=2 rejections=2 renamed=yes overwrite=reject",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

@@ -65,7 +65,7 @@ closed with a stable diagnostic identifier and nonzero status.
 The CLI spelling is provisional. Alpha bundles record its exact revision and
 invocation; scripts must not treat it as a stable public API.
 
-Revision `0.0.0-alpha.5` connects `check`, `build`, and `inspect` through an
+Revision `0.0.0-alpha.6` connects `check`, `build`, and `inspect` through an
 in-process C API. The live frontend no longer invokes the E0 source parser: it
 emits the exact E0 typed-core bytes from the alpha AST after the independent
 checker succeeds. The alpha backend independently decodes and fully validates
@@ -101,10 +101,19 @@ while a threshold mutation changes both core and projected C. The core emitter
 and independent backend now recognize an identity-independent U8-decision shape:
 arbitrary module, declaration, field, case, kernel, and parameter names; an
 arbitrary U8 threshold; and an arbitrary U8-sized rejection tag. A wholly renamed
-`gate_policy` program compiles to strict C with derived symbols while the original
+`gate_policy` program now exercises two ordered U8 fields, two ordered rejection
+cases, rejection tag 7, precedence index 1, and threshold 42. The emitter derives
+the selected field/constructor indices and the 40-bit exact live bound. The
+repository's separate general SCB decoder and semantic checker reopen and verify
+that emitted artifact, and its generated C compiles strictly. The original
 minimum-age artifacts remain byte-identical. Other comparison operators and data
 shapes fail closed; this is not yet the complete A0 expression language or a
 general compiler core.
+
+This slice currently requires type declarations, record fields, and variant tags
+to appear in canonical order. The emitter rejects noncanonical source ordering
+rather than silently emitting inadmissible SCB; later general elaboration may
+sort source declarations before assigning canonical indices.
 
 The live entry point requires end-of-file after the supported declarations.
 Unknown declarations and trailing tokens fail as `A0-PARSE-0034`; no later

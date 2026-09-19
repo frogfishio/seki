@@ -68,6 +68,20 @@ static void put_unit(struct core_buffer *buffer) { put_u8(buffer, 0U); }
 static void put_bool(struct core_buffer *buffer) { put_u8(buffer, 1U); }
 static void put_type_u8(struct core_buffer *buffer) { put_u8(buffer, 2U); }
 
+static int
+variant_tag_for_name(const struct seki_variant_decl *variant,
+    const struct seki_name *name, uint32_t *tag)
+{
+    size_t index;
+    for (index = 0U; index < variant->case_count; index += 1U) {
+        if (seki_name_equal(&variant->cases[index].name, name)) {
+            *tag = variant->cases[index].tag;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void
 put_bounds(struct core_buffer *buffer, uint32_t steps, uint32_t live,
     uint32_t depth, uint32_t workspace)
@@ -103,8 +117,18 @@ has_names(const struct seki_name *names, size_t count,
 }
 
 static int
+name_precedes(const struct seki_name *left, const struct seki_name *right)
+{
+    const size_t shared = left->length < right->length ?
+        left->length : right->length;
+    const int comparison = memcmp(left->bytes, right->bytes, shared);
+    return comparison < 0 || (comparison == 0 && left->length < right->length);
+}
+
+static int
 extract_u8_decision(const struct seki_module_prefix *module,
-    uint32_t *threshold)
+    uint32_t *threshold, uint32_t *field_index, uint32_t *case_index,
+    uint32_t *precedence_index, uint32_t *exact_live_bits)
 {
     static const char *const claims[] = {
         "semantic_evaluation", "lean_projection", "restricted_c_source"
@@ -122,6 +146,10 @@ extract_u8_decision(const struct seki_module_prefix *module,
     const struct seki_expression *if_true;
     const struct seki_expression *if_false;
     const struct seki_expression *accepted;
+    size_t index;
+    int found_field = 0;
+    int found_case = 0;
+    int found_precedence = 0;
 
     if (module->header.path_count == 0U ||
         !seki_name_is(&module->header.profile, "c11_bounded") ||
@@ -135,15 +163,38 @@ extract_u8_decision(const struct seki_module_prefix *module,
         return 0;
     }
     if (module->declarations[0].kind != SEKI_DECL_RECORD ||
-        module->declarations[0].value.record.field_count != 1U ||
-        module->declarations[0].value.record.fields[0].type.kind !=
-            SEKI_TYPE_NAMED ||
-        !seki_name_is(&module->declarations[0].value.record.fields[0].type.name,
-            "U8") || module->declarations[1].kind != SEKI_DECL_VARIANT ||
-        module->declarations[1].value.variant.case_count != 1U ||
-        module->declarations[1].value.variant.cases[0].tag > UINT8_MAX ||
-        module->declarations[1].value.variant.cases[0].payload_count != 0U) {
+        module->declarations[0].value.record.field_count == 0U ||
+        module->declarations[1].kind != SEKI_DECL_VARIANT ||
+        module->declarations[1].value.variant.case_count == 0U ||
+        !name_precedes(&module->declarations[0].name,
+            &module->declarations[1].name)) {
         return 0;
+    }
+    for (index = 0U;
+        index < module->declarations[0].value.record.field_count; index += 1U) {
+        const struct seki_type_ref *type =
+            &module->declarations[0].value.record.fields[index].type;
+        if (type->kind != SEKI_TYPE_NAMED || !seki_name_is(&type->name, "U8")) {
+            return 0;
+        }
+        if (index != 0U && !name_precedes(
+            &module->declarations[0].value.record.fields[index - 1U].name,
+            &module->declarations[0].value.record.fields[index].name)) {
+            return 0;
+        }
+    }
+    for (index = 0U;
+        index < module->declarations[1].value.variant.case_count; index += 1U) {
+        const struct seki_variant_case *item =
+            &module->declarations[1].value.variant.cases[index];
+        if (item->tag > UINT8_MAX || item->payload_count != 0U) {
+            return 0;
+        }
+        if (index != 0U &&
+            module->declarations[1].value.variant.cases[index - 1U].tag >=
+                item->tag) {
+            return 0;
+        }
     }
     kernel = &module->kernels[0];
     if (kernel->parameter_count != 1U ||
@@ -159,11 +210,7 @@ extract_u8_decision(const struct seki_module_prefix *module,
         !seki_name_equal(&kernel->result.arguments[1].name,
             &module->declarations[1].name) ||
         !seki_name_is(&kernel->arithmetic_policy, "checked") ||
-        kernel->rejection_count != 1U ||
-        !seki_name_equal(&kernel->rejections[0].owner,
-            &module->declarations[1].name) ||
-        !seki_name_equal(&kernel->rejections[0].item,
-            &module->declarations[1].value.variant.cases[0].name) ||
+        kernel->rejection_count == 0U ||
         kernel->publication_eligible != 0 ||
         kernel->bounds.steps < 8U || kernel->bounds.live_bits < 25U ||
         kernel->bounds.control_depth < 5U ||
@@ -185,8 +232,6 @@ extract_u8_decision(const struct seki_module_prefix *module,
         if_true->kind != SEKI_EXPR_REJECT ||
         !seki_name_equal(&if_true->value.rejection.owner,
             &module->declarations[1].name) ||
-        !seki_name_equal(&if_true->value.rejection.item,
-            &module->declarations[1].value.variant.cases[0].name) ||
         if_false->kind != SEKI_EXPR_ACCEPT ||
         (size_t)condition->value.compare.left >= kernel->expression_count ||
         (size_t)condition->value.compare.right >= kernel->expression_count ||
@@ -197,8 +242,6 @@ extract_u8_decision(const struct seki_module_prefix *module,
     right = &kernel->expressions[condition->value.compare.right];
     accepted = &kernel->expressions[if_false->value.accept.value];
     if (left->kind != SEKI_EXPR_FIELD ||
-        !seki_name_equal(&left->value.field.field,
-            &module->declarations[0].value.record.fields[0].name) ||
         (size_t)left->value.field.receiver >= kernel->expression_count ||
         right->kind != SEKI_EXPR_NATURAL || right->value.natural > UINT8_MAX ||
         accepted->kind != SEKI_EXPR_UNIT) {
@@ -210,14 +253,73 @@ extract_u8_decision(const struct seki_module_prefix *module,
             &kernel->parameters[0].label)) {
         return 0;
     }
+    for (index = 0U;
+        index < module->declarations[0].value.record.field_count; index += 1U) {
+        if (seki_name_equal(&left->value.field.field,
+            &module->declarations[0].value.record.fields[index].name)) {
+            *field_index = (uint32_t)index;
+            found_field = 1;
+            break;
+        }
+    }
+    for (index = 0U;
+        index < module->declarations[1].value.variant.case_count; index += 1U) {
+        if (seki_name_equal(&if_true->value.rejection.item,
+            &module->declarations[1].value.variant.cases[index].name)) {
+            *case_index = (uint32_t)index;
+            found_case = 1;
+            break;
+        }
+    }
+    for (index = 0U; index < kernel->rejection_count; index += 1U) {
+        uint32_t ignored_tag = 0U;
+        size_t earlier;
+        if (!seki_name_equal(&kernel->rejections[index].owner,
+            &module->declarations[1].name) ||
+            !variant_tag_for_name(&module->declarations[1].value.variant,
+                &kernel->rejections[index].item, &ignored_tag)) {
+            return 0;
+        }
+        for (earlier = 0U; earlier < index; earlier += 1U) {
+            if (seki_name_equal(&kernel->rejections[earlier].item,
+                &kernel->rejections[index].item)) {
+                return 0;
+            }
+        }
+        if (seki_name_equal(&kernel->rejections[index].item,
+            &if_true->value.rejection.item)) {
+            *precedence_index = (uint32_t)index;
+            found_precedence = 1;
+        }
+    }
+    if (!found_field || !found_case || !found_precedence) {
+        return 0;
+    }
     *threshold = right->value.natural;
+    {
+        const uint32_t record_bits =
+            (uint32_t)module->declarations[0].value.record.field_count * 8U;
+        const uint32_t projection_peak = record_bits * 2U + 8U;
+        const uint32_t comparison_peak = record_bits + 17U;
+        *exact_live_bits = projection_peak > comparison_peak ?
+            projection_peak : comparison_peak;
+    }
+    if (kernel->bounds.live_bits < *exact_live_bits) {
+        return 0;
+    }
     return 1;
 }
 
 static void
-put_kernel(struct core_buffer *buffer, const struct seki_kernel_decl *kernel,
-    uint32_t threshold, uint32_t rejection_tag)
+put_kernel(struct core_buffer *buffer, const struct seki_module_prefix *module,
+    uint32_t threshold, uint32_t field_index, uint32_t case_index,
+    uint32_t precedence_index, uint32_t exact_live_bits)
 {
+    const struct seki_kernel_decl *kernel = &module->kernels[0];
+    const struct seki_variant_decl *variant =
+        &module->declarations[1].value.variant;
+    size_t index;
+    uint32_t rejection_tag = variant->cases[case_index].tag;
     put_name(buffer, &kernel->name);
     put_u32(buffer, 1U);
     put_name(buffer, &kernel->parameters[0].label);
@@ -226,9 +328,17 @@ put_kernel(struct core_buffer *buffer, const struct seki_kernel_decl *kernel,
     put_u8(buffer, 19U);
     put_unit(buffer);
     put_rejection_type(buffer);
-    put_u32(buffer, 1U);
-    put_local_type_ref(buffer, 1U);
-    put_u32(buffer, rejection_tag);
+    put_u32(buffer, (uint32_t)kernel->rejection_count);
+    for (index = 0U; index < kernel->rejection_count; index += 1U) {
+        uint32_t ordered_tag = 0U;
+        if (!variant_tag_for_name(variant, &kernel->rejections[index].item,
+            &ordered_tag)) {
+            buffer->failed = 1;
+            return;
+        }
+        put_local_type_ref(buffer, 1U);
+        put_u32(buffer, ordered_tag);
+    }
 
     put_u8(buffer, 4U);
     put_bool(buffer);
@@ -241,7 +351,7 @@ put_kernel(struct core_buffer *buffer, const struct seki_kernel_decl *kernel,
     put_u32(buffer, 0U);
     put_u8(buffer, 0U);
     put_local_type_ref(buffer, 0U);
-    put_u32(buffer, 0U);
+    put_u32(buffer, field_index);
     put_type_u8(buffer);
     put_u8(buffer, 2U);
     put_u8(buffer, 0U);
@@ -253,21 +363,22 @@ put_kernel(struct core_buffer *buffer, const struct seki_kernel_decl *kernel,
     put_local_type_ref(buffer, 1U);
     put_u32(buffer, rejection_tag);
     put_u32(buffer, 0U);
-    put_u32(buffer, 0U);
+    put_u32(buffer, precedence_index);
     put_u8(buffer, 0U);
     put_unit(buffer);
     put_u8(buffer, 0U);
 
     put_bounds(buffer, kernel->bounds.steps, kernel->bounds.live_bits,
         kernel->bounds.control_depth, kernel->bounds.workspace_bits);
-    put_bounds(buffer, 8U, 25U, 5U, 0U);
+    put_bounds(buffer, 8U, exact_live_bits, 5U, 0U);
     put_u8(buffer, 0U);
 }
 
 static int
 encode_u8_decision(const struct seki_module_prefix *module,
     unsigned char *output, size_t capacity, size_t *output_length,
-    uint32_t threshold)
+    uint32_t threshold, uint32_t field_index, uint32_t case_index,
+    uint32_t precedence_index, uint32_t exact_live_bits)
 {
     unsigned char payload_bytes[SEKI_CORE_CAPACITY];
     struct core_buffer payload = {
@@ -290,22 +401,30 @@ encode_u8_decision(const struct seki_module_prefix *module,
     put_u32(&payload, 2U);
     put_name(&payload, &module->declarations[0].name);
     put_u8(&payload, 2U);
-    put_u32(&payload, 1U);
-    put_name(&payload,
-        &module->declarations[0].value.record.fields[0].name);
-    put_type_u8(&payload);
+    put_u32(&payload, (uint32_t)
+        module->declarations[0].value.record.field_count);
+    for (index = 0U;
+        index < module->declarations[0].value.record.field_count; index += 1U) {
+        put_name(&payload,
+            &module->declarations[0].value.record.fields[index].name);
+        put_type_u8(&payload);
+    }
     put_name(&payload, &module->declarations[1].name);
     put_u8(&payload, 3U);
-    put_u32(&payload, 1U);
-    put_u32(&payload,
-        module->declarations[1].value.variant.cases[0].tag);
-    put_name(&payload,
-        &module->declarations[1].value.variant.cases[0].name);
-    put_u8(&payload, 0U);
+    put_u32(&payload, (uint32_t)
+        module->declarations[1].value.variant.case_count);
+    for (index = 0U;
+        index < module->declarations[1].value.variant.case_count; index += 1U) {
+        put_u32(&payload,
+            module->declarations[1].value.variant.cases[index].tag);
+        put_name(&payload,
+            &module->declarations[1].value.variant.cases[index].name);
+        put_u8(&payload, 0U);
+    }
     put_u32(&payload, 0U);
     put_u32(&payload, 1U);
-    put_kernel(&payload, &module->kernels[0], threshold,
-        module->declarations[1].value.variant.cases[0].tag);
+    put_kernel(&payload, module, threshold, field_index, case_index,
+        precedence_index, exact_live_bits);
     put_u32(&payload, 0U);
     put_u32(&payload, 2U);
     put_u32(&payload, 0U);
@@ -357,19 +476,25 @@ seki_emit_core(const struct seki_module_prefix *module,
     struct seki_core_error *error)
 {
     uint32_t threshold = 0U;
+    uint32_t field_index = 0U;
+    uint32_t case_index = 0U;
+    uint32_t precedence_index = 0U;
+    uint32_t exact_live_bits = 0U;
     if (module == NULL || output == NULL || output_length == NULL ||
         error == NULL) {
         return 0;
     }
     error->code = "A0-CORE-0000";
     error->message = "invalid core-emitter state";
-    if (!extract_u8_decision(module, &threshold)) {
+    if (!extract_u8_decision(module, &threshold, &field_index, &case_index,
+        &precedence_index, &exact_live_bits)) {
         error->code = "A0-CORE-0001";
         error->message = "module is outside the U8-decision core slice";
         return 0;
     }
     if (!encode_u8_decision(module, output, capacity, output_length,
-        threshold)) {
+        threshold, field_index, case_index, precedence_index,
+        exact_live_bits)) {
         error->code = "A0-CORE-0002";
         error->message = "candidate typed-core output exceeds capacity";
         return 0;

@@ -10,7 +10,7 @@
   "encoding_frozen": false,
   "authority_granted": false,
   "development_assurance_model": "internal-self-attestation",
-  "cli_version": "0.0.0-alpha.5",
+  "cli_version": "0.0.0-alpha.6",
   "connected_commands": [
     "check",
     "build",
@@ -33,6 +33,9 @@
   "u8_decision_independent_core_decoder_ready": true,
   "u8_decision_c_backend_ready": true,
   "u8_decision_identity_independent": true,
+  "u8_decision_multiple_fields": true,
+  "u8_decision_multiple_rejections": true,
+  "u8_decision_independent_semantic_recheck": true,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

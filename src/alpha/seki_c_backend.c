@@ -9,6 +9,8 @@ enum restricted_decision {
 };
 
 #define DECODED_NAME_CAPACITY 64U
+#define DECODED_FIELD_CAPACITY 32U
+#define DECODED_CASE_CAPACITY 32U
 
 struct decoded_name {
     char bytes[DECODED_NAME_CAPACITY];
@@ -20,6 +22,9 @@ struct restricted_kernel {
     uint32_t field_index;
     uint8_t threshold;
     uint8_t rejection_tag;
+    uint32_t rejection_tags[DECODED_CASE_CAPACITY];
+    size_t rejection_count;
+    uint32_t precedence_index;
     struct decoded_name name;
     struct decoded_name parameter_name;
     enum restricted_decision if_true;
@@ -31,8 +36,13 @@ struct restricted_module {
     struct decoded_name module_name;
     struct decoded_name record_name;
     struct decoded_name field_name;
+    struct decoded_name fields[DECODED_FIELD_CAPACITY];
+    size_t field_count;
     struct decoded_name variant_name;
     struct decoded_name case_name;
+    struct decoded_name cases[DECODED_CASE_CAPACITY];
+    uint32_t case_tags[DECODED_CASE_CAPACITY];
+    size_t case_count;
     struct restricted_kernel kernel;
 };
 
@@ -155,6 +165,16 @@ read_name(struct reader *reader, struct decoded_name *name)
     reader->offset += name->length;
 }
 
+static int
+decoded_name_precedes(const struct decoded_name *left,
+    const struct decoded_name *right)
+{
+    const size_t shared = left->length < right->length ?
+        left->length : right->length;
+    const int comparison = memcmp(left->bytes, right->bytes, shared);
+    return comparison < 0 || (comparison == 0 && left->length < right->length);
+}
+
 static void
 expect_local_type(struct reader *reader, uint32_t index)
 {
@@ -186,6 +206,9 @@ decode_header(struct reader *reader, struct restricted_module *module)
     uint32_t path_count;
     uint32_t path_index;
     uint32_t rejection_tag;
+    uint32_t field_count;
+    uint32_t case_count;
+    uint32_t declaration_index;
     const uint32_t payload_length_expected =
         reader->length >= 13U ? (uint32_t)(reader->length - 13U) : 0U;
     expect_raw(reader, magic, sizeof magic, "bad SCB-0 magic");
@@ -212,20 +235,65 @@ decode_header(struct reader *reader, struct restricted_module *module)
     expect_u32(reader, 2U, "U8-decision slice requires two declarations");
     read_name(reader, &module->record_name);
     expect_u8(reader, 2U, "first declaration must be a record");
-    expect_u32(reader, 1U, "input record must have one field");
-    read_name(reader, &module->field_name);
-    expect_u8(reader, 2U, "input field must be U8");
-    read_name(reader, &module->variant_name);
-    expect_u8(reader, 3U, "second declaration must be a variant");
-    expect_u32(reader, 1U, "rejection variant must have one case");
-    rejection_tag = read_u32(reader);
-    if (!reader->failed && rejection_tag > UINT8_MAX) {
-        reader_fail(reader, "rejection tag exceeds C representation");
+    field_count = read_u32(reader);
+    if (!reader->failed && (field_count == 0U ||
+        field_count > DECODED_FIELD_CAPACITY)) {
+        reader_fail(reader, "record field count exceeds backend capacity");
     }
-    module->kernel.rejection_tag = (uint8_t)rejection_tag;
-    read_name(reader, &module->case_name);
-    expect_u8(reader, 0U, "rejection case must have no payload");
+    module->field_count = (size_t)field_count;
+    for (declaration_index = 0U;
+        declaration_index < field_count && !reader->failed;
+        declaration_index += 1U) {
+        read_name(reader, &module->fields[declaration_index]);
+        expect_u8(reader, 2U, "input field must be U8");
+        if (!reader->failed && declaration_index != 0U &&
+            !decoded_name_precedes(&module->fields[declaration_index - 1U],
+                &module->fields[declaration_index])) {
+            reader_fail(reader, "record fields are not canonically ordered");
+        }
+    }
+    read_name(reader, &module->variant_name);
+    if (!reader->failed && !decoded_name_precedes(&module->record_name,
+        &module->variant_name)) {
+        reader_fail(reader, "type declarations are not canonically ordered");
+    }
+    expect_u8(reader, 3U, "second declaration must be a variant");
+    case_count = read_u32(reader);
+    if (!reader->failed && (case_count == 0U ||
+        case_count > DECODED_CASE_CAPACITY)) {
+        reader_fail(reader, "variant case count exceeds backend capacity");
+    }
+    module->case_count = (size_t)case_count;
+    for (declaration_index = 0U;
+        declaration_index < case_count && !reader->failed;
+        declaration_index += 1U) {
+        rejection_tag = read_u32(reader);
+        if (!reader->failed && rejection_tag > UINT8_MAX) {
+            reader_fail(reader, "rejection tag exceeds C representation");
+        }
+        module->case_tags[declaration_index] = rejection_tag;
+        read_name(reader, &module->cases[declaration_index]);
+        expect_u8(reader, 0U, "rejection case must have no payload");
+        if (!reader->failed && declaration_index != 0U &&
+            module->case_tags[declaration_index - 1U] >= rejection_tag) {
+            reader_fail(reader, "variant cases are not canonically ordered");
+        }
+    }
     expect_u32(reader, 0U, "functions must be empty");
+}
+
+static int
+case_index_for_tag(const struct restricted_module *module, uint32_t tag,
+    size_t *case_index)
+{
+    size_t index;
+    for (index = 0U; index < module->case_count; index += 1U) {
+        if (module->case_tags[index] == tag) {
+            *case_index = index;
+            return 1;
+        }
+    }
+    return 0;
 }
 
 static void
@@ -234,6 +302,11 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
     uint32_t declared_steps;
     uint32_t declared_live;
     uint32_t declared_depth;
+    uint32_t rejection_count;
+    uint32_t rejection_index;
+    uint32_t constructed_tag;
+    uint32_t exact_live_bits;
+    size_t selected_case = 0U;
 
     expect_u32(reader, 1U, "U8-decision slice requires one kernel");
     read_name(reader, &module->kernel.name);
@@ -244,10 +317,24 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
     expect_u8(reader, 19U, "decide result must be Decision");
     expect_u8(reader, 0U, "accepted result must be Unit");
     expect_declared_type(reader, 1U);
-    expect_u32(reader, 1U, "decide requires one rejection-order entry");
-    expect_local_type(reader, 1U);
-    expect_u32(reader, module->kernel.rejection_tag,
-        "unexpected rejection tag");
+    rejection_count = read_u32(reader);
+    if (!reader->failed && (rejection_count == 0U ||
+        rejection_count > DECODED_CASE_CAPACITY)) {
+        reader_fail(reader, "rejection order exceeds backend capacity");
+    }
+    module->kernel.rejection_count = (size_t)rejection_count;
+    for (rejection_index = 0U;
+        rejection_index < rejection_count && !reader->failed;
+        rejection_index += 1U) {
+        size_t ignored_case = 0U;
+        uint32_t ordered_tag;
+        expect_local_type(reader, 1U);
+        ordered_tag = read_u32(reader);
+        if (!case_index_for_tag(module, ordered_tag, &ignored_case)) {
+            reader_fail(reader, "rejection order references unknown case");
+        }
+        module->kernel.rejection_tags[rejection_index] = ordered_tag;
+    }
 
     expect_u8(reader, 4U, "kernel body must be If");
     expect_u8(reader, 1U, "If condition must claim Bool");
@@ -261,6 +348,12 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
     expect_u8(reader, 0U, "field owner must be local");
     expect_local_type(reader, 0U);
     module->kernel.field_index = read_u32(reader);
+    if (!reader->failed &&
+        (size_t)module->kernel.field_index >= module->field_count) {
+        reader_fail(reader, "projection field index is out of range");
+    } else if (!reader->failed) {
+        module->field_name = module->fields[module->kernel.field_index];
+    }
     expect_u8(reader, 2U, "comparison literal must claim U8");
     expect_u8(reader, 2U, "comparison right side must be IntLit");
     expect_u8(reader, 0U, "comparison literal family must be U8");
@@ -270,10 +363,23 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
     expect_declared_type(reader, 1U);
     expect_u8(reader, 8U, "rejection value must construct a variant");
     expect_local_type(reader, 1U);
-    expect_u32(reader, module->kernel.rejection_tag,
-        "true branch constructs wrong rejection");
+    constructed_tag = read_u32(reader);
+    if (!reader->failed && !case_index_for_tag(module, constructed_tag,
+        &selected_case)) {
+        reader_fail(reader, "true branch constructs unknown rejection");
+    } else if (!reader->failed) {
+        module->kernel.rejection_tag = (uint8_t)constructed_tag;
+        module->case_name = module->cases[selected_case];
+    }
     expect_u32(reader, 0U, "Underage must have no arguments");
-    expect_u32(reader, 0U, "unexpected rejection precedence index");
+    module->kernel.precedence_index = read_u32(reader);
+    if (!reader->failed &&
+        ((size_t)module->kernel.precedence_index >=
+            module->kernel.rejection_count ||
+         module->kernel.rejection_tags[module->kernel.precedence_index] !=
+            constructed_tag)) {
+        reader_fail(reader, "rejection precedence index is inconsistent");
+    }
     module->kernel.if_true = RESTRICTED_REJECT_UNDERAGE;
 
     expect_u8(reader, 0U, "false branch must accept");
@@ -285,15 +391,20 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
     declared_live = read_u32(reader);
     declared_depth = read_u32(reader);
     (void)read_u32(reader);
-    if (!reader->failed && (declared_steps < 8U || declared_live < 25U ||
-        declared_depth < 5U)) {
+    if (!reader->failed && (declared_steps < 8U || declared_depth < 5U)) {
         reader_fail(reader, "declared resource ceiling below exact bound");
     }
-    expect_bounds(reader, 8U, 25U, 5U, 0U);
+    exact_live_bits = (uint32_t)module->field_count * 16U + 8U;
+    if ((uint32_t)module->field_count * 8U + 17U > exact_live_bits) {
+        exact_live_bits = (uint32_t)module->field_count * 8U + 17U;
+    }
+    if (!reader->failed && declared_live < exact_live_bits) {
+        reader_fail(reader, "declared live-bit ceiling below exact bound");
+    }
+    expect_bounds(reader, 8U, exact_live_bits, 5U, 0U);
     expect_u8(reader, 0U, "publication must be disabled");
-    if (!reader->failed && (module->kernel.parameter_index != 0U ||
-        module->kernel.field_index != 0U)) {
-        reader_fail(reader, "condition references unexpected input field");
+    if (!reader->failed && module->kernel.parameter_index != 0U) {
+        reader_fail(reader, "condition references unexpected parameter");
     }
 }
 
@@ -472,13 +583,21 @@ print_module(const struct restricted_module *module, char *c_source,
     size_t c_capacity, size_t *c_length)
 {
     struct text_buffer output = {c_source, c_capacity, 0U, 0};
+    size_t field_index;
     text_put(&output,
         "#include <stdint.h>\n"
         "\n"
-        "typedef struct {\n"
-        "    uint8_t ");
-    text_put_field_identifier(&output, module);
-    text_put(&output, ";\n} ");
+        "typedef struct {\n");
+    for (field_index = 0U; field_index < module->field_count;
+        field_index += 1U) {
+        text_put(&output, "    uint8_t ");
+        if (!uses_e0_compatibility_abi(module)) {
+            text_put(&output, "seki_f_");
+        }
+        text_put_name(&output, &module->fields[field_index], 0);
+        text_put(&output, ";\n");
+    }
+    text_put(&output, "} ");
     text_put_prefix(&output, module);
     text_put(&output, "_");
     text_put_name(&output, &module->record_name, 1);
