@@ -1,8 +1,9 @@
 # Seki execution status
 
 - Updated: 2026-09-19
-- Plan: `docs/roadmap/DELIVERY_PLAN.md` version 0.3
-- Current stage: B0 bootstrap
+- Plan: `docs/roadmap/DELIVERY_PLAN.md` version 0.4
+- Current stage: A0 provisional alpha
+- Bootstrap status: complete
 - Current gate: global F0 open
 - Active work package: A0-02 reusable C11 compiler core and `sekic` CLI
 - E0-VS1 experimental work: complete
@@ -19,7 +20,7 @@
 
 - Frozen v0.3 seed imported and verified.
 - GPL-3.0-or-later adopted.
-- Customer-controlled output policy accepted; exception wording remains pending.
+- Customer-controlled output policy and Seki Generated Output Exception 1.0 adopted.
 - Project/customer independence recorded.
 - Machine-readable claim ceiling and CI check added.
 - Linux x86-64 selected as initial qualification platform.
@@ -158,17 +159,38 @@
   operator's lawful AbsInt agreement or a separately audited permissive proof
   closure. The official `v3.18` archive is bound, with a controlled finding that
   its root `VERSION` file still reports `3.17`.
+- B0-11 adopts the original Seki Generated Output Exception 1.0 as a GPLv3
+  section 7 additional permission, without copying or modifying GCC's exception.
+- B0-13 pins bootstrap CI to an immutable Linux/amd64 Node 22 Bookworm image
+  manifest and an exact `actions/checkout` commit. The lock explicitly carries
+  no formal-foundation or qualification authority.
+- The complete bootstrap portfolio passes inside that pinned Linux/amd64 image.
+  The local observation records a mounted working tree; the pinned CI workflow
+  is responsible for reproducing it from a clean checkout after commit.
+- B0 is complete. Foundation sources and use policies are bound; their installed
+  builds and qualification remain later formal-delivery work rather than
+  repository-bootstrap conditions.
 - ADRs 0021 and 0022 resolve the sequencing problem: Seki develops autonomously
   through a checksum-bound, internally certified release candidate, then Gnosis,
   Kiku, and Grit use those exact bytes in anger before any live decision. Internal
   certification is a self-attestation, not independent certification.
-- A0-01 fixes the alpha subset, CLI intent, usability test, ten-package work
+- A0-01 fixes the alpha subset, CLI intent, usability test, six-package work
   ledger, and claim ceiling. It requires both the minimum-age and Grit Stage 1
   publication kernels to pass through one general compiler.
-- A0-02 has begun with a strictly compiled `sekic 0.0.0-alpha.1` command shell.
-  Help and version reporting work; `check`, `build`, and `inspect` fail closed
-  with a stable diagnostic until reusable compiler paths replace the E0-shaped
-  implementations.
+- A0-02 now has a strictly compiled `sekic 0.0.0-alpha.2` vertical. `check`,
+  `build`, and `inspect` execute through an in-process C API; `build` reproduces
+  the exact E0 typed-core and restricted-C bytes and rejects existing or aliased
+  outputs. The inspection record says `adapter=e0-vs1`, so the remaining blocker
+  is explicit: replace the program-shaped adapter with a general compiler core.
+- The first adapter-independent A0-02 component is complete: a name-agnostic,
+  allocation-free lexer covers the candidate grammar's identifiers, checked
+  `U32` numbers, hexadecimal strings, comments, newlines, delimiters, and
+  operators. Its strict-C11 suite checks 32 token observations and four hostile
+  classes.
+- The live CLI now parses module paths, module/profile versions, claims, and
+  theorem obligations through the general lexer/parser before invoking the E0
+  adapter. Fixed capacities and duplicate rejection have independent positive
+  and hostile coverage. General declaration and expression parsing remains open.
 
 ## Active work
 
@@ -184,8 +206,7 @@ conformance.
 1. A0-02 — extract the reusable compiler core and `sekic` CLI.
 2. A0-03 — implement and test the fixed alpha subset.
 3. A0-04 — add the runnable Grit publication kernel.
-4. B0-11 — adopt reviewed runtime/output exception text.
-5. B0-13 — build the locked foundations in a pinned clean-room environment.
+4. A0-05/A0-06 — produce deterministic bundles and the consumer quickstart.
 
 ## Open decisions and blockers
 
@@ -194,7 +215,6 @@ conformance.
 | Grit field-validator identity and acceptance absent | Expected during development; F0 and live eligibility remain open until post-candidate field validation. |
 | SCB-0 field/tag ledger and vectors incomplete | Canonical bytes, verified decoding, and operational lock digests cannot freeze. |
 | Reconstruction witness rules unproved | Digest-bearing derivations cannot freeze. |
-| Exact runtime/output exception not adopted | Seki-owned runtime/templates cannot enter distributable customer output. |
 | No lawful qualified CompCert installation selected | F4/F5 cannot execute or qualify. |
 | Locked foundation sources not clean-room built | Formal results cannot qualify. |
 | Several surface forms remain provisional | Parser work may experiment but cannot freeze conformance. |
@@ -214,6 +234,8 @@ make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 
 ## Last verification
 
-Local seed, status, JSON, encoding-vector, semantic-coverage, and whitespace
-checks passed on 2026-09-19. This remains a bootstrap check, not clean-room or
-qualification evidence.
+Local and pinned Linux/amd64 seed, status, bootstrap-closure, JSON,
+encoding-vector, semantic-coverage, strict-C11, sanitizer, and whitespace checks
+passed on 2026-09-19. The container run used the mounted working tree and carries
+no formal qualification authority; clean-checkout reproduction is delegated to
+the exact pinned CI workflow.

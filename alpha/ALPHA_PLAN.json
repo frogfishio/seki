@@ -10,13 +10,17 @@
   "encoding_frozen": false,
   "authority_granted": false,
   "development_assurance_model": "internal-self-attestation",
-  "internal_certification_target": "release-candidate",
-  "field_validation_before_live": true,
-  "field_validation_projects": [
-    "Gnosis",
-    "Kiku",
-    "Grit"
+  "cli_version": "0.0.0-alpha.2",
+  "connected_commands": [
+    "check",
+    "build",
+    "inspect"
   ],
+  "compiler_core": "e0-regression-adapter",
+  "general_compiler_core_ready": false,
+  "general_lexer_ready": true,
+  "general_header_parser_ready": true,
+  "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",
     "grit-stage1-publication"
@@ -32,10 +36,6 @@
     { "id": "A0-03", "state": "pending", "title": "Implement the documented monomorphic alpha subset" },
     { "id": "A0-04", "state": "pending", "title": "Compile and exercise the Grit publication kernel" },
     { "id": "A0-05", "state": "pending", "title": "Make deterministic build and artifact bundles" },
-    { "id": "A0-06", "state": "pending", "title": "Write consumer quickstart and diagnostics guide" },
-    { "id": "A0-07", "state": "pending", "title": "Issue the exact internal release-candidate attestation" },
-    { "id": "A0-08", "state": "pending", "title": "Run customer field validation on real workloads" },
-    { "id": "A0-09", "state": "pending", "title": "Resolve findings and re-attest changed candidates" },
-    { "id": "A0-10", "state": "pending", "title": "Record F0 evidence and the separate go-live decision" }
+    { "id": "A0-06", "state": "pending", "title": "Write consumer quickstart and diagnostics guide" }
   ]
 }

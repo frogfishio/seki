@@ -65,11 +65,36 @@ closed with a stable diagnostic identifier and nonzero status.
 The CLI spelling is provisional. Alpha bundles record its exact revision and
 invocation; scripts must not treat it as a stable public API.
 
-The initial `0.0.0-alpha.1` shell implements `--help` and `--version`. The three
-compiler commands deliberately return `A0-CLI-0002` and exit 69 until the
-reusable compiler paths are connected. This fail-closed shell fixes the command
-boundary without misrepresenting the E0 program-shaped tools as a general
-compiler.
+Revision `0.0.0-alpha.2` connects `check`, `build`, and `inspect` through an
+in-process C API. It reproduces the exact E0 typed-core and restricted-C bytes,
+reports stable A0 diagnostic identifiers, and refuses existing or aliased output
+paths. Its inspection output names `adapter=e0-vs1`: the program-shaped E0 core
+is deliberately visible and A0-02 remains open until a general compiler core
+replaces it.
+
+The replacement path has begun with `src/alpha/seki_lexer.c`: an allocation-free,
+name-agnostic lexer for the candidate grammar. It handles CR, LF, and CRLF source,
+comments, identifiers, checked `U32` literals, hexadecimal string bodies, and all
+current punctuation/operator tokens. Its independent strict-C11 test covers 32
+token observations and four hostile classes. The E0 adapter does not yet consume
+this lexer directly.
+
+`src/alpha/seki_parser.c` now uses that lexer on the live `check` and `build`
+paths. It parses arbitrary lower-case module paths, module/profile versions,
+claim ceilings, and theorem-obligation lists into fixed-capacity borrowed slices,
+rejecting duplicate names and excessive path/list shapes. The declaration and
+expression parser remains the next A0-02 boundary; successful headers still pass
+to the visibly labelled E0 adapter.
+
+Build and exercise the current increment with:
+
+```sh
+make alpha
+build/sekic check experiments/e0-vs1/minimum_age.seki
+build/sekic build --core /tmp/minimum_age.scb0 --c /tmp/minimum_age.c \
+  experiments/e0-vs1/minimum_age.seki
+build/sekic inspect /tmp/minimum_age.scb0
+```
 
 ## Work packages
 
@@ -81,26 +106,19 @@ compiler.
 | A0-04 | Grit kernel | Exact source, expected decisions, generated artifacts, and behavioral tests are checked in. |
 | A0-05 | Deterministic bundle | Two clean builds reproduce bytes and a manifest binds compiler, inputs, outputs, commands, and claim ceiling. |
 | A0-06 | Consumer documentation | A clean checkout can follow one quickstart without fixture-specific knowledge. |
-| A0-07 | Internal certification | A checksum-bound self-attestation names the exact release-candidate bytes and all satisfied and trusted premises. |
-| A0-08 | Field validation | Gnosis, Kiku, and Grit exercise the exact candidate on representative real workloads. |
-| A0-09 | Finding closure | Findings are resolved and every affected candidate artifact is regenerated and re-attested. |
-| A0-10 | Pre-live decision | F0 evidence and a separate go-live eligibility decision are checksum-bound. |
 
 ## Exit and relationship to F0
 
-A0 development proceeds without external review through a release candidate.
-The project internally certifies that exact candidate only after both required
-examples pass the reproducible consumer quickstart, all selected proof and test
-gates pass, and the trust report contains no unrecorded pipeline arrow. Here,
-internal certification means a checksum-bound project self-attestation; it is
-not independent certification.
+A0 exits when both required examples pass the reproducible consumer quickstart
+and the alpha trust report contains no unrecorded pipeline arrow. This creates a
+usable compiler and authorizes entry into internal formal delivery work; it does
+not internally certify a release candidate.
 
-The internally certified candidate is then used in anger by Gnosis, Kiku, and
-Grit before any live declaration. Feedback may require replacement of any A0
-interface or artifact; a changed candidate must repeat every affected internal
-gate and receive a new attestation. The field-validation record supplies the
-external F0 evidence.
+F1 through F5 subsequently freeze and prove the semantic, representation, C,
+certificate, and installed-artifact layers. Only then does R0 issue the
+checksum-bound internal release-candidate attestation. Gnosis, Kiku, and Grit
+use that exact candidate in F6/F7 field validation before F0 closure and the F8
+go-live decision.
 
-A0 completion alone does not close F0, authorize F1, or make Seki live-eligible.
-A separate pre-live decision follows successful field validation and closure of
-its findings.
+A0 completion does not close F0 or make Seki live-eligible. It may authorize F1
+through an atomic project-status update after the A0 exit evidence passes.

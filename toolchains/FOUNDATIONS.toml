@@ -1,19 +1,27 @@
-# Versions are frozen by the v0.3 charter. Exact source identities, checksums,
-# acquisition methods, and license decisions remain bootstrap work.
+# Human-readable summary of foundations/FOUNDATION_LOCK.json. Source identities
+# and use policies are bound; none of these tools is installed or qualified yet.
 
 [lean]
 version = "4.30.0"
-source_identity = "unbound"
-license_review = "pending"
+tag = "v4.30.0"
+commit = "d024af099ca4bf2c86f649261ebf59565dc8c622"
+archive_sha256 = "c11edd040d77be85865e41b4a37a77d14f824c07d8642434eb3561163f2afa5d"
+license = "Apache-2.0"
+qualification = "source-bound-not-installed"
 
 [rocq]
 version = "9.2.0"
-source_identity = "unbound"
-license_review = "pending"
+tag = "V9.2.0"
+commit = "adfbf1855c348766beb4b790dcc8ebc02f908f63"
+archive_sha256 = "a45280ab4fbaac7540b136a6b073b4a6db15739ec1e149bded43fa6f4fc25f20"
+license = "LGPL-2.1-only"
+qualification = "source-bound-not-installed"
 
 [compcert]
 version = "3.18"
-source_identity = "unbound"
-license_review = "pending"
-redistribution_review = "required"
-
+tag = "v3.18"
+commit = "14d616046360a0b2611ebdfc2f98368af402e1f7"
+archive_sha256 = "564b312b3ed3162f02605f0108feb555bd28fe7a80b97ea269c546bcc60c1cf0"
+license = "INRIA-NonCommercial-or-separate-AbsInt-agreement"
+qualification = "source-bound-use-policy-fixed-not-installed"
+redistribution = "user-supplied-no-full-redistribution"

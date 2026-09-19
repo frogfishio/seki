@@ -55,6 +55,11 @@ authority. See
 [`ADR 0021`](docs/decisions/0021-build-usable-alpha-before-f0-review.md) and
 [`ADR 0022`](docs/decisions/0022-internal-certification-before-field-validation.md).
 
+Repository bootstrap B0 is complete. Its portfolio passes locally and in the
+immutable Linux/amd64 environment recorded by
+[`toolchains/CLEAN_ROOM.json`](toolchains/CLEAN_ROOM.json). This verifies the
+bootstrap repository; it does not install or qualify the formal foundations.
+
 Current bootstrap records:
 
 - [`PLAN.md`](PLAN.md) — controlled delivery plan and handoff entry point
@@ -115,7 +120,8 @@ Seki is free software licensed under
 [`GPL-3.0-or-later`](LICENSE). Third-party foundations retain their own
 licenses. Running `sekic` does not change the ownership or licensing of a
 customer's module or generated artifacts. Customers may distribute generated
-C, proofs, manifests, and certificates under terms of their choice. Any
-Seki-owned runtime or template material included in an output will carry an
-explicit GCC-style runtime exception; that legal text must be adopted before
-such material is distributed.
+C, proofs, manifests, and certificates under terms of their choice. Seki-owned
+material included in Generated Output carries the project-owned
+[`Seki Generated Output Exception 1.0`](SEKI_OUTPUT_EXCEPTION), a GPLv3 section
+7 additional permission. Standalone compiler, runtime, library, and third-party
+material retain their applicable licenses.

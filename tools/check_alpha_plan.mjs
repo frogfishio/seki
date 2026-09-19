@@ -25,12 +25,19 @@ expect(alpha.language_frozen === false && alpha.encoding_frozen === false,
 expect(alpha.authority_granted === false, "A0 granted authority");
 expect(alpha.development_assurance_model === "internal-self-attestation",
   "development assurance model drift");
-expect(alpha.internal_certification_target === "release-candidate",
-  "internal certification target drift");
-expect(alpha.field_validation_before_live === true,
-  "field validation is not required before live use");
-expect(alpha.field_validation_projects.join(",") === "Gnosis,Kiku,Grit",
-  "field-validation project set drift");
+expect(alpha.cli_version === "0.0.0-alpha.2", "alpha CLI version drift");
+expect(alpha.connected_commands.join(",") === "check,build,inspect",
+  "connected alpha commands drift");
+expect(alpha.compiler_core === "e0-regression-adapter",
+  "unexpected provisional compiler core");
+expect(alpha.general_compiler_core_ready === false,
+  "A0-02 cannot close while the E0 adapter remains");
+expect(alpha.general_lexer_ready === true,
+  "general alpha lexer progress record lost");
+expect(alpha.general_header_parser_ready === true,
+  "general module-header parser progress record lost");
+expect(alpha.general_declaration_parser_ready === false,
+  "declaration parser claimed ready before implementation");
 expect(status.development_assurance_model === "internal-self-attestation",
   "project status lost internal assurance model");
 expect(status.internal_certification_status === "not-ready",
@@ -42,10 +49,10 @@ expect(alpha.required_examples.join(",") ===
   "minimum-age,grit-stage1-publication", "required example drift");
 
 const packages = alpha.work_packages;
-expect(Array.isArray(packages) && packages.length === 10,
+expect(Array.isArray(packages) && packages.length === 6,
   "unexpected work-package ledger");
 expect(packages.map((item) => item.id).join(",") ===
-  "A0-01,A0-02,A0-03,A0-04,A0-05,A0-06,A0-07,A0-08,A0-09,A0-10",
+  "A0-01,A0-02,A0-03,A0-04,A0-05,A0-06",
   "work-package order drift");
 expect(packages.filter((item) => item.state === "active").length === 1,
   "exactly one alpha work package must be active");
@@ -57,7 +64,7 @@ for (const forbidden of [
   "product_authority", "production_authority"
 ]) expect(status[forbidden] === false, `${forbidden} granted during A0`);
 
-expect(scope.includes("A0 completion alone does not close F0, authorize F1"),
+expect(scope.includes("A0 completion does not close F0 or make Seki live-eligible"),
   "scope lost its gate boundary");
 expect(adr.includes("The solution is not to weaken F0"),
   "decision rationale drift");

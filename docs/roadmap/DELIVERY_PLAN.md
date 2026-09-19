@@ -1,11 +1,12 @@
 # Seki controlled delivery plan
 
-- Plan version: 0.3
+- Plan version: 0.4
 - Date: 2026-09-19
-- Status: active bootstrap plan
+- Status: bootstrap complete; A0 active
 - Language identity: `io.frogfish.seki/language@0`
 - Governing design input: Seki v0.3 project seed
-- Current gate: global F0 open
+- Current delivery gate: A0 usable-alpha construction
+- Current deferred pre-live gate: global F0 open
 
 ## 1. Objective
 
@@ -16,8 +17,21 @@ material, and checksum-closed manifests. Authority-bearing use requires the
 claims and certificates defined by the selected qualification profile.
 
 This plan turns the seed's F0–F8 ladder into executable project work. It does not
-weaken or replace the seed charter. A later plan revision may clarify work but
-cannot silently expand a phase's authority.
+silently expand a phase's authority. ADR 0022 explicitly revises the seed's gate
+ordering: internal implementation and proof construction precede external field
+validation, while all production and live authority remains blocked by it.
+
+The operative dependency order is:
+
+```text
+B0 -> E0 -> A0 -> F1 -> F2 -> F3 -> F4 -> F5 -> R0
+                                                  |
+                                                  v
+                                      F6 + F7 field validation
+                                                  |
+                                                  v
+                                           F0 closure -> F8
+```
 
 ## 2. Operating rules
 
@@ -129,9 +143,9 @@ Create a reproducible project shell without claiming implementation authority.
 | B0-08 | W-REL | Bind exact Lean 4.30.0 source/archive identity and license. | done; source bound, installation/qualification pending |
 | B0-09 | W-REL | Bind exact Rocq 9.2.0 source/archive identity and license. | done; source bound, installation/qualification pending |
 | B0-10 | W-REL | Resolve CompCert 3.18 acquisition, use, and redistribution policy. | done; user-supplied, no full redistribution |
-| B0-11 | W-REL | Adopt reviewed Seki runtime/output exception text. | pending |
+| B0-11 | W-REL | Adopt reviewed Seki runtime/output exception text. | done; Seki Generated Output Exception 1.0 |
 | B0-12 | W-C | Write the C11 engineering standard and build/test matrix. | done; compiler matrix awaits code/toolchain pins |
-| B0-13 | W-TEST | Add clean-room CI with pinned container/image identity. | pending |
+| B0-13 | W-TEST | Add clean-room CI with pinned container/image identity. | done; Linux/amd64 image and checkout action commit locked |
 | B0-14 | W-SPEC | Record treatment of local `contrib` materials. | done; transient ignored reference |
 
 ### Required artifacts
@@ -144,9 +158,9 @@ Create a reproducible project shell without claiming implementation authority.
 
 ### Exit criteria
 
-B0 is complete when B0-08 through B0-14 are resolved, the seed verifies in the
-pinned clean-room environment, and no foundational dependency or contributed
-input has an unknown use boundary.
+B0 completed on 2026-09-19: B0-08 through B0-14 are resolved, the seed and
+bootstrap portfolio verify in the pinned clean-room environment, and no
+foundational dependency or contributed input has an unknown use boundary.
 
 B0 completion does not close F0 or authorize F1.
 
@@ -219,10 +233,6 @@ grants no implementation, proof, native-binary, product, or production authority
 | A0-04 | W-CUST/W-TEST | Compile and exercise the Grit Stage 1 publication coordinator. | pending |
 | A0-05 | W-REL | Produce deterministic, manifest-bound build and artifact bundles. | pending |
 | A0-06 | W-CUST | Write a clean-checkout consumer quickstart and diagnostics guide. | pending |
-| A0-07 | W-REL | Internally certify the exact release candidate with a checksum-bound self-attestation. | pending |
-| A0-08 | W-CUST | Have Gnosis, Kiku, and Grit use the exact candidate on representative real workloads. | pending |
-| A0-09 | W-C/W-TEST | Resolve field findings and re-attest every affected candidate. | pending |
-| A0-10 | W-CUST/W-REL | Bind F0 field evidence and record the separate go-live eligibility decision. | pending |
 
 ### Exit gate
 
@@ -231,38 +241,39 @@ deterministic candidate typed-core and restricted-C11 artifacts, reject the
 hostile portfolio, and pass the clean-checkout consumer quickstart. Every
 unproved arrow remains explicit.
 
-The project develops without external review until these engineering and
-evidence requirements yield an internally certified release candidate. That
-self-attestation is not independent certification and does not make Seki live.
-The exact candidate must then survive customer field use, finding closure, and
-a separate pre-live decision. A0 completion alone neither closes F0 nor
-authorizes F1.
+The project develops without external review. A0 completion produces a usable
+alpha, not an internally certified release candidate. Its exact evidence may
+atomically authorize F1; it neither closes F0 nor makes Seki live.
 
-## 7. Phase F0 — Charter and independent-consumer freeze
+## 7. Deferred phase F0 — Pre-live field-validation closure
 
 ### Purpose
 
-Demonstrate that Seki's charter serves a materially different bounded decision
-without importing Kiku/Arena semantics into the core.
+Close the pre-live gate using actual field evidence that Seki serves both the
+founding Kiku decision and a materially different bounded decision without
+importing customer semantics into the core. F0 is defined here but executes
+after F6 and F7.
 
 ### Entry criteria
 
-- Kiku acceptance record verifies.
-- Independent review request identifies an actual candidate consumer and case.
+- R0 has internally certified exact installed release-candidate bytes.
+- F6 and F7 exercised those bytes on representative real workloads.
+- The Kiku and independent-consumer findings are closed or explicitly reject
+  live release.
 
 ### Work
 
 | ID | Workstream | Task |
 | --- | --- | --- |
-| F0-01 | W-CUST | Select the independent decision and accountable reviewer. |
-| F0-02 | W-CUST | Record immutable inputs, result, nominal domains, and rejection classes. |
-| F0-03 | W-CUST | Record maximum data, traversal, step, stack, and workspace bounds. |
-| F0-04 | W-SPEC | Map required operations to core versus versioned library. |
-| F0-05 | W-CUST | Confirm the case needs no Kiku, Arena, or GCIR core primitive. |
-| F0-06 | W-CUST | Obtain the exact scoped acceptance or a controlled finding. |
+| F0-01 | W-CUST | Bind the independent field decision, exact candidate, and accountable validator. |
+| F0-02 | W-CUST | Confirm immutable inputs, result, nominal domains, and rejection classes from field use. |
+| F0-03 | W-CUST | Confirm maximum data, traversal, step, stack, and workspace bounds. |
+| F0-04 | W-SPEC | Confirm the core-versus-library operation map against implementation evidence. |
+| F0-05 | W-CUST | Confirm the case introduced no customer-specific core primitive. |
+| F0-06 | W-CUST | Obtain exact scoped field acceptance or a controlled finding. |
 | F0-07 | W-SPEC | Resolve every controlled finding through a charter revision or rejection. |
 | F0-08 | W-REL | Bind acceptance to exact charter bytes and reviewer identity. |
-| F0-09 | W-REL | Update project status and record `seki_f1_implementation_authorized`. |
+| F0-09 | W-REL | Update project status and record product-freeze authorization. |
 
 Current F0 candidate: Grit Stage 1's sole semantic-handoff publication boundary.
 The draft packet fixes the decision shape and future field-validator role.
@@ -283,10 +294,11 @@ The packet contains:
 
 ### Exit gate
 
-F0 closes only when both Kiku and one materially different prospective consumer
-accept the same charter without expanding its claims. The closure record must be
-machine-readable and checksum-bound. `PROJECT_STATUS.json` changes atomically
-with the authorization record.
+F0 closes only when both Kiku and one materially different consumer accept the
+exact fielded release candidate without domain-specific claim expansion. The
+closure record must be machine-readable and checksum-bound. Project status
+changes atomically with product-freeze authorization. F0 never retrospectively
+grants proof authority to artifacts that failed their internal gates.
 
 ## 8. Phase F1 — Lean semantic core
 
@@ -297,8 +309,8 @@ and resource-bound foundation. F1 emits no qualified C backend.
 
 ### Entry criteria
 
-- Global F0 is closed.
-- `seki_f1_implementation_authorized` is recorded.
+- B0 is complete and A0's usable-alpha exit gate is closed.
+- `seki_f1_implementation_authorized` is recorded from internal A0 evidence.
 - Exact Lean toolchain identity and acquisition are locked.
 
 ### Ordered work packages
@@ -508,11 +520,36 @@ state the remaining native trusted computing base honestly.
 Installed bytes reopen to the released portfolio and all unproved native
 components are explicit premises. No customer acceptance follows automatically.
 
+## 12A. Phase R0 — Internal release-candidate certification
+
+### Purpose
+
+Issue the project's checksum-bound self-attestation for exact installed
+release-candidate bytes before any customer field validation. Internal
+certification is not independent certification and grants no live authority.
+
+### Work packages
+
+| ID | Deliverable |
+| --- | --- |
+| R0-01 | Exact source, compiler, proof, generated-artifact, installation, and dependency manifest. |
+| R0-02 | Machine-readable inventory of proved claims, tests, trusted premises, exclusions, and unproved arrows. |
+| R0-03 | Clean-room reproduction of every authority-relevant artifact and report. |
+| R0-04 | Identity-bound project self-attestation naming the exact candidate bytes. |
+| R0-05 | Invalidation rule requiring affected gates and attestation to repeat after any change. |
+
+### Exit gate
+
+Every required internal gate passes for the exact installed candidate, its trust
+report has no unexplained entry, and the self-attestation reopens from committed
+bytes. R0 authorizes F6/F7 field validation only; it does not authorize live use.
+
 ## 13. Phase F6 — Kiku reference vertical
 
 ### Purpose
 
-Qualify the founding Kiku Arena decision through the full installed pipeline.
+Field-validate the founding Kiku Arena decision through the internally certified
+installed pipeline.
 
 ### Required evidence
 
@@ -526,27 +563,37 @@ Qualify the founding Kiku Arena decision through the full installed pipeline.
 
 ### Exit gate
 
-Kiku accepts the exact installed vertical. This grants no authority to unrelated
-Seki modules or consumers.
+Kiku accepts or records controlled findings against the exact installed
+candidate. Findings invalidate affected R0 attestations until corrected and
+re-attested. This grants no authority to unrelated Seki modules or consumers.
 
 ## 14. Phase F7 — Independent vertical
 
 ### Purpose
 
-Qualify the materially different F0 consumer case through the same complete
-pipeline and demonstrate that no Kiku-specific semantics entered the core.
+Field-validate the materially different F0 consumer case through the same
+complete pipeline and demonstrate that no Kiku-specific semantics entered the
+core.
 
 ### Exit gate
 
-The independent consumer accepts its exact installed vertical; shared core
-changes, if any, are demonstrably domain-neutral and both verticals continue to
-pass without claim expansion.
+The independent consumer accepts or records controlled findings against its
+exact installed candidate. Shared core changes, if any, are demonstrably
+domain-neutral, repeat affected R0 gates, and both verticals continue to pass
+without claim expansion.
 
 ## 15. Phase F8 — Product freeze
 
 ### Purpose
 
 Produce the first releasable, versioned Seki profile with two qualified verticals.
+
+### Entry criteria
+
+- F6 and F7 field validation completed on internally certified bytes.
+- Global F0 closed with exact acceptance and finding-closure records.
+- Project status explicitly authorizes product freeze while live eligibility
+  remains false until the F8 exit gate closes.
 
 ### Work packages
 
@@ -647,30 +694,15 @@ The next tasks, in dependency order, are:
 2. **A0-03:** implement the exact alpha subset and its positive/hostile suite.
 3. **A0-04:** compile and execute the proposed Grit publication kernel.
 4. **A0-05/A0-06:** make the result reproducible and usable from a clean checkout.
-5. **A0-07:** complete the internal evidence ledger and attest the exact release
-   candidate without claiming independent certification.
-6. **A0-08/F0:** have Gnosis, Kiku, and Grit use the exact candidate in anger;
-   capture corrections to the data, bounds, rejection inventory, and tooling.
-7. **F1-A01/F1-A02 draft review:** review the initial typed-core declaration,
-   expression, admission, and fixture drafts without claiming F1 start.
-8. **F1-A04/F1-A06:** review the explicit single-payload binder rule and indexed
-   rejection-precedence model.
-9. **B0-08/B0-09:** bind Lean and Rocq exact sources and licenses.
-10. **B0-10:** resolve the CompCert acquisition/use profile.
-11. **Completed experimentally:** add a separate syntax-directed checker that
-   reopens imported signatures, expression types, kernel decisions, and exact
-   resource tuples over the three current positive fixtures and eight isolated
-   semantic hostile cases.
-12. **Semantic bootstrap slices completed experimentally.** Record/payload,
-   arithmetic/control, construction/access, array traversal, workspace,
-   kernel-control, and the checked node audit are complete; all 65 tags have
-   positive evidence. Module/profile and bundle-graph ceilings, checked `U32`
-   bound arithmetic, fixed type formation/equality, empty-form policy, source-byte
-   authority, and publication coupling now have explicit rules and executable
-   checks. This is fixture evidence, not a proof or admission freeze.
-13. Close field findings, re-attest changed bytes, assemble the final F0 record,
-    and make the separate pre-live decision.
+5. **A0 exit:** bind the alpha evidence and atomically authorize F1 internal work.
+6. **F1-F5:** freeze and prove semantics, representation, restricted C,
+   invocation certificates, and installed artifacts in dependency order.
+7. **R0:** internally certify the exact installed release-candidate bytes.
+8. **F6/F7:** have Kiku and the independent Grit case use those bytes in anger;
+   close findings and repeat affected R0 gates after changes.
+9. **F0/F8:** bind field acceptance, authorize product freeze, and make the
+   separate go-live decision.
 
-E0, A0, and tasks 7–12 are bootstrap/specification work and may proceed while
-F0 is open. No F1 start, completion, or authority claim may be made until task
-13 closes the gate.
+F0 remains open during A0 and internal F1-F5/R0 delivery. This blocks product
+freeze and live authority, not internally controlled implementation and proof
+work. No phase inherits authority from a later gate.

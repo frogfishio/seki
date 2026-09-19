@@ -1,6 +1,6 @@
 # ADR 0003: Customer-controlled generated artifacts
 
-- Status: accepted; exact runtime-exception text pending legal review
+- Status: accepted; Seki Generated Output Exception 1.0 adopted
 - Date: 2026-09-11
 
 ## Context
@@ -35,13 +35,12 @@ Runtime Library Exception.
 - Make each delivery manifest report copied and linked licensed material.
 - Put an explicit output notice in generated artifacts without asserting
   ownership over customer material.
-- Adopt legally reviewed exception text before distributing any Seki-owned
-  runtime or template material as part of customer output.
+- Bind the adopted exception identity in every distributed output containing
+  Seki-owned runtime or template material.
 
 The GCC Runtime Library Exception cannot simply be renamed or edited: its
-published text defines GCC and forbids modification. Seki therefore needs its
-own reviewed additional permission implementing the same customer-freedom
-policy. Until that instrument is adopted, qualified output must contain no
-Seki-owned runtime or template material whose inclusion would restrict the
-customer's chosen terms.
-
+published text defines GCC and forbids modification. Seki therefore adopts its
+own original additional permission implementing the same customer-freedom
+policy: `SEKI_OUTPUT_EXCEPTION`, version 1.0. It applies only to Generated Output
+and Seki Output Material as defined there; it does not relicense the compiler, a
+standalone runtime or library, or third-party works.

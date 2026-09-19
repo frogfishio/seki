@@ -10,10 +10,9 @@ permissions:
 jobs:
   seed-and-status:
     runs-on: ubuntu-24.04
+    container:
+      image: docker.io/library/node:22-bookworm@sha256:ae9f58d5c9f5a537110310be6b3cf67cf9c67146a3bb9310c0cb515fe71c8392
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Run bootstrap checks
         run: make check

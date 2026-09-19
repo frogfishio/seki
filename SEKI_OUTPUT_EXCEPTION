@@ -1,0 +1,46 @@
+Seki Generated Output Exception, version 1.0
+
+Copyright (C) 2026 Seki contributors
+
+This Exception is an additional permission under section 7 of the GNU General
+Public License, version 3 ("GPLv3").
+
+0. Definitions
+
+"Seki Compiler" means a program distributed by the Seki project under GPLv3 or
+GPLv3-or-later that translates a Seki module or canonical Seki typed core into
+another representation.
+
+"Generated Output" means an output produced by running the Seki Compiler on
+input supplied by a user, including generated C source, headers, formal
+definitions, proof material, manifests, and certificates.
+
+"Seki Output Material" means copyrightable material owned by Seki contributors
+that the Seki Compiler copies into Generated Output for the purpose of making
+that output usable. It does not include the Seki Compiler itself, a standalone
+Seki runtime or library, or third-party material.
+
+1. Additional permission
+
+When you create Generated Output, you may use, reproduce, modify, and convey
+that Generated Output, including any Seki Output Material contained in it, under
+terms of your choice. Those terms need not be GPL-compatible and need not require
+the Generated Output to be licensed under GPLv3.
+
+This permission does not claim ownership of user-supplied input or of material
+derived from that input. Running the Seki Compiler does not change the ownership
+or licensing of either the input or the Generated Output.
+
+2. Boundaries
+
+This Exception grants no permission for the Seki Compiler itself, for a
+standalone Seki runtime or library, or for third-party material. Those works
+remain governed by their applicable licenses. Merely aggregating or linking a
+separate work with Generated Output does not bring that separate work within
+this Exception.
+
+If you modify Seki Output Material outside the Generated Output in which it was
+provided, that separate copy remains governed by GPLv3 unless another permission
+applies. You may remove this additional permission from a copy as GPLv3 section
+7 permits.
+

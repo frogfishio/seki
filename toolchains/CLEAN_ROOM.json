@@ -1,0 +1,23 @@
+{
+  "schema": "io.frogfish.seki/clean-room@1",
+  "status": "pinned-bootstrap-environment",
+  "platform": "linux/amd64",
+  "image": "docker.io/library/node:22-bookworm@sha256:ae9f58d5c9f5a537110310be6b3cf67cf9c67146a3bb9310c0cb515fe71c8392",
+  "image_index_sha256": "db06b62399bc4780e3f44aa0ce27e1678145cf0b16354508b8d83e72f5b9dd83",
+  "image_manifest_sha256": "ae9f58d5c9f5a537110310be6b3cf67cf9c67146a3bb9310c0cb515fe71c8392",
+  "image_observed": "2026-09-19",
+  "checkout_action_commit": "11d5960a326750d5838078e36cf38b85af677262",
+  "commands": [
+    "make check"
+  ],
+  "scope": "bootstrap-repository-checks",
+  "formal_foundations_included": false,
+  "qualification_authority": false,
+  "last_local_execution": {
+    "date": "2026-09-19",
+    "command": "make check",
+    "result": "pass",
+    "source_state": "mounted-working-tree",
+    "docker_server_version": "29.6.2"
+  }
+}

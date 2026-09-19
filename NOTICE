@@ -5,9 +5,9 @@ This project is licensed under the GNU General Public License, version 3 or
 (at your option) any later version. See LICENSE.
 
 Running the Seki compiler does not change the ownership or licensing of a
-customer's input module or generated artifacts. Any Seki-owned runtime or
-template material copied into an output requires the separate output exception
-described in docs/licensing/OUTPUT_POLICY.md.
+customer's input module or generated artifacts. Seki-owned runtime or template
+material copied into Generated Output is covered by the Seki Generated Output
+Exception 1.0 in SEKI_OUTPUT_EXCEPTION, subject to the boundaries stated there.
 
 The files under SEKI_V0_3_PROJECT_SEED preserve the accepted design seed and
 its provenance. Gnosis and Kiku jointly specified that seed as founding

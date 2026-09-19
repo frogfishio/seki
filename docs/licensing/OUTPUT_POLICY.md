@@ -1,6 +1,6 @@
 # Generated-output policy
 
-Status: policy accepted; runtime-exception legal text pending
+Status: policy and Seki Generated Output Exception 1.0 adopted
 
 ## Customer ownership and choice
 
@@ -16,17 +16,13 @@ runtime, header, or template material. Seki will follow the GCC model by
 granting an explicit additional permission for that material so generated
 kernels can be embedded and conveyed under the customer's chosen terms.
 
-The exact Seki exception must be reviewed and adopted before affected material
-is distributed. The existing GCC Runtime Library Exception is not copied or
-modified because its terms specifically define GCC and its license text says
-that changing it is not allowed.
-
-Until the Seki exception is adopted, the generator must either:
-
-1. emit artifacts containing no copyrightable Seki-owned material; or
-2. mark the output unqualified and prevent its distribution as a release
-   artifact.
+The project-owned exception is
+[`SEKI_OUTPUT_EXCEPTION`](../../SEKI_OUTPUT_EXCEPTION). It is an original GPLv3
+section 7 additional permission implementing this policy; the GCC Runtime
+Library Exception was not copied or modified because its terms specifically
+define GCC and its license text says that changing it is not allowed.
 
 Every future delivery manifest must distinguish customer-derived output from
-Seki-owned runtime or template material and report the license of the latter.
-
+Seki-owned runtime or template material and report the license and exception
+identity of the latter. Standalone compiler, runtime, and library artifacts are
+not generated output and retain their applicable licenses.

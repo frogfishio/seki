@@ -6,7 +6,16 @@ import path from "node:path";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "seki-a0-cli-"));
 const compiler = path.join(temporary, "sekic");
-const source = "src/alpha/sekic.c";
+const canonicalSource = "experiments/e0-vs1/minimum_age.seki";
+const recordedCore = "experiments/e0-vs1/minimum_age.scb0.hex";
+const recordedC = "experiments/e0-vs1/minimum_age.generated.c";
+const sources = [
+  "src/alpha/sekic.c",
+  "src/alpha/seki_lexer.c",
+  "src/alpha/seki_parser.c",
+  "src/alpha/e0_frontend_adapter.c",
+  "src/alpha/e0_backend_adapter.c",
+];
 const strictFlags = [
   "-std=c11", "-pedantic", "-Wall", "-Wextra", "-Werror",
   "-Wconversion", "-Wsign-conversion", "-Wshadow", "-Wstrict-prototypes",
@@ -18,39 +27,82 @@ function run(args) {
 }
 
 try {
-  execFileSync("cc", [...strictFlags, source, "-o", compiler], {
-    stdio: "inherit",
-  });
+  execFileSync("cc", [
+    ...strictFlags,
+    "-Isrc/alpha",
+    ...sources,
+    "-o", compiler,
+  ], { stdio: "inherit" });
 
   const version = run(["--version"]);
   assert.equal(version.status, 0);
   assert.equal(version.stderr, "");
   assert.equal(version.stdout,
-    "sekic 0.0.0-alpha.1 (provisional, authority=none)\n");
+    "sekic 0.0.0-alpha.2 (provisional, authority=none)\n");
 
   const help = run(["--help"]);
   assert.equal(help.status, 0);
   assert.match(help.stdout, /^usage:\n/u);
   assert.equal(help.stderr, "");
 
-  for (const [name, args] of [
-    ["check", ["check", "input.seki"]],
-    ["build", ["build", "--core", "out.scb0", "--c", "out.c", "input.seki"]],
-    ["inspect", ["inspect", "input.scb0"]],
-  ]) {
-    const result = run(args);
-    assert.equal(result.status, 69, `${name} did not fail closed`);
-    assert.equal(result.stdout, "");
-    assert.match(result.stderr,
-      new RegExp(`^A0-CLI-0002: ${name} is not connected`, "u"));
-  }
+  const checked = run(["check", canonicalSource]);
+  assert.equal(checked.status, 0, checked.stderr);
+  assert.equal(checked.stdout, "");
+  assert.equal(checked.stderr, "");
 
-  const bad = run(["build", "input.seki"]);
+  const hostileSource = path.join(temporary, "hostile.seki");
+  fs.writeFileSync(hostileSource,
+    fs.readFileSync(canonicalSource, "utf8").replace("< 18", "< 256"));
+  const hostile = run(["check", hostileSource]);
+  assert.equal(hostile.status, 65);
+  assert.match(hostile.stderr,
+    /^A0-SOURCE-0001:.*:\d+:\d+: minimum-age literal does not fit U8\n$/u);
+
+  const duplicateHeader = path.join(temporary, "duplicate-header.seki");
+  fs.writeFileSync(duplicateHeader,
+    fs.readFileSync(canonicalSource, "utf8").replace(
+      "semantic_evaluation, lean_projection, restricted_c_source",
+      "semantic_evaluation, semantic_evaluation, restricted_c_source"));
+  const duplicate = run(["check", duplicateHeader]);
+  assert.equal(duplicate.status, 65);
+  assert.match(duplicate.stderr,
+    /^A0-PARSE-0007:.*:\d+:\d+: duplicate header name\n$/u);
+
+  const corePath = path.join(temporary, "minimum_age.scb0");
+  const cPath = path.join(temporary, "minimum_age.c");
+  const built = run([
+    "build", "--core", corePath, "--c", cPath, canonicalSource,
+  ]);
+  assert.equal(built.status, 0, built.stderr);
+  assert.equal(built.stdout, "");
+  assert.equal(built.stderr, "");
+  assert.deepEqual(fs.readFileSync(corePath),
+    Buffer.from(fs.readFileSync(recordedCore, "ascii").trim(), "hex"));
+  assert.deepEqual(fs.readFileSync(cPath), fs.readFileSync(recordedC));
+
+  const inspected = run(["inspect", corePath]);
+  assert.equal(inspected.status, 0, inspected.stderr);
+  assert.equal(inspected.stderr, "");
+  assert.equal(inspected.stdout,
+    "adapter=e0-vs1\n" +
+    "profile=c11_bounded@1\n" +
+    "threshold_u8=18\n" +
+    "authority=none\n");
+
+  const overwrite = run([
+    "build", "--core", corePath, "--c", cPath, canonicalSource,
+  ]);
+  assert.equal(overwrite.status, 74);
+  assert.match(overwrite.stderr, /^A0-IO-0002:/u);
+
+  const bad = run(["build", canonicalSource]);
   assert.equal(bad.status, 64);
   assert.match(bad.stderr, /^usage:\n/u);
 
-  console.log("seki_alpha_cli=verified version=0.0.0-alpha.1 commands=4 connected=0");
+  console.log(
+    "seki_alpha_cli=verified version=0.0.0-alpha.2 commands=4 connected=3 " +
+    "adapter=e0-vs1 overwrite=reject",
+  );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });
 }
-
