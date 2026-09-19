@@ -177,11 +177,11 @@
 - A0-01 fixes the alpha subset, CLI intent, usability test, six-package work
   ledger, and claim ceiling. It requires both the minimum-age and Grit Stage 1
   publication kernels to pass through one general compiler.
-- A0-02 now has a strictly compiled `sekic 0.0.0-alpha.3` vertical. `check`,
+- A0-02 now has a strictly compiled `sekic 0.0.0-alpha.4` vertical. `check`,
   `build`, and `inspect` execute through an in-process C API; `build` reproduces
   the exact E0 typed-core and restricted-C bytes and rejects existing or aliased
   outputs. Inspection exposes `frontend=alpha-minimum-age` and
-  `backend=e0-vs1`, keeping the remaining backend boundary explicit.
+  `backend=alpha-minimum-age`.
 - The first adapter-independent A0-02 component is complete: a name-agnostic,
   allocation-free lexer covers the candidate grammar's identifiers, checked
   `U32` numbers, hexadecimal strings, comments, newlines, delimiters, and
@@ -207,8 +207,11 @@
 - The live `sekic` frontend no longer links the E0 source parser. A new bounded
   core emitter maps the checked minimum-age AST to the exact 417-byte SCB-0
   regression artifact; changing the threshold to 19 changes both the core and
-  generated C. Core emission remains shape-limited and C projection remains on
-  the E0 backend adapter.
+  generated C. Core emission remains shape-limited.
+- The live compiler no longer links the E0 backend adapter. Its alpha backend
+  independently validates the complete SCB-0 minimum-age slice, reconstructs a
+  restricted-C model, and prints the exact 524-byte regression output. Bad
+  magic and payload-length mutations reject before inspection or C generation.
 - Complete-module parsing is now mandatory on the live path. Unsupported
   declarations and trailing source reject instead of disappearing beyond a
   parsed prefix, closing a dependency that had previously been covered by the

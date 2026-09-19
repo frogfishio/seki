@@ -2,20 +2,20 @@
  * Seki A0 command-line shell.
  *
  * Provisional bootstrap software with no implementation, proof, or production
- * authority. The connected frontend is the alpha minimum-age semantic slice;
- * restricted-C projection still uses the E0 backend adapter. A0-02 remains
- * open until the complete general compiler core replaces that narrow path.
+ * authority. The connected frontend and backend implement the alpha
+ * minimum-age semantic slice. A0-02 remains open until the complete general
+ * compiler core replaces that narrow path.
  */
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "e0_adapter.h"
+#include "seki_c_backend.h"
 #include "seki_checker.h"
 #include "seki_core.h"
 #include "seki_parser.h"
 
-#define SEKI_A0_VERSION "0.0.0-alpha.3"
+#define SEKI_A0_VERSION "0.0.0-alpha.4"
 #define SEKI_A0_SOURCE_CAPACITY 65536U
 
 enum exit_status {
@@ -102,15 +102,10 @@ write_new_file(const char *path, const void *bytes, size_t length)
 }
 
 static void
-print_diagnostic(const char *path, const struct seki_e0_diagnostic *diagnostic)
+print_backend_error(const char *path, const struct seki_backend_error *error)
 {
-    if (diagnostic->line != 0U) {
-        (void)fprintf(stderr, "%s:%s:%zu:%zu: %s\n", diagnostic->code,
-            path, diagnostic->line, diagnostic->column, diagnostic->message);
-    } else {
-        (void)fprintf(stderr, "%s:%s:%zu: %s\n", diagnostic->code,
-            path, diagnostic->offset, diagnostic->message);
-    }
+    (void)fprintf(stderr, "%s:%s:%zu: %s\n", error->code, path,
+        error->offset, error->message);
 }
 
 static int
@@ -152,7 +147,7 @@ compile_source(const char *path, unsigned char *core, size_t *core_length)
 static int
 check_command(const char *input_path)
 {
-    unsigned char core[SEKI_E0_CORE_CAPACITY];
+    unsigned char core[SEKI_CORE_CAPACITY];
     size_t core_length = 0U;
 
     return compile_source(input_path, core, &core_length);
@@ -162,11 +157,11 @@ static int
 build_command(const char *input_path, const char *core_path,
     const char *c_path)
 {
-    unsigned char core[SEKI_E0_CORE_CAPACITY];
-    char c_source[SEKI_E0_C_CAPACITY];
+    unsigned char core[SEKI_CORE_CAPACITY];
+    char c_source[SEKI_C_SOURCE_CAPACITY];
     size_t core_length = 0U;
     size_t c_length = 0U;
-    struct seki_e0_diagnostic diagnostic;
+    struct seki_backend_error backend_error;
     int status;
 
     if (strcmp(core_path, c_path) == 0 || path_exists(core_path) ||
@@ -179,10 +174,11 @@ build_command(const char *input_path, const char *core_path,
     if (status != EXIT_OK) {
         return status;
     }
-    if (!seki_e0_core_to_c(core, core_length, c_source, sizeof c_source,
-        &c_length, &diagnostic)) {
-        print_diagnostic(input_path, &diagnostic);
-        return diagnostic.code[3] == 'I' ? EXIT_INTERNAL : EXIT_DATA;
+    if (!seki_core_to_c(core, core_length, c_source, sizeof c_source,
+        &c_length, &backend_error)) {
+        print_backend_error(input_path, &backend_error);
+        return strcmp(backend_error.code, "A0-BACKEND-0002") == 0 ?
+            EXIT_INTERNAL : EXIT_DATA;
     }
     if (!write_new_file(core_path, core, core_length)) {
         (void)fprintf(stderr, "A0-IO-0003:%s: cannot create core output\n",
@@ -201,10 +197,10 @@ build_command(const char *input_path, const char *core_path,
 static int
 inspect_command(const char *input_path)
 {
-    unsigned char core[SEKI_E0_CORE_CAPACITY];
+    unsigned char core[SEKI_CORE_CAPACITY];
     size_t core_length = 0U;
-    struct seki_e0_diagnostic diagnostic;
-    struct seki_e0_inspection inspection;
+    struct seki_backend_error backend_error;
+    struct seki_core_inspection inspection;
 
     if (!read_bounded(input_path, core, sizeof core, &core_length)) {
         (void)fprintf(stderr,
@@ -212,13 +208,13 @@ inspect_command(const char *input_path)
             input_path, (unsigned)sizeof core);
         return EXIT_IO;
     }
-    if (!seki_e0_inspect_core(core, core_length, &inspection, &diagnostic)) {
-        print_diagnostic(input_path, &diagnostic);
+    if (!seki_inspect_core(core, core_length, &inspection, &backend_error)) {
+        print_backend_error(input_path, &backend_error);
         return EXIT_DATA;
     }
     (void)printf(
         "frontend=alpha-minimum-age\n"
-        "backend=e0-vs1\n"
+        "backend=alpha-minimum-age\n"
         "profile=c11_bounded@%u\n"
         "threshold_u8=%u\n"
         "authority=none\n",

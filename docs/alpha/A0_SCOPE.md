@@ -65,13 +65,14 @@ closed with a stable diagnostic identifier and nonzero status.
 The CLI spelling is provisional. Alpha bundles record its exact revision and
 invocation; scripts must not treat it as a stable public API.
 
-Revision `0.0.0-alpha.3` connects `check`, `build`, and `inspect` through an
+Revision `0.0.0-alpha.4` connects `check`, `build`, and `inspect` through an
 in-process C API. The live frontend no longer invokes the E0 source parser: it
 emits the exact E0 typed-core bytes from the alpha AST after the independent
-checker succeeds. Restricted-C projection and inspection still use the E0
-backend. Inspection reports both boundaries as `frontend=alpha-minimum-age` and
-`backend=e0-vs1`. The CLI reports stable A0 diagnostics and refuses existing or
-aliased output paths.
+checker succeeds. The alpha backend independently decodes and fully validates
+those bytes into a restricted-C model before printing C. Neither E0 adapter is
+linked into the live compiler. Inspection reports both boundaries as
+`frontend=alpha-minimum-age` and `backend=alpha-minimum-age`. The CLI reports
+stable A0 diagnostics and refuses existing or aliased output paths.
 
 The replacement path has begun with `src/alpha/seki_lexer.c`: an allocation-free,
 name-agnostic lexer for the candidate grammar. It handles CR, LF, and CRLF source,
@@ -97,9 +98,8 @@ and relates terminal values and rejection constructors to `Decision[A, R]` and
 the ordered rejection inventory. `src/alpha/seki_core.c` then constructs SCB-0
 from that checked AST. It reproduces the 417-byte regression artifact exactly,
 while a threshold mutation changes both core and projected C. The core emitter
-still recognizes the minimum-age semantic shape and the visibly labelled E0
-backend still performs restricted-C generation; this is not yet the complete A0
-expression language or a general compiler core.
+and independent backend still recognize the minimum-age semantic shape; this is
+not yet the complete A0 expression language or a general compiler core.
 
 The live entry point requires end-of-file after the supported declarations.
 Unknown declarations and trailing tokens fail as `A0-PARSE-0034`; no later

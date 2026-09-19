@@ -16,12 +16,14 @@ a minimal restricted-C AST to deterministic C11. Neither defines a frozen
 compiler architecture or conformance boundary.
 
 The `alpha/` directory contains the provisional `sekic` CLI. Revision
-`0.0.0-alpha.3` runs the general lexer/parser and the minimum-age semantic checker
+`0.0.0-alpha.4` runs the general lexer/parser and the minimum-age semantic checker
 before `alpha/seki_core.c` emits SCB-0 directly from the checked AST. The
 immutable E0 frontend is no longer linked into `sekic`; its exact 417-byte output
-remains a regression oracle. Restricted-C projection and inspection still use
-the E0 backend adapter. This is an A0-02 increment, not its exit: core emission
-still recognizes only the minimum-age semantic shape.
+remains a regression oracle. `alpha/seki_c_backend.c` independently reopens the
+SCB-0 bytes into a restricted-C model, validates the complete slice, and emits
+the exact established C. Neither E0 adapter is linked into `sekic`. This is an
+A0-02 increment, not its exit: both directions still recognize only the
+minimum-age semantic shape.
 
 `alpha/seki_lexer.c` is the first adapter-independent compiler component. It is
 allocation-free, contains no module or declaration names, and tokenizes the
@@ -37,6 +39,6 @@ and condition types, and checks terminal decisions. `alpha/seki_core.c` maps tha
 checked minimum-age AST to the exact established SCB-0 bytes, including a
 source-derived threshold and declared resource ceilings. The rest of the
 expression language and general typed-core construction remain open; C projection
-is still adapter-backed until the general backend exists.
+is now independent but remains limited to the same minimum-age slice.
 The live parser requires end-of-file after the supported module and rejects all
 unknown or trailing top-level syntax.

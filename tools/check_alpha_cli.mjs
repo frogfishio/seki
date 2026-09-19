@@ -15,7 +15,7 @@ const sources = [
   "src/alpha/seki_parser.c",
   "src/alpha/seki_checker.c",
   "src/alpha/seki_core.c",
-  "src/alpha/e0_backend_adapter.c",
+  "src/alpha/seki_c_backend.c",
 ];
 const strictFlags = [
   "-std=c11", "-pedantic", "-Wall", "-Wextra", "-Werror",
@@ -39,7 +39,7 @@ try {
   assert.equal(version.status, 0);
   assert.equal(version.stderr, "");
   assert.equal(version.stdout,
-    "sekic 0.0.0-alpha.3 (provisional, authority=none)\n");
+    "sekic 0.0.0-alpha.4 (provisional, authority=none)\n");
 
   const help = run(["--help"]);
   assert.equal(help.status, 0);
@@ -108,10 +108,27 @@ try {
   assert.equal(inspected.stderr, "");
   assert.equal(inspected.stdout,
     "frontend=alpha-minimum-age\n" +
-    "backend=e0-vs1\n" +
+    "backend=alpha-minimum-age\n" +
     "profile=c11_bounded@1\n" +
     "threshold_u8=18\n" +
     "authority=none\n");
+
+  const badMagicPath = path.join(temporary, "bad-magic.scb0");
+  const badMagicCore = fs.readFileSync(corePath);
+  badMagicCore[0] ^= 0xff;
+  fs.writeFileSync(badMagicPath, badMagicCore);
+  const badMagic = run(["inspect", badMagicPath]);
+  assert.equal(badMagic.status, 65);
+  assert.match(badMagic.stderr,
+    /^A0-BACKEND-0001:.*:\d+: bad SCB-0 magic\n$/u);
+
+  const trailingPath = path.join(temporary, "trailing.scb0");
+  fs.writeFileSync(trailingPath,
+    Buffer.concat([fs.readFileSync(corePath), Buffer.from([0])]));
+  const trailing = run(["inspect", trailingPath]);
+  assert.equal(trailing.status, 65);
+  assert.match(trailing.stderr,
+    /^A0-BACKEND-0001:.*:\d+: SCB-0 payload length mismatch\n$/u);
 
   const overwrite = run([
     "build", "--core", corePath, "--c", cPath, canonicalSource,
@@ -124,8 +141,8 @@ try {
   assert.match(bad.stderr, /^usage:\n/u);
 
   console.log(
-    "seki_alpha_cli=verified version=0.0.0-alpha.3 commands=4 connected=3 " +
-    "frontend=alpha-minimum-age backend=e0-vs1 overwrite=reject",
+    "seki_alpha_cli=verified version=0.0.0-alpha.4 commands=4 connected=3 " +
+    "frontend=alpha-minimum-age backend=alpha-minimum-age overwrite=reject",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });
