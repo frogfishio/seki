@@ -156,6 +156,10 @@ C struct in canonical order, a variant contributes no type of its own because
 its cases are the `reason` octet of the decision result, and the kernel
 signature selects the declarations it uses by position.
 
+Short-circuit `&&` and `||` are connected end to end, with `&&` binding tighter
+and both associating to the left. Their operands must both be `Bool`; anything
+else is rejected as `A0-CHECK-0018`.
+
 `Bytes[N]` and `Digest[sha256, 32]` fields project to octet arrays. Their
 equality projects to a comparison whose running time does not depend on where
 the first differing octet lies, because these values are authenticated evidence

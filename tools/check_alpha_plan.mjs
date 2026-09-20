@@ -92,6 +92,8 @@ expect(alpha.octet_identity_fields_ready === true,
   "Bytes and Digest field progress record lost");
 expect(alpha.constant_time_identity_comparison === true,
   "identity comparison lost its data-independent running time");
+expect(alpha.short_circuit_boolean_ready === true,
+  "short-circuit Boolean progress record lost");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",

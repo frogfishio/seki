@@ -597,8 +597,12 @@ take_compare_operator(struct parser *parser,
     return 1;
 }
 
+/*
+ * Comparison does not chain: `a < b < c` has no meaning in the candidate
+ * grammar, so at most one operator is accepted at this level.
+ */
 static uint32_t
-parse_value_expression(struct parser *parser,
+parse_comparison_expression(struct parser *parser,
     struct seki_kernel_decl *kernel)
 {
     uint32_t left = parse_projection_expression(parser, kernel);
@@ -611,6 +615,45 @@ parse_value_expression(struct parser *parser,
         expression.value.compare.operator = operator;
         expression.value.compare.left = left;
         expression.value.compare.right = right;
+        left = add_expression(parser, kernel, &expression);
+    }
+    return left;
+}
+
+/* `&&` binds tighter than `||`, and both associate to the left. */
+static uint32_t
+parse_conjunction_expression(struct parser *parser,
+    struct seki_kernel_decl *kernel)
+{
+    uint32_t left = parse_comparison_expression(parser, kernel);
+    while (!parser->failed && parser->current.kind == SEKI_TOKEN_AND) {
+        struct seki_expression expression;
+        uint32_t right;
+        advance(parser);
+        right = parse_comparison_expression(parser, kernel);
+        memset(&expression, 0, sizeof expression);
+        expression.kind = SEKI_EXPR_AND;
+        expression.value.logical.left = left;
+        expression.value.logical.right = right;
+        left = add_expression(parser, kernel, &expression);
+    }
+    return left;
+}
+
+static uint32_t
+parse_value_expression(struct parser *parser,
+    struct seki_kernel_decl *kernel)
+{
+    uint32_t left = parse_conjunction_expression(parser, kernel);
+    while (!parser->failed && parser->current.kind == SEKI_TOKEN_OR) {
+        struct seki_expression expression;
+        uint32_t right;
+        advance(parser);
+        right = parse_conjunction_expression(parser, kernel);
+        memset(&expression, 0, sizeof expression);
+        expression.kind = SEKI_EXPR_OR;
+        expression.value.logical.left = left;
+        expression.value.logical.right = right;
         left = add_expression(parser, kernel, &expression);
     }
     return left;

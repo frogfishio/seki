@@ -140,6 +140,8 @@ enum seki_expression_kind {
     SEKI_EXPR_NATURAL,
     SEKI_EXPR_FIELD,
     SEKI_EXPR_COMPARE,
+    SEKI_EXPR_AND,
+    SEKI_EXPR_OR,
     SEKI_EXPR_ACCEPT,
     SEKI_EXPR_REJECT,
     SEKI_EXPR_IF
@@ -169,6 +171,10 @@ struct seki_expression {
             uint32_t left;
             uint32_t right;
         } compare;
+        struct {
+            uint32_t left;
+            uint32_t right;
+        } logical;
         struct {
             uint32_t value;
         } accept;

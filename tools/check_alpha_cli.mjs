@@ -409,6 +409,51 @@ try {
   assert.match(ordered.stderr,
     /^A0-CHECK-0004:.*ordered comparison requires numeric operands\n$/u);
 
+  // Short-circuit Boolean operators, with `&&` binding tighter than `||`.
+  const boolSource = path.join(temporary, "bool.seki");
+  const boolCore = path.join(temporary, "bool.scb0");
+  const boolC = path.join(temporary, "bool.c");
+  fs.writeFileSync(boolSource, [
+    "module gate::bool @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export record Entry { age: U8, tier: U8, region: U8 }.",
+    "export variant Denial [ NotEligible @ 1. ].",
+    "",
+    "export kernel screen entry: Entry",
+    "-> Decision[Unit, Denial] arithmetic: checked",
+    "bounded steps: 256 liveBits: 2048 controlDepth: 64 workspaceBits: 0",
+    "rejects: Denial::NotEligible",
+    "publication: none [",
+    "  (entry age) < 18 || (entry tier) == 0 && (entry region) != 7",
+    "    ifTrue: [ reject Denial::NotEligible ] ifFalse: [ accept unit ] ].",
+    "",
+  ].join("\n"));
+  const booleans = run(["build", "--core", boolCore, "--c", boolC, boolSource]);
+  assert.equal(booleans.status, 0, booleans.stderr);
+  const boolDecoded = decodeModule(fs.readFileSync(boolCore));
+  checkTypedCore(boolDecoded);
+  const boolCondition = boolDecoded.kernels[0][1].body[1].term;
+  // `||` is the root and `&&` its right child: precedence, not source order.
+  assert.equal(boolCondition[0], 18);
+  assert.equal(boolCondition[2].term[0], 17);
+  assert.deepEqual(boolDecoded.kernels[0][1].exact, [18, 56, 7, 0]);
+  // The printed C groups explicitly rather than relying on C precedence.
+  assert.match(fs.readFileSync(boolC, "utf8"),
+    /< UINT8_C\(18\) \|\| \(.* && .*\)\) \{/u);
+  execFileSync("cc", [...strictFlags, "-c", boolC, "-o",
+    path.join(temporary, "bool.o")], { stdio: "inherit" });
+
+  // A non-Boolean operand is rejected before any artifact is constructed.
+  const boolBad = path.join(temporary, "bool-bad.seki");
+  fs.writeFileSync(boolBad, fs.readFileSync(boolSource, "utf8")
+    .replace("(entry tier) == 0", "(entry tier)"));
+  const boolBadRun = run(["check", boolBad]);
+  assert.equal(boolBadRun.status, 65);
+  assert.match(boolBadRun.stderr, /^A0-CHECK-0018:/u);
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -483,7 +528,8 @@ try {
     "slice=u8-decision fields=2 rejections=2 renamed=yes overwrite=reject " +
     "operators=4 source_order=canonical table_order=name-derived " +
     "header_vectors=general nested_control=yes exhaustive=65536 " +
-    "widths=u8,u16,u32,u64 declarations=n octets=constant-time",
+    "widths=u8,u16,u32,u64 declarations=n octets=constant-time " +
+    "boolean=short-circuit",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

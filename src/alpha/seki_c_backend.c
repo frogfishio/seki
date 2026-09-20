@@ -41,7 +41,9 @@ enum restricted_term {
     RESTRICTED_UNIT_LIT,
     RESTRICTED_BOOL_LIT,
     RESTRICTED_VARIANT,
-    RESTRICTED_COMPARE
+    RESTRICTED_COMPARE,
+    RESTRICTED_AND_THEN,
+    RESTRICTED_OR_ELSE
 };
 
 struct restricted_expression {
@@ -662,6 +664,13 @@ decode_expression(struct reader *reader, struct restricted_module *module)
         }
         break;
     }
+    case 17U:
+    case 18U:
+        expression.kind = term == 17U ?
+            RESTRICTED_AND_THEN : RESTRICTED_OR_ELSE;
+        expression.a = decode_expression(reader, module);
+        expression.b = decode_expression(reader, module);
+        break;
     case 14U:
     case 15U:
     case 19U: {
@@ -1034,6 +1043,30 @@ text_put_indent(struct text_buffer *output, unsigned depth)
     }
 }
 
+static void print_expression(struct text_buffer *output,
+    const struct restricted_module *module, uint32_t index);
+
+/*
+ * Parenthesises an operand that is itself a short-circuit node, so the printed
+ * C groups exactly as the decoded tree does rather than relying on the reader
+ * to recall C's precedence between `&&` and `||`.
+ */
+static void
+print_logical_operand(struct text_buffer *output,
+    const struct restricted_module *module, uint32_t index)
+{
+    const int nested = (size_t)index < module->kernel.expression_count &&
+        (module->kernel.expressions[index].kind == RESTRICTED_AND_THEN ||
+         module->kernel.expressions[index].kind == RESTRICTED_OR_ELSE);
+    if (nested) {
+        text_put(output, "(");
+    }
+    print_expression(output, module, index);
+    if (nested) {
+        text_put(output, ")");
+    }
+}
+
 static void
 print_expression(struct text_buffer *output,
     const struct restricted_module *module, uint32_t index)
@@ -1104,6 +1137,13 @@ print_expression(struct text_buffer *output,
         print_expression(output, module, expression->b);
         break;
     }
+    case RESTRICTED_AND_THEN:
+    case RESTRICTED_OR_ELSE:
+        print_logical_operand(output, module, expression->a);
+        text_put(output, expression->kind == RESTRICTED_AND_THEN ?
+            " && " : " || ");
+        print_logical_operand(output, module, expression->b);
+        break;
     case RESTRICTED_UNIT_LIT:
     case RESTRICTED_VARIANT:
     default:

@@ -374,6 +374,28 @@ infer_expression(struct checker *checker, uint32_t expression_index,
         record_info(checker, expression_index, inferred.type, 0U, 0U, 0U);
         break;
     }
+    case SEKI_EXPR_AND:
+    case SEKI_EXPR_OR: {
+        const uint32_t boolean = seki_type_intern(&checker->elaboration->types,
+            SEKI_T_BOOL, 0U, 0U);
+        const struct inferred left = infer_expression(checker,
+            expression->value.logical.left, environment);
+        const struct inferred right = infer_expression(checker,
+            expression->value.logical.right, environment);
+        if (checker->failed) {
+            break;
+        }
+        if (boolean == SEKI_TYPE_INVALID || left.is_natural ||
+            right.is_natural || left.type != boolean ||
+            right.type != boolean) {
+            check_fail(checker, "A0-CHECK-0018",
+                "Boolean operands must both have type Bool");
+            break;
+        }
+        inferred.type = boolean;
+        record_info(checker, expression_index, inferred.type, 0U, 0U, 0U);
+        break;
+    }
     default:
         check_fail(checker, "A0-CHECK-0005",
             "kernel control used as a value expression");
@@ -619,6 +641,31 @@ cost_of_expression(struct checker *checker, uint32_t expression_index,
         };
         cost = cost_strict(checker, children, 2U, result_type, environment,
             base);
+        break;
+    }
+    case SEKI_EXPR_AND:
+    case SEKI_EXPR_OR: {
+        /*
+         * Short-circuit control releases the left result before evaluating
+         * the right, so both are charged at the same base and the live peak is
+         * their maximum rather than their sum. The right operand's steps are
+         * still charged: the bound is worst case.
+         */
+        const struct cost left = cost_of_expression(checker,
+            expression->value.logical.left, environment, base);
+        const struct cost right = cost_of_expression(checker,
+            expression->value.logical.right, environment, base);
+        uint32_t steps = 0U;
+        if (!seki_checked_add(left.steps, right.steps, &steps) ||
+            !seki_checked_add(steps, 1U, &cost.steps)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            break;
+        }
+        cost.live = left.live > right.live ? left.live : right.live;
+        cost.depth = (left.depth > right.depth ? left.depth : right.depth) + 1U;
+        cost.workspace = left.workspace > right.workspace ?
+            left.workspace : right.workspace;
         break;
     }
     default:

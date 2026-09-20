@@ -301,6 +301,15 @@
   two-digest kernel derives `(9,1536,5,0)`, which the independent checker
   reproduces, and its generated comparison is verified against every
   single-bit difference across all 32 octets.
+- Short-circuit Boolean operators are connected end to end. `&&` binds tighter
+  than `||`, both associate to the left, and the printed C groups explicitly
+  rather than relying on the reader to recall C precedence. Their cost follows
+  the algebra's short-circuit rule: both operands are charged steps because the
+  bound is worst case, but the left result is released before the right is
+  evaluated, so the live peak is their maximum rather than their sum. A
+  three-field kernel derives `(18,56,7,0)`, which the independent checker
+  reproduces, and its generated C agrees with the stated policy on 692,224
+  sampled input triples.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
@@ -351,10 +360,10 @@ make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 
 Local and pinned Linux/amd64 seed, status, bootstrap-closure, JSON,
 encoding-vector, semantic-coverage, strict-C11, sanitizer, and whitespace checks
-passed on 2026-09-20. The alpha compiler additionally passed 3,200 source and
-3,700 typed-core mutation cases across the minimum-age, nested three-premise,
-wide-integer, four-declaration, and two-digest kernels under AddressSanitizer
-and UndefinedBehaviorSanitizer with no finding, after the two stack-exhaustion
-defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
+passed on 2026-09-20. The alpha compiler additionally passed 3,800 source and
+4,300 typed-core mutation cases across the minimum-age, nested three-premise,
+wide-integer, four-declaration, two-digest, and short-circuit Boolean kernels
+under AddressSanitizer and UndefinedBehaviorSanitizer with no finding, after
+the two stack-exhaustion defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.

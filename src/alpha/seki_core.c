@@ -31,6 +31,8 @@
 #define SEKI_TERM_VARIANT 8U
 #define SEKI_TERM_EQUAL 14U
 #define SEKI_TERM_NOT_EQUAL 15U
+#define SEKI_TERM_AND_THEN 17U
+#define SEKI_TERM_OR_ELSE 18U
 #define SEKI_TERM_COMPARE 19U
 
 /* SCB-0 `KernelExpr` discriminants used by the alpha subset. */
@@ -514,6 +516,13 @@ put_expression(struct emitter *emitter, uint32_t expression_index)
         put_expression(emitter, expression->value.compare.right);
         break;
     }
+    case SEKI_EXPR_AND:
+    case SEKI_EXPR_OR:
+        put_u8(emitter->buffer, expression->kind == SEKI_EXPR_AND ?
+            SEKI_TERM_AND_THEN : SEKI_TERM_OR_ELSE);
+        put_expression(emitter, expression->value.logical.left);
+        put_expression(emitter, expression->value.logical.right);
+        break;
     default:
         emitter->buffer->failed = 1;
         break;
