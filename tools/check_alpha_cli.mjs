@@ -201,6 +201,76 @@ try {
   execFileSync("cc", [...strictFlags, "-c", minimalHeaderC, "-o",
     path.join(temporary, "minimal-header.o")], { stdio: "inherit" });
 
+  // Kernel control nests: a three-premise decision with ordered rejection
+  // precedence compiles end to end, is revalidated by the independent semantic
+  // checker, and is exhaustively compared against the policy it states.
+  const nestedSource = path.join(temporary, "nested.seki");
+  const nestedCore = path.join(temporary, "nested.scb0");
+  const nestedC = path.join(temporary, "nested.c");
+  fs.writeFileSync(nestedSource, [
+    "module gate::nested @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export record Claim { age: U8, tier: U8 }.",
+    "export variant Denial [ Underage @ 1. WrongTier @ 4. Blocked @ 9. ].",
+    "",
+    "export kernel screen claim: Claim",
+    "-> Decision[Unit, Denial] arithmetic: checked",
+    "bounded steps: 128 liveBits: 1024 controlDepth: 64 workspaceBits: 0",
+    "rejects: Denial::Blocked, Denial::Underage, Denial::WrongTier",
+    "publication: none [",
+    "  (claim tier) == 0",
+    "    ifTrue: [ reject Denial::Blocked ]",
+    "    ifFalse: [ (claim age) < 18",
+    "      ifTrue: [ reject Denial::Underage ]",
+    "      ifFalse: [ (claim tier) > 3",
+    "        ifTrue: [ reject Denial::WrongTier ]",
+    "        ifFalse: [ accept unit ] ] ]",
+    "].",
+    "",
+  ].join("\n"));
+  const nested = run([
+    "build", "--core", nestedCore, "--c", nestedC, nestedSource,
+  ]);
+  assert.equal(nested.status, 0, nested.stderr);
+  const nestedDecoded = decodeModule(fs.readFileSync(nestedCore));
+  checkTypedCore(nestedDecoded);
+  // The C derivation of the cost algebra must agree with this module's stored
+  // exact bounds, which the independent checker has just recomputed.
+  assert.deepEqual(nestedDecoded.kernels[0][1].exact, [18, 40, 7, 0]);
+
+  const nestedHarness = path.join(temporary, "nested_main.c");
+  fs.writeFileSync(nestedHarness, [
+    '#include <stdint.h>',
+    '#include <stdio.h>',
+    '#include "nested.c"',
+    'int main(void) {',
+    '    unsigned bad = 0U;',
+    '    for (unsigned age = 0U; age < 256U; ++age)',
+    '    for (unsigned tier = 0U; tier < 256U; ++tier) {',
+    '        seki_a0_nested_claim c;',
+    '        seki_a0_nested_decision got;',
+    '        uint8_t wt, wr;',
+    '        c.seki_f_age = (uint8_t)age; c.seki_f_tier = (uint8_t)tier;',
+    '        got = seki_a0_nested_screen(c);',
+    '        if (tier == 0U)     { wt = 1U; wr = 9U; }',
+    '        else if (age < 18U) { wt = 1U; wr = 1U; }',
+    '        else if (tier > 3U) { wt = 1U; wr = 4U; }',
+    '        else                { wt = 0U; wr = 0U; }',
+    '        if (got.tag != wt || got.reason != wr) ++bad;',
+    '    }',
+    '    printf("%u\\n", bad);',
+    '    return bad != 0U;',
+    '}',
+    '',
+  ].join("\n"));
+  const nestedExe = path.join(temporary, "nested_main");
+  execFileSync("cc", [...strictFlags, "-fsanitize=address,undefined",
+    `-I${temporary}`, nestedHarness, "-o", nestedExe], { stdio: "inherit" });
+  assert.equal(execFileSync(nestedExe, { encoding: "utf8" }), "0\n");
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -274,7 +344,7 @@ try {
     "seki_alpha_cli=verified version=0.0.0-alpha.6 commands=4 connected=3 " +
     "slice=u8-decision fields=2 rejections=2 renamed=yes overwrite=reject " +
     "operators=4 source_order=canonical table_order=name-derived " +
-    "header_vectors=general",
+    "header_vectors=general nested_control=yes exhaustive=65536",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

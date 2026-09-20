@@ -269,6 +269,18 @@
   as `frontend=alpha-decision` and `backend=alpha-u8-decision`. Closing that
   gap is A0-03 work; both directions fail closed and `build` writes no artifact
   unless every stage succeeds.
+- The C backend decodes a restricted-C AST instead of a linear byte
+  expectation. Kernel control now nests: a three-premise decision with ordered
+  rejection precedence compiles end to end, its exact bounds `(18,40,7,0)` are
+  independently reproduced by the JavaScript cost algebra, and the generated C
+  agrees with the stated policy on all 65,536 input pairs under
+  AddressSanitizer and UndefinedBehaviorSanitizer. Boolean literal conditions
+  also project. The minimum-age C remains byte-identical.
+- The C projection no longer re-derives exact resource bounds with a
+  shape-specific formula. It checks that stored bounds are well formed and
+  within the declared ceiling, and leaves exact-bound equality to admission,
+  which owns the canonical cost algebra. A second, weaker derivation inside the
+  projection would have been a checker that silently disagrees.
 
 ## Active work
 
@@ -314,9 +326,9 @@ make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 
 Local and pinned Linux/amd64 seed, status, bootstrap-closure, JSON,
 encoding-vector, semantic-coverage, strict-C11, sanitizer, and whitespace checks
-passed on 2026-09-20. The alpha compiler additionally passed 800 source and 800
-typed-core mutation cases under AddressSanitizer and UndefinedBehaviorSanitizer
-with no finding, after the two stack-exhaustion defects that earlier sweeps
-found were fixed. The container run used the mounted working tree and carries
+passed on 2026-09-20. The alpha compiler additionally passed 1,500 source and
+1,500 typed-core mutation cases across the minimum-age and nested three-premise
+kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
+after the two stack-exhaustion defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.

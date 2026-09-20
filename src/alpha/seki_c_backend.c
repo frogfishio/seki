@@ -3,14 +3,11 @@
 #include <stdint.h>
 #include <string.h>
 
-enum restricted_decision {
-    RESTRICTED_ACCEPT_UNIT,
-    RESTRICTED_REJECT_UNDERAGE
-};
-
 #define DECODED_NAME_CAPACITY 64U
 #define DECODED_FIELD_CAPACITY 32U
 #define DECODED_CASE_CAPACITY 32U
+#define RESTRICTED_MAX_EXPRESSIONS 256U
+#define RESTRICTED_MAX_TAILS 128U
 
 struct decoded_name {
     char bytes[DECODED_NAME_CAPACITY];
@@ -31,19 +28,67 @@ enum restricted_compare {
     RESTRICTED_NOT_EQUAL = 5
 };
 
-struct restricted_kernel {
-    uint32_t parameter_index;
-    uint32_t field_index;
+/*
+ * Restricted-C value terms. The decoder builds this arena from SCB-0 and the
+ * printer walks it; no stage assumes a particular tree shape.
+ */
+enum restricted_term {
+    RESTRICTED_LOCAL,
+    RESTRICTED_PROJECT,
+    RESTRICTED_INT_LIT,
+    RESTRICTED_UNIT_LIT,
+    RESTRICTED_BOOL_LIT,
+    RESTRICTED_VARIANT,
+    RESTRICTED_COMPARE
+};
+
+struct restricted_expression {
+    enum restricted_term kind;
     enum restricted_compare compare;
-    uint8_t threshold;
-    uint8_t rejection_tag;
+    /*
+     * LOCAL    a = environment slot
+     * PROJECT  a = record expression, b = field index
+     * INT_LIT  a = value
+     * BOOL_LIT a = 0 or 1
+     * VARIANT  a = stable tag
+     * COMPARE  a = left, b = right
+     */
+    uint32_t a;
+    uint32_t b;
+};
+
+enum restricted_tail_kind {
+    RESTRICTED_ACCEPT,
+    RESTRICTED_REJECT,
+    RESTRICTED_IF
+};
+
+struct restricted_tail {
+    enum restricted_tail_kind kind;
+    /*
+     * ACCEPT  a = accepted value expression
+     * REJECT  a = reason expression, b = precedence index
+     * IF      a = condition, b = when-true tail, c = when-false tail
+     */
+    uint32_t a;
+    uint32_t b;
+    uint32_t c;
+};
+
+struct restricted_kernel {
     uint32_t rejection_tags[DECODED_CASE_CAPACITY];
     size_t rejection_count;
-    uint32_t precedence_index;
     struct decoded_name name;
     struct decoded_name parameter_name;
-    enum restricted_decision if_true;
-    enum restricted_decision if_false;
+    struct restricted_expression expressions[RESTRICTED_MAX_EXPRESSIONS];
+    size_t expression_count;
+    struct restricted_tail tails[RESTRICTED_MAX_TAILS];
+    size_t tail_count;
+    uint32_t body_root;
+    /* First projected field and first constructed rejection, retained only for
+     * the E0 compatibility-ABI test and the `inspect` threshold report. */
+    uint8_t threshold;
+    uint8_t rejection_tag;
 };
 
 struct restricted_module {
@@ -360,25 +405,247 @@ case_index_for_tag(const struct restricted_module *module, uint32_t tag,
     return 0;
 }
 
+/*
+ * Decodes one `Expr`: its claimed type value followed by its term. Returns the
+ * arena index, or leaves the reader failed.
+ */
+static uint32_t
+add_expression(struct reader *reader, struct restricted_module *module,
+    const struct restricted_expression *expression)
+{
+    uint32_t index;
+    if (reader->failed) {
+        return 0U;
+    }
+    if (module->kernel.expression_count == RESTRICTED_MAX_EXPRESSIONS) {
+        reader_fail(reader, "kernel expressions exceed backend capacity");
+        return 0U;
+    }
+    index = (uint32_t)module->kernel.expression_count;
+    module->kernel.expressions[index] = *expression;
+    module->kernel.expression_count += 1U;
+    return index;
+}
+
+/*
+ * Reads one claimed type value, restricted to the forms this projection can
+ * represent in C. `Declared` references are checked against the canonical
+ * positions established by the header.
+ */
+static void
+expect_claimed_type(struct reader *reader, struct restricted_module *module)
+{
+    const uint8_t tag = read_u8(reader);
+    if (reader->failed) {
+        return;
+    }
+    switch (tag) {
+    case 0U:
+    case 1U:
+    case 2U:
+        return;
+    case 19U:
+        expect_u8(reader, 0U, "decision result must accept Unit");
+        expect_declared_type(reader, module->variant_position);
+        return;
+    case 21U: {
+        const uint8_t local = read_u8(reader);
+        const uint32_t position = read_u32(reader);
+        if (!reader->failed && (local != 0U ||
+            (position != module->record_position &&
+             position != module->variant_position))) {
+            reader_fail(reader, "declared type is outside the module");
+        }
+        return;
+    }
+    default:
+        break;
+    }
+    reader_fail(reader, "claimed type is outside the restricted-C slice");
+}
+
+static uint32_t
+decode_expression(struct reader *reader, struct restricted_module *module)
+{
+    struct restricted_expression expression;
+    uint8_t term;
+    memset(&expression, 0, sizeof expression);
+    if (reader->failed) {
+        return 0U;
+    }
+    expect_claimed_type(reader, module);
+    term = read_u8(reader);
+    if (reader->failed) {
+        return 0U;
+    }
+    switch (term) {
+    case 0U:
+        expression.kind = RESTRICTED_UNIT_LIT;
+        break;
+    case 1U: {
+        const uint8_t value = read_u8(reader);
+        if (!reader->failed && value > 1U) {
+            reader_fail(reader, "boolean literal is not 0 or 1");
+            return 0U;
+        }
+        expression.kind = RESTRICTED_BOOL_LIT;
+        expression.a = value;
+        break;
+    }
+    case 2U:
+        expect_u8(reader, 0U, "integer literal family must be U8");
+        expression.kind = RESTRICTED_INT_LIT;
+        expression.a = read_u8(reader);
+        if (module->kernel.threshold == 0U) {
+            module->kernel.threshold = (uint8_t)expression.a;
+        }
+        break;
+    case 4U:
+        expression.kind = RESTRICTED_LOCAL;
+        expression.a = read_u32(reader);
+        if (!reader->failed && expression.a != 0U) {
+            reader_fail(reader, "condition references unexpected parameter");
+            return 0U;
+        }
+        break;
+    case 7U: {
+        const uint32_t record = decode_expression(reader, module);
+        expression.kind = RESTRICTED_PROJECT;
+        expression.a = record;
+        expect_u8(reader, 0U, "field owner must be a record type");
+        expect_local_type(reader, module->record_position);
+        expression.b = read_u32(reader);
+        if (!reader->failed &&
+            (size_t)expression.b >= module->field_count) {
+            reader_fail(reader, "projection field index is out of range");
+            return 0U;
+        }
+        if (!reader->failed && module->field_name.length == 0U) {
+            module->field_name = module->fields[expression.b];
+        }
+        break;
+    }
+    case 8U: {
+        size_t selected = 0U;
+        expect_local_type(reader, module->variant_position);
+        expression.kind = RESTRICTED_VARIANT;
+        expression.a = read_u32(reader);
+        if (!reader->failed && !case_index_for_tag(module, expression.a,
+            &selected)) {
+            reader_fail(reader, "rejection constructs an unknown case");
+            return 0U;
+        }
+        expect_u32(reader, 0U, "rejection case takes no arguments");
+        if (!reader->failed && module->case_name.length == 0U) {
+            module->case_name = module->cases[selected];
+            module->kernel.rejection_tag = (uint8_t)expression.a;
+        }
+        break;
+    }
+    case 14U:
+    case 15U:
+    case 19U: {
+        if (term == 19U) {
+            const uint8_t operation = read_u8(reader);
+            if (!reader->failed && operation > 3U) {
+                reader_fail(reader, "unknown comparison operator");
+                return 0U;
+            }
+            expression.compare = (enum restricted_compare)operation;
+        } else {
+            expression.compare = term == 14U ?
+                RESTRICTED_EQUAL : RESTRICTED_NOT_EQUAL;
+        }
+        expression.kind = RESTRICTED_COMPARE;
+        expression.a = decode_expression(reader, module);
+        expression.b = decode_expression(reader, module);
+        break;
+    }
+    default:
+        reader_fail(reader, "term is outside the restricted-C slice");
+        return 0U;
+    }
+    return add_expression(reader, module, &expression);
+}
+
+static uint32_t
+decode_tail(struct reader *reader, struct restricted_module *module,
+    unsigned depth)
+{
+    struct restricted_tail tail;
+    uint8_t kind;
+    uint32_t index;
+    memset(&tail, 0, sizeof tail);
+    if (reader->failed) {
+        return 0U;
+    }
+    /* Kernel control nests, so descent is bounded by the arena rather than by
+     * the host stack. */
+    if (depth >= RESTRICTED_MAX_TAILS) {
+        reader_fail(reader, "kernel control nesting exceeds backend capacity");
+        return 0U;
+    }
+    kind = read_u8(reader);
+    if (reader->failed) {
+        return 0U;
+    }
+    switch (kind) {
+    case 0U:
+        tail.kind = RESTRICTED_ACCEPT;
+        tail.a = decode_expression(reader, module);
+        break;
+    case 1U:
+        tail.kind = RESTRICTED_REJECT;
+        tail.a = decode_expression(reader, module);
+        tail.b = read_u32(reader);
+        if (!reader->failed &&
+            ((size_t)tail.b >= module->kernel.rejection_count ||
+             module->kernel.expressions[tail.a].kind != RESTRICTED_VARIANT ||
+             module->kernel.rejection_tags[tail.b] !=
+                module->kernel.expressions[tail.a].a)) {
+            reader_fail(reader, "rejection precedence index is inconsistent");
+            return 0U;
+        }
+        break;
+    case 4U:
+        tail.kind = RESTRICTED_IF;
+        tail.a = decode_expression(reader, module);
+        tail.b = decode_tail(reader, module, depth + 1U);
+        tail.c = decode_tail(reader, module, depth + 1U);
+        break;
+    default:
+        reader_fail(reader, "kernel control is outside the restricted-C slice");
+        return 0U;
+    }
+    if (reader->failed) {
+        return 0U;
+    }
+    if (module->kernel.tail_count == RESTRICTED_MAX_TAILS) {
+        reader_fail(reader, "kernel control exceeds backend capacity");
+        return 0U;
+    }
+    index = (uint32_t)module->kernel.tail_count;
+    module->kernel.tails[index] = tail;
+    module->kernel.tail_count += 1U;
+    return index;
+}
+
 static void
 decode_kernel(struct reader *reader, struct restricted_module *module)
 {
-    uint32_t declared_steps;
-    uint32_t declared_live;
-    uint32_t declared_depth;
+    uint32_t declared[4];
+    uint32_t exact[4];
     uint32_t rejection_count;
     uint32_t rejection_index;
-    uint32_t constructed_tag;
-    uint32_t exact_live_bits;
-    size_t selected_case = 0U;
+    size_t component;
 
-    expect_u32(reader, 1U, "U8-decision slice requires one kernel");
+    expect_u32(reader, 1U, "restricted-C slice requires one kernel");
     read_name(reader, &module->kernel.name);
     expect_u32(reader, 1U, "kernel requires one parameter label");
     read_name(reader, &module->kernel.parameter_name);
     expect_u32(reader, 1U, "kernel requires one parameter type");
     expect_declared_type(reader, module->record_position);
-    expect_u8(reader, 19U, "decide result must be Decision");
+    expect_u8(reader, 19U, "kernel result must be a Decision");
     expect_u8(reader, 0U, "accepted result must be Unit");
     expect_declared_type(reader, module->variant_position);
     rejection_count = read_u32(reader);
@@ -400,92 +667,34 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
         module->kernel.rejection_tags[rejection_index] = ordered_tag;
     }
 
-    expect_u8(reader, 4U, "kernel body must be If");
-    expect_u8(reader, 1U, "If condition must claim Bool");
-    {
-        const uint8_t term = read_u8(reader);
-        if (term == 19U) {
-            const uint8_t operation = read_u8(reader);
-            if (!reader->failed && operation > 3U) {
-                reader_fail(reader, "unknown comparison operator");
-            }
-            module->kernel.compare = (enum restricted_compare)operation;
-        } else if (term == 14U) {
-            module->kernel.compare = RESTRICTED_EQUAL;
-        } else if (term == 15U) {
-            module->kernel.compare = RESTRICTED_NOT_EQUAL;
-        } else {
-            reader_fail(reader, "condition must be a comparison");
+    module->kernel.body_root = decode_tail(reader, module, 0U);
+
+    /*
+     * The projection checks that the stored exact bounds are well formed and
+     * within the declared ceiling. Equality between the stored bounds and the
+     * canonical derivation is an admission obligation, checked by the semantic
+     * checker against the cost algebra; re-deriving it here with a second,
+     * weaker algebra would create a checker that silently disagrees.
+     */
+    for (component = 0U; component < 4U; component += 1U) {
+        declared[component] = read_u32(reader);
+    }
+    for (component = 0U; component < 4U; component += 1U) {
+        exact[component] = read_u32(reader);
+        if (!reader->failed && exact[component] > declared[component]) {
+            reader_fail(reader, "exact bound exceeds the declared ceiling");
+            return;
         }
     }
-    expect_u8(reader, 2U, "projection must claim U8");
-    expect_u8(reader, 7U, "condition left side must be Project");
-    expect_declared_type(reader, module->record_position);
-    expect_u8(reader, 4U, "projection base must be Local");
-    module->kernel.parameter_index = read_u32(reader);
-    expect_u8(reader, 0U, "field owner must be local");
-    expect_local_type(reader, module->record_position);
-    module->kernel.field_index = read_u32(reader);
-    if (!reader->failed &&
-        (size_t)module->kernel.field_index >= module->field_count) {
-        reader_fail(reader, "projection field index is out of range");
-    } else if (!reader->failed) {
-        module->field_name = module->fields[module->kernel.field_index];
-    }
-    expect_u8(reader, 2U, "comparison literal must claim U8");
-    expect_u8(reader, 2U, "comparison right side must be IntLit");
-    expect_u8(reader, 0U, "comparison literal family must be U8");
-    module->kernel.threshold = read_u8(reader);
-
-    expect_u8(reader, 1U, "true branch must reject");
-    expect_declared_type(reader, module->variant_position);
-    expect_u8(reader, 8U, "rejection value must construct a variant");
-    expect_local_type(reader, module->variant_position);
-    constructed_tag = read_u32(reader);
-    if (!reader->failed && !case_index_for_tag(module, constructed_tag,
-        &selected_case)) {
-        reader_fail(reader, "true branch constructs unknown rejection");
-    } else if (!reader->failed) {
-        module->kernel.rejection_tag = (uint8_t)constructed_tag;
-        module->case_name = module->cases[selected_case];
-    }
-    expect_u32(reader, 0U, "Underage must have no arguments");
-    module->kernel.precedence_index = read_u32(reader);
-    if (!reader->failed &&
-        ((size_t)module->kernel.precedence_index >=
-            module->kernel.rejection_count ||
-         module->kernel.rejection_tags[module->kernel.precedence_index] !=
-            constructed_tag)) {
-        reader_fail(reader, "rejection precedence index is inconsistent");
-    }
-    module->kernel.if_true = RESTRICTED_REJECT_UNDERAGE;
-
-    expect_u8(reader, 0U, "false branch must accept");
-    expect_u8(reader, 0U, "accepted value must claim Unit");
-    expect_u8(reader, 0U, "accepted value must be Unit literal");
-    module->kernel.if_false = RESTRICTED_ACCEPT_UNIT;
-
-    declared_steps = read_u32(reader);
-    declared_live = read_u32(reader);
-    declared_depth = read_u32(reader);
-    (void)read_u32(reader);
-    if (!reader->failed && (declared_steps < 8U || declared_depth < 5U)) {
-        reader_fail(reader, "declared resource ceiling below exact bound");
-    }
-    exact_live_bits = (uint32_t)module->field_count * 16U + 8U;
-    if ((uint32_t)module->field_count * 8U + 17U > exact_live_bits) {
-        exact_live_bits = (uint32_t)module->field_count * 8U + 17U;
-    }
-    if (!reader->failed && declared_live < exact_live_bits) {
-        reader_fail(reader, "declared live-bit ceiling below exact bound");
-    }
-    expect_bounds(reader, 8U, exact_live_bits, 5U, 0U);
     expect_u8(reader, 0U, "publication must be disabled");
-    if (!reader->failed && module->kernel.parameter_index != 0U) {
-        reader_fail(reader, "condition references unexpected parameter");
-    }
 }
 
+/*
+ * Theorem and claim vectors are module metadata, not part of the restricted C
+ * slice. Check that each is a strictly increasing vector of known tags rather
+ * than one specific list, so a module stating a different obligation set still
+ * projects to C.
+ */
 static void
 expect_tag_vector(struct reader *reader, uint8_t maximum, const char *what)
 {
@@ -643,16 +852,6 @@ text_put_prefix(struct text_buffer *buffer,
 }
 
 static void
-text_put_field_identifier(struct text_buffer *buffer,
-    const struct restricted_module *module)
-{
-    if (!uses_e0_compatibility_abi(module)) {
-        text_put(buffer, "seki_f_");
-    }
-    text_put_name(buffer, &module->field_name, 0);
-}
-
-static void
 text_put_parameter_identifier(struct text_buffer *buffer,
     const struct restricted_module *module)
 {
@@ -672,19 +871,111 @@ restricted_compare_text(enum restricted_compare compare)
 }
 
 static void
-print_decision(struct text_buffer *output, enum restricted_decision decision,
-    uint8_t rejection_tag)
+text_put_indent(struct text_buffer *output, unsigned depth)
 {
-    if (decision == RESTRICTED_REJECT_UNDERAGE) {
-        text_put(output,
-            "        result.tag = UINT8_C(1);\n"
-            "        result.reason = UINT8_C(");
-        text_put_u8(output, rejection_tag);
+    unsigned level;
+    for (level = 0U; level < depth; level += 1U) {
+        text_put(output, "    ");
+    }
+}
+
+static void
+print_expression(struct text_buffer *output,
+    const struct restricted_module *module, uint32_t index)
+{
+    const struct restricted_expression *expression;
+    if (output->failed ||
+        (size_t)index >= module->kernel.expression_count) {
+        output->failed = 1;
+        return;
+    }
+    expression = &module->kernel.expressions[index];
+    switch (expression->kind) {
+    case RESTRICTED_LOCAL:
+        text_put_parameter_identifier(output, module);
+        break;
+    case RESTRICTED_PROJECT:
+        print_expression(output, module, expression->a);
+        text_put(output, ".");
+        if (!uses_e0_compatibility_abi(module)) {
+            text_put(output, "seki_f_");
+        }
+        if ((size_t)expression->b >= module->field_count) {
+            output->failed = 1;
+            return;
+        }
+        text_put_name(output, &module->fields[expression->b], 0);
+        break;
+    case RESTRICTED_INT_LIT:
+        text_put(output, "UINT8_C(");
+        text_put_u8(output, (uint8_t)expression->a);
+        text_put(output, ")");
+        break;
+    case RESTRICTED_BOOL_LIT:
+        text_put(output, expression->a != 0U ? "1" : "0");
+        break;
+    case RESTRICTED_COMPARE:
+        print_expression(output, module, expression->a);
+        text_put(output, restricted_compare_text(expression->compare));
+        print_expression(output, module, expression->b);
+        break;
+    case RESTRICTED_UNIT_LIT:
+    case RESTRICTED_VARIANT:
+    default:
+        /* Neither appears in a C value position: the decision result carries
+         * them as the tag/reason pair written by print_tail. */
+        output->failed = 1;
+        break;
+    }
+}
+
+static void
+print_tail(struct text_buffer *output, const struct restricted_module *module,
+    uint32_t index, unsigned depth)
+{
+    const struct restricted_tail *tail;
+    if (output->failed || (size_t)index >= module->kernel.tail_count) {
+        output->failed = 1;
+        return;
+    }
+    tail = &module->kernel.tails[index];
+    switch (tail->kind) {
+    case RESTRICTED_ACCEPT:
+        text_put_indent(output, depth);
+        text_put(output, "result.tag = UINT8_C(0);\n");
+        text_put_indent(output, depth);
+        text_put(output, "result.reason = UINT8_C(0);\n");
+        break;
+    case RESTRICTED_REJECT: {
+        const struct restricted_expression *reason;
+        if ((size_t)tail->a >= module->kernel.expression_count) {
+            output->failed = 1;
+            return;
+        }
+        reason = &module->kernel.expressions[tail->a];
+        text_put_indent(output, depth);
+        text_put(output, "result.tag = UINT8_C(1);\n");
+        text_put_indent(output, depth);
+        text_put(output, "result.reason = UINT8_C(");
+        text_put_u8(output, (uint8_t)reason->a);
         text_put(output, ");\n");
-    } else {
-        text_put(output,
-            "        result.tag = UINT8_C(0);\n"
-            "        result.reason = UINT8_C(0);\n");
+        break;
+    }
+    case RESTRICTED_IF:
+        text_put_indent(output, depth);
+        text_put(output, "if (");
+        print_expression(output, module, tail->a);
+        text_put(output, ") {\n");
+        print_tail(output, module, tail->b, depth + 1U);
+        text_put_indent(output, depth);
+        text_put(output, "} else {\n");
+        print_tail(output, module, tail->c, depth + 1U);
+        text_put_indent(output, depth);
+        text_put(output, "}\n");
+        break;
+    default:
+        output->failed = 1;
+        break;
     }
 }
 
@@ -745,21 +1036,9 @@ print_module(const struct restricted_module *module, char *c_source,
     text_put_parameter_identifier(&output, module);
     text_put(&output, ")\n{\n    ");
     text_put_prefix(&output, module);
-    text_put(&output, "_decision result;\n    if (");
-    text_put_parameter_identifier(&output, module);
-    text_put(&output, ".");
-    text_put_field_identifier(&output, module);
-    text_put(&output, restricted_compare_text(module->kernel.compare));
-    text_put(&output, "UINT8_C(");
-    text_put_u8(&output, module->kernel.threshold);
-    text_put(&output, ")) {\n");
-    print_decision(&output, module->kernel.if_true,
-        module->kernel.rejection_tag);
-    text_put(&output, "    } else {\n");
-    print_decision(&output, module->kernel.if_false,
-        module->kernel.rejection_tag);
+    text_put(&output, "_decision result;\n");
+    print_tail(&output, module, module->kernel.body_root, 1U);
     text_put(&output,
-        "    }\n"
         "    return result;\n"
         "}\n");
     if (output.failed) {

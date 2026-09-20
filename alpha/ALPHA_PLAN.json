@@ -42,6 +42,8 @@
   "canonical_table_ordering_ready": true,
   "general_comparison_operators_ready": true,
   "syntax_nesting_bounded": true,
+  "restricted_c_ast_ready": true,
+  "nested_kernel_control_ready": true,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

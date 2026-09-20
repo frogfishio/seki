@@ -20,8 +20,10 @@ The `alpha/` directory contains the provisional `sekic` CLI. Revision
 before `alpha/seki_core.c` emits SCB-0 directly from the checked AST. The
 immutable E0 frontend is no longer linked into `sekic`; its exact 417-byte output
 remains a regression oracle. `alpha/seki_c_backend.c` independently reopens the
-SCB-0 bytes into a restricted-C model, validates the complete slice, and emits
-the exact established C. Neither E0 adapter is linked into `sekic`. Both
+SCB-0 bytes into a restricted-C expression and tail AST, validates the complete
+slice, and emits the exact established C. Because it decodes a tree rather than
+one fixed byte sequence, kernel control nests to arbitrary depth within its
+fixed arena. Neither E0 adapter is linked into `sekic`. Both
 directions now derive module, type, field, variant, case, kernel, parameter,
 literal, and rejection-tag identities from the program. This is an A0-02
 increment, not its exit: the structural slice now permits canonically ordered U8

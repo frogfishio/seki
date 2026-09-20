@@ -147,12 +147,27 @@ a module stating a different obligation set still projects to C.
 currently narrower. A module can therefore pass `check` and fail `build` with a
 stable `A0-BACKEND-*` diagnostic and no output file. At revision
 `0.0.0-alpha.6` the known cases are non-`U8` record fields, payload-bearing
-variant cases, and a kernel tail whose false branch is another conditional
-rather than a terminal decision. `inspect` reports the two boundaries
-separately as `frontend=alpha-decision` and `backend=alpha-u8-decision`.
+variant cases, and modules declaring more than one record and one variant.
+`inspect` reports the two boundaries separately as `frontend=alpha-decision`
+and `backend=alpha-u8-decision`.
 
 Closing that gap is A0-03 work, not a defect in either direction: both fail
 closed, and `build` writes no artifact unless every stage succeeds.
+
+### Kernel control nests
+
+The C backend decodes a restricted-C expression and tail AST rather than
+expecting one fixed byte sequence, so kernel control nests to the depth the
+arena admits. A three-premise decision with ordered rejection precedence
+compiles end to end; its exact bounds are independently reproduced by the
+JavaScript cost algebra, and its generated C is exhaustively compared against
+the policy it states.
+
+The projection deliberately does not re-derive exact resource bounds. It checks
+that the stored bounds are well formed and within the declared ceiling and
+leaves exact-bound equality to admission, which owns the canonical cost
+algebra. Carrying a second, weaker derivation here would produce a checker that
+silently disagrees with the one that has authority.
 
 The live entry point requires end-of-file after the supported declarations.
 Unknown declarations and trailing tokens fail as `A0-PARSE-0034`; no later

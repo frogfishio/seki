@@ -80,6 +80,10 @@ expect(alpha.general_comparison_operators_ready === true,
   "comparison lowering narrowed back to one operator");
 expect(alpha.syntax_nesting_bounded === true,
   "recursive descent is no longer bounded by the profile nesting ceiling");
+expect(alpha.restricted_c_ast_ready === true,
+  "C projection regained a fixed linear byte expectation");
+expect(alpha.nested_kernel_control_ready === true,
+  "nested kernel control progress record lost");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",
