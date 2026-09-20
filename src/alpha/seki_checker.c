@@ -346,6 +346,69 @@ infer_expression(struct checker *checker, uint32_t expression_index,
             checker->elaboration->types.entries[owner].a, field_index, 0U);
         break;
     }
+    case SEKI_EXPR_RECORD: {
+        const uint32_t owner = declaration_index(checker->module,
+            &expression->value.record.type_name);
+        const struct seki_type_decl *declaration;
+        size_t field;
+        if (owner == SEKI_TYPE_INVALID ||
+            checker->module->declarations[owner].kind != SEKI_DECL_RECORD) {
+            check_fail(checker, "A0-CHECK-0020",
+                "record literal does not name a declared record");
+            break;
+        }
+        declaration = &checker->module->declarations[owner];
+        if (declaration->value.record.field_count !=
+            (size_t)expression->value.record.count) {
+            check_fail(checker, "A0-CHECK-0021",
+                "record literal does not initialise every field exactly once");
+            break;
+        }
+        /* Each declared field must be supplied once, with a matching type.
+         * The literal's own order is free; emission uses canonical order. */
+        for (field = 0U; field < declaration->value.record.field_count;
+            field += 1U) {
+            const struct seki_field_decl *declared =
+                &declaration->value.record.fields[field];
+            const uint32_t declared_type = resolve(checker, &declared->type);
+            uint32_t supplied = UINT32_MAX;
+            size_t entry;
+            struct inferred value;
+            if (checker->failed) {
+                return inferred;
+            }
+            for (entry = 0U; entry < (size_t)expression->value.record.count;
+                entry += 1U) {
+                const struct seki_record_init *initialiser =
+                    &checker->kernel->record_fields
+                        [expression->value.record.first + entry];
+                if (seki_name_equal(&initialiser->name, &declared->name)) {
+                    supplied = initialiser->value;
+                    break;
+                }
+            }
+            if (supplied == UINT32_MAX) {
+                check_fail(checker, "A0-CHECK-0021",
+                    "record literal does not initialise every field "
+                    "exactly once");
+                return inferred;
+            }
+            value = infer_expression(checker, supplied, environment);
+            if (checker->failed) {
+                return inferred;
+            }
+            (void)adopt_natural(checker, supplied, &value, declared_type);
+            if (value.type != declared_type) {
+                check_fail(checker, "A0-CHECK-0022",
+                    "record literal field does not match its declared type");
+                return inferred;
+            }
+        }
+        inferred.type = seki_type_intern(&checker->elaboration->types,
+            SEKI_T_DECLARED, owner, 0U);
+        record_info(checker, expression_index, inferred.type, owner, 0U, 0U);
+        break;
+    }
     case SEKI_EXPR_COMPARE: {
         const uint32_t left_index = expression->value.compare.left;
         const uint32_t right_index = expression->value.compare.right;
@@ -718,6 +781,47 @@ cost_of_expression(struct checker *checker, uint32_t expression_index,
             expression->value.compare.left, expression->value.compare.right
         };
         cost = cost_strict(checker, children, 2U, result_type, environment,
+            base);
+        break;
+    }
+    case SEKI_EXPR_RECORD: {
+        /* Children are visited in canonical field order, which is the order
+         * the emitter writes them, so the derivation matches the encoding. */
+        uint32_t children[SEKI_RECORD_MAX_FIELDS];
+        const struct seki_expr_info *info =
+            &checker->kernel_elaboration->expressions[expression_index];
+        const struct seki_type_decl *declaration;
+        size_t field;
+        if (info->a >= checker->module->declaration_count) {
+            check_fail(checker, "A0-CHECK-0020",
+                "record literal does not name a declared record");
+            break;
+        }
+        declaration = &checker->module->declarations[info->a];
+        for (field = 0U; field < declaration->value.record.field_count;
+            field += 1U) {
+            size_t entry;
+            children[field] = UINT32_MAX;
+            for (entry = 0U; entry < (size_t)expression->value.record.count;
+                entry += 1U) {
+                const struct seki_record_init *initialiser =
+                    &checker->kernel->record_fields
+                        [expression->value.record.first + entry];
+                if (seki_name_equal(&initialiser->name,
+                    &declaration->value.record.fields[field].name)) {
+                    children[field] = initialiser->value;
+                    break;
+                }
+            }
+            if (children[field] == UINT32_MAX) {
+                check_fail(checker, "A0-CHECK-0021",
+                    "record literal does not initialise every field "
+                    "exactly once");
+                return cost;
+            }
+        }
+        cost = cost_strict(checker, children,
+            declaration->value.record.field_count, result_type, environment,
             base);
         break;
     }

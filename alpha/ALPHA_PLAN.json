@@ -55,6 +55,8 @@
   "selector_lookahead_from_grammar": true,
   "immutable_bindings_ready": true,
   "lexical_scope_chain_ready": true,
+  "accepted_value_ready": true,
+  "record_construction_ready": true,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

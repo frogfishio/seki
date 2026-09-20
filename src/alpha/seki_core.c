@@ -27,6 +27,7 @@
 #define SEKI_TERM_BOOL_LIT 1U
 #define SEKI_TERM_INT_LIT 2U
 #define SEKI_TERM_LOCAL 4U
+#define SEKI_TERM_RECORD 6U
 #define SEKI_TERM_PROJECT 7U
 #define SEKI_TERM_VARIANT 8U
 #define SEKI_TERM_EQUAL 14U
@@ -493,6 +494,49 @@ put_expression(struct emitter *emitter, uint32_t expression_index)
         put_u8(emitter->buffer, SEKI_TERM_LOCAL);
         put_u32(emitter->buffer, info->a);
         break;
+    case SEKI_EXPR_RECORD: {
+        const struct seki_type_decl *declaration;
+        size_t field;
+        if (info->a >= emitter->module->declaration_count) {
+            emitter->buffer->failed = 1;
+            return;
+        }
+        declaration = &emitter->module->declarations[info->a];
+        put_u8(emitter->buffer, SEKI_TERM_RECORD);
+        put_type_ref(emitter->buffer, emitter->layout->type_position[info->a]);
+        put_u32(emitter->buffer,
+            (uint32_t)declaration->value.record.field_count);
+        /* Constructor fields are keyed by FieldRef and must be strictly
+         * increasing, so they are written in canonical field order. */
+        for (field = 0U; field < declaration->value.record.field_count;
+            field += 1U) {
+            const uint32_t source =
+                emitter->layout->field_order[info->a][field];
+            size_t entry;
+            uint32_t value = UINT32_MAX;
+            for (entry = 0U; entry < (size_t)expression->value.record.count;
+                entry += 1U) {
+                const struct seki_record_init *initialiser =
+                    &emitter->kernel->record_fields
+                        [expression->value.record.first + entry];
+                if (seki_name_equal(&initialiser->name,
+                    &declaration->value.record.fields[source].name)) {
+                    value = initialiser->value;
+                    break;
+                }
+            }
+            if (value == UINT32_MAX) {
+                emitter->buffer->failed = 1;
+                return;
+            }
+            put_u8(emitter->buffer, 0U);
+            put_type_ref(emitter->buffer,
+                emitter->layout->type_position[info->a]);
+            put_u32(emitter->buffer, (uint32_t)field);
+            put_expression(emitter, value);
+        }
+        break;
+    }
     case SEKI_EXPR_FIELD:
         put_u8(emitter->buffer, SEKI_TERM_PROJECT);
         put_expression(emitter, expression->value.field.receiver);

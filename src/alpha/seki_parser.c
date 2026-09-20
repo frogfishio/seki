@@ -501,6 +501,24 @@ add_expression(struct parser *parser, struct seki_kernel_decl *kernel,
     return index;
 }
 
+static int
+next_token_is(const struct parser *parser, enum seki_token_kind kind)
+{
+    struct seki_lexer lookahead = parser->lexer;
+    struct seki_token token;
+    struct seki_lex_error error;
+    if (!seki_lexer_next(&lookahead, &token, &error)) {
+        return 0;
+    }
+    return token.kind == kind;
+}
+
+static int
+next_token_is_colon(const struct parser *parser)
+{
+    return next_token_is(parser, SEKI_TOKEN_COLON);
+}
+
 static uint32_t parse_value_expression(struct parser *parser,
     struct seki_kernel_decl *kernel);
 
@@ -532,6 +550,60 @@ parse_primary_expression(struct parser *parser,
         expression.kind = SEKI_EXPR_VALUE_NAME;
         expression.value.name = take_value_name(parser);
         result = add_expression(parser, kernel, &expression);
+    } else if (parser->current.kind == SEKI_TOKEN_IDENT &&
+        parser->current.length != 0U && parser->current.start[0] >= 'A' &&
+        parser->current.start[0] <= 'Z' &&
+        next_token_is(parser, SEKI_TOKEN_LBRACE)) {
+        /* `Type { field: value, ... }` constructs a record. */
+        if (!enter_nesting(parser)) {
+            return UINT32_MAX;
+        }
+        expression.kind = SEKI_EXPR_RECORD;
+        expression.value.record.type_name = take_type_name(parser);
+        expression.value.record.first =
+            (uint32_t)kernel->record_field_count;
+        expect_kind(parser, SEKI_TOKEN_LBRACE, "expected record literal body");
+        while (!parser->failed &&
+            parser->current.kind != SEKI_TOKEN_RBRACE) {
+            struct seki_record_init initialiser;
+            size_t earlier;
+            if (kernel->record_field_count ==
+                SEKI_KERNEL_MAX_RECORD_FIELDS) {
+                parser_fail(parser, "A0-PARSE-0036",
+                    "record literal fields exceed fixed capacity");
+                break;
+            }
+            memset(&initialiser, 0, sizeof initialiser);
+            initialiser.name = take_value_name(parser);
+            for (earlier = expression.value.record.first;
+                earlier < kernel->record_field_count; earlier += 1U) {
+                if (seki_name_equal(&kernel->record_fields[earlier].name,
+                    &initialiser.name)) {
+                    parser_fail(parser, "A0-PARSE-0037",
+                        "duplicate record literal field");
+                    break;
+                }
+            }
+            expect_kind(parser, SEKI_TOKEN_COLON,
+                "expected record literal field colon");
+            initialiser.value = parse_value_expression(parser, kernel);
+            if (parser->failed) {
+                break;
+            }
+            kernel->record_fields[kernel->record_field_count++] = initialiser;
+            if (parser->current.kind == SEKI_TOKEN_COMMA) {
+                advance(parser);
+            } else if (parser->current.kind != SEKI_TOKEN_RBRACE) {
+                parser_fail(parser, "A0-PARSE-0038",
+                    "expected comma or record literal close");
+            }
+        }
+        expression.value.record.count =
+            (uint32_t)kernel->record_field_count -
+            expression.value.record.first;
+        expect_kind(parser, SEKI_TOKEN_RBRACE, "expected record literal close");
+        leave_nesting(parser);
+        result = add_expression(parser, kernel, &expression);
     } else if (parser->current.kind == SEKI_TOKEN_LPAREN) {
         if (!enter_nesting(parser)) {
             return UINT32_MAX;
@@ -554,24 +626,6 @@ parse_primary_expression(struct parser *parser,
  * keywords means a new keyword cannot be silently eaten as a field name.
  * The lexer is a value, so peeking copies it instead of mutating the parser.
  */
-static int
-next_token_is(const struct parser *parser, enum seki_token_kind kind)
-{
-    struct seki_lexer lookahead = parser->lexer;
-    struct seki_token token;
-    struct seki_lex_error error;
-    if (!seki_lexer_next(&lookahead, &token, &error)) {
-        return 0;
-    }
-    return token.kind == kind;
-}
-
-static int
-next_token_is_colon(const struct parser *parser)
-{
-    return next_token_is(parser, SEKI_TOKEN_COLON);
-}
-
 static uint32_t
 parse_projection_expression(struct parser *parser,
     struct seki_kernel_decl *kernel)

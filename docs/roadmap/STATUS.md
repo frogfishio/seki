@@ -344,6 +344,18 @@
   the order it was introduced and resolves references by slot. A two-binding
   kernel derives `(17,49,7,0)`, which the independent checker reproduces, and
   its generated C agrees with the stated policy on all 65,536 input pairs.
+- Acceptance can carry a value. The decision result holds the kernel's accepted
+  type, and `Unit` still carries no representation, so a Unit-accepting kernel
+  keeps exactly the established two-octet shape and the minimum-age C is
+  unchanged. A bare accepted octet array is rejected with a diagnostic that
+  says to wrap it in a record, since C cannot assign one.
+- Record construction is connected end to end. `Type { field: value, ... }`
+  builds a value whose fields the checker requires to be supplied exactly once
+  with matching types. Constructor fields are keyed by `FieldRef` and must be
+  strictly increasing, so the literal's own field order is free and emission
+  is canonical. A permit-issuing kernel derives `(17,121,7,0)`, which the
+  independent checker reproduces, and the generated C carries exactly the
+  inputs the kernel granted across every tested case.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
@@ -415,7 +427,7 @@ passed on 2026-09-20, including the E0 Lean proof under the pinned toolchain.
 The alpha compiler additionally passed 4,400 source and 4,900 typed-core
 mutation cases across the minimum-age, nested three-premise, wide-integer,
 four-declaration, two-digest, short-circuit Boolean, nominal-identity,
-require-premise, and binding kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
+require-premise, binding, and permit-issuing kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
 after the two stack-exhaustion defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.

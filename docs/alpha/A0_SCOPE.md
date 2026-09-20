@@ -163,6 +163,12 @@ C struct in canonical order, a variant contributes no type of its own because
 its cases are the `reason` octet of the decision result, and the kernel
 signature selects the declarations it uses by position.
 
+`Decision[A, R]` admits any concrete accepted type, and `Type { field: value }`
+constructs a record to fill it. Every declared field must be supplied exactly
+once; the literal's own order is free because constructor fields are emitted in
+canonical order. An accepted octet array must be wrapped in a record, because C
+cannot assign a bare array.
+
 `name := expr.` binds one fresh immutable local whose scope is the rest of the
 body. Bindings cannot shadow a visible local, and a binding has no type
 annotation, so a bare integer literal has nothing to take its width from and is

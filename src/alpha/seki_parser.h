@@ -16,6 +16,7 @@
 #define SEKI_CALLABLE_MAX_PARAMETERS 16U
 #define SEKI_KERNEL_MAX_REJECTIONS 32U
 #define SEKI_KERNEL_MAX_EXPRESSIONS 256U
+#define SEKI_KERNEL_MAX_RECORD_FIELDS 64U
 
 /*
  * Syntactic nesting ceiling, matching `maximum_nesting` in the
@@ -133,12 +134,23 @@ struct seki_variant_ref {
     struct seki_name item;
 };
 
+/*
+ * One field initialiser of a record literal. They live in a per-kernel arena
+ * rather than inside the expression union, which would otherwise carry a
+ * whole field table per node.
+ */
+struct seki_record_init {
+    struct seki_name name;
+    uint32_t value;
+};
+
 enum seki_expression_kind {
     SEKI_EXPR_VALUE_NAME,
     SEKI_EXPR_BOOL,
     SEKI_EXPR_UNIT,
     SEKI_EXPR_NATURAL,
     SEKI_EXPR_FIELD,
+    SEKI_EXPR_RECORD,
     SEKI_EXPR_COMPARE,
     SEKI_EXPR_AND,
     SEKI_EXPR_OR,
@@ -168,6 +180,11 @@ struct seki_expression {
             uint32_t receiver;
             struct seki_name field;
         } field;
+        struct {
+            struct seki_name type_name;
+            uint32_t first;
+            uint32_t count;
+        } record;
         struct {
             enum seki_compare_operator operator;
             uint32_t left;
@@ -211,6 +228,8 @@ struct seki_kernel_decl {
     int publication_eligible;
     struct seki_expression expressions[SEKI_KERNEL_MAX_EXPRESSIONS];
     size_t expression_count;
+    struct seki_record_init record_fields[SEKI_KERNEL_MAX_RECORD_FIELDS];
+    size_t record_field_count;
     uint32_t body_root;
 };
 

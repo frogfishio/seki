@@ -615,6 +615,59 @@ try {
   assert.equal(shadowed.status, 65);
   assert.match(shadowed.stderr, /^A0-CHECK-0019:/u);
 
+  // Acceptance can carry a value rather than `Unit`: the decision result holds
+  // it, and a record literal builds it. The literal's own field order is free
+  // because constructor fields are keyed by FieldRef and emitted canonically.
+  const permitSource = path.join(temporary, "permit.seki");
+  const permitCore = path.join(temporary, "permit.scb0");
+  const permitC = path.join(temporary, "permit.c");
+  fs.writeFileSync(permitSource, [
+    "module grit::permit @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export record Candidate { epoch: U32, tier: U8 }.",
+    "export record Permit { grantedEpoch: U32, grantedTier: U8 }.",
+    "export variant Refusal [ Stale @ 1. LowTier @ 2. ].",
+    "",
+    "export kernel publish candidate: Candidate",
+    "-> Decision[Permit, Refusal] arithmetic: checked",
+    "bounded steps: 256 liveBits: 4096 controlDepth: 64 workspaceBits: 0",
+    "rejects: Refusal::Stale, Refusal::LowTier",
+    "publication: none [",
+    "  require (candidate epoch) == 42 else: Refusal::Stale.",
+    "  require (candidate tier) >= 3 else: Refusal::LowTier.",
+    "  accept Permit { grantedTier: (candidate tier),",
+    "                  grantedEpoch: (candidate epoch) }",
+    "].",
+    "",
+  ].join("\n"));
+  const permit = run([
+    "build", "--core", permitCore, "--c", permitC, permitSource,
+  ]);
+  assert.equal(permit.status, 0, permit.stderr);
+  const permitDecoded = decodeModule(fs.readFileSync(permitCore));
+  checkTypedCore(permitDecoded);
+  assert.deepEqual(permitDecoded.kernels[0][1].exact, [17, 121, 7, 0]);
+  const permitText = fs.readFileSync(permitC, "utf8");
+  assert.match(permitText, /uint8_t reason;\n    seki_a0_permit_permit accepted;/u);
+  // Source order was grantedTier first; canonical order is by field name.
+  assert.match(permitText,
+    /\.seki_f_grantedEpoch = .*, \.seki_f_grantedTier = /u);
+  execFileSync("cc", [...strictFlags, "-c", permitC, "-o",
+    path.join(temporary, "permit.o")], { stdio: "inherit" });
+
+  // Every declared field must be supplied exactly once.
+  const permitPartial = path.join(temporary, "permit-partial.seki");
+  fs.writeFileSync(permitPartial, fs.readFileSync(permitSource, "utf8")
+    .replace("accept Permit { grantedTier: (candidate tier),\n" +
+      "                  grantedEpoch: (candidate epoch) }",
+      "accept Permit { grantedTier: (candidate tier) }"));
+  const partial = run(["check", permitPartial]);
+  assert.equal(partial.status, 65);
+  assert.match(partial.stderr, /^A0-CHECK-0021:/u);
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -691,7 +744,7 @@ try {
     "header_vectors=general nested_control=yes exhaustive=65536 " +
     "widths=u8,u16,u32,u64 declarations=n octets=constant-time " +
     "boolean=short-circuit nominals=non-substitutable require=precedence " +
-    "bindings=scoped",
+    "bindings=scoped accepted=value records=constructed",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

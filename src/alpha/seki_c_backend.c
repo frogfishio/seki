@@ -10,6 +10,7 @@
 #define DECODED_OCTETS_CAPACITY 1024U
 #define RESTRICTED_MAX_EXPRESSIONS 256U
 #define RESTRICTED_MAX_TAILS 128U
+#define RESTRICTED_MAX_RECORD_FIELDS 128U
 
 struct decoded_name {
     char bytes[DECODED_NAME_CAPACITY];
@@ -41,6 +42,7 @@ enum restricted_term {
     RESTRICTED_UNIT_LIT,
     RESTRICTED_BOOL_LIT,
     RESTRICTED_VARIANT,
+    RESTRICTED_RECORD,
     RESTRICTED_COMPARE,
     RESTRICTED_AND_THEN,
     RESTRICTED_OR_ELSE
@@ -57,6 +59,8 @@ struct restricted_expression {
     uint8_t type_tag;
     uint32_t type_length;
     uint32_t type_declaration;
+    /* RECORD: how many field values follow from slot `b`. */
+    uint32_t field_count;
     /*
      * LOCAL    a = environment slot, b = binding ordinal, or UINT32_MAX
      *          when the slot is the kernel parameter
@@ -64,6 +68,8 @@ struct restricted_expression {
      * INT_LIT  a = value
      * BOOL_LIT a = 0 or 1
      * VARIANT  a = stable tag
+     * RECORD   a = declaration position, b = first field slot,
+     *          field_count = how many
      * COMPARE  a = left, b = right
      */
     uint32_t a;
@@ -99,9 +105,20 @@ struct restricted_kernel {
     struct decoded_name parameter_name;
     struct restricted_expression expressions[RESTRICTED_MAX_EXPRESSIONS];
     size_t expression_count;
+    /* Field values of every record literal, in canonical order. */
+    uint32_t record_fields[RESTRICTED_MAX_RECORD_FIELDS];
+    size_t record_field_count;
     struct restricted_tail tails[RESTRICTED_MAX_TAILS];
     size_t tail_count;
     uint32_t body_root;
+    /*
+     * The accepted type of the kernel's `Decision` result. `Unit` carries no
+     * representation, so the decision struct then holds only its tag and
+     * reason and the established minimum-age ABI is unchanged.
+     */
+    uint8_t accepted_tag;
+    uint32_t accepted_length;
+    uint32_t accepted_declaration;
     /* First integer literal and first constructed rejection, retained for the
      * E0 compatibility-ABI test and the `inspect` report. */
     uint64_t first_literal;
@@ -331,6 +348,9 @@ static void read_claimed_type(struct reader *reader,
     struct restricted_module *module, uint8_t *type_tag,
     uint32_t *type_length, uint32_t *declared);
 
+static void resolve_representation(const struct restricted_module *module,
+    uint8_t tag, uint32_t declared, uint8_t *out_tag, uint32_t *out_length);
+
 static void
 decode_header(struct reader *reader, struct restricted_module *module)
 {
@@ -497,6 +517,26 @@ rejection_variant(const struct restricted_module *module)
 }
 
 /*
+ * Reads a bare `TypeRef` and binds it to a declaration of the expected kind.
+ * A `Record` term names its type this way rather than with a full type value.
+ */
+static uint32_t
+read_type_ref_position(struct reader *reader,
+    const struct restricted_module *module,
+    enum decoded_declaration_kind expected, const char *what)
+{
+    uint32_t position;
+    expect_u8(reader, 0U, what);
+    position = read_u32(reader);
+    if (!reader->failed && ((size_t)position >= module->declaration_count ||
+        module->declarations[position].kind != expected)) {
+        reader_fail(reader, what);
+        return 0U;
+    }
+    return position;
+}
+
+/*
  * Reads a `Declared` type value from the kernel signature and binds it to a
  * declaration of the expected kind. The signature selects which declarations
  * the projection uses; nothing assumes a fixed table position.
@@ -593,10 +633,15 @@ read_claimed_type(struct reader *reader, struct restricted_module *module,
             reader_fail(reader, "sha256 digest must be 32 octets");
         }
         return;
-    case 19U:
-        expect_u8(reader, 0U, "decision result must accept Unit");
+    case 19U: {
+        uint8_t accepted_tag = 0U;
+        uint32_t accepted_length = 0U;
+        uint32_t accepted_declared = UINT32_MAX;
+        read_claimed_type(reader, module, &accepted_tag, &accepted_length,
+            &accepted_declared);
         expect_declared_type(reader, module->variant_position);
         return;
+    }
     case 21U: {
         const uint8_t local = read_u8(reader);
         const uint32_t position = read_u32(reader);
@@ -686,6 +731,40 @@ decode_expression(struct reader *reader, struct restricted_module *module,
             }
         }
         break;
+    case 6U: {
+        const uint32_t owner = read_type_ref_position(reader, module,
+            DECODED_DECL_RECORD, "record literal must name a declared record");
+        const uint32_t count = read_u32(reader);
+        uint32_t entry;
+        if (reader->failed) {
+            return 0U;
+        }
+        if (count != module->declarations[owner].field_count) {
+            reader_fail(reader,
+                "record literal does not supply every field exactly once");
+            return 0U;
+        }
+        expression.kind = RESTRICTED_RECORD;
+        expression.a = owner;
+        expression.b = (uint32_t)module->kernel.record_field_count;
+        expression.field_count = count;
+        if (module->kernel.record_field_count + count >
+            RESTRICTED_MAX_RECORD_FIELDS) {
+            reader_fail(reader, "record literals exceed backend capacity");
+            return 0U;
+        }
+        module->kernel.record_field_count += count;
+        for (entry = 0U; entry < count && !reader->failed; entry += 1U) {
+            /* FieldRef keys are strictly increasing, so the entries arrive in
+             * canonical field order and index `entry` directly. */
+            expect_u8(reader, 0U, "field owner must be a record type");
+            expect_local_type(reader, owner);
+            expect_u32(reader, entry, "record literal fields are not ordered");
+            module->kernel.record_fields[expression.b + entry] =
+                decode_expression(reader, module, bindings);
+        }
+        break;
+    }
     case 7U: {
         const uint32_t record = decode_expression(reader, module, bindings);
         expression.kind = RESTRICTED_PROJECT;
@@ -856,7 +935,22 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
     module->record_position = read_declared_position(reader, module,
         DECODED_DECL_RECORD, "kernel parameter must be a declared record");
     expect_u8(reader, 19U, "kernel result must be a Decision");
-    expect_u8(reader, 0U, "accepted result must be Unit");
+    read_claimed_type(reader, module, &module->kernel.accepted_tag,
+        &module->kernel.accepted_length,
+        &module->kernel.accepted_declaration);
+    if (!reader->failed) {
+        uint8_t representation = 0U;
+        uint32_t ignored = 0U;
+        resolve_representation(module, module->kernel.accepted_tag,
+            module->kernel.accepted_declaration, &representation, &ignored);
+        if (representation == 11U || representation == 13U) {
+            /* A bare octet array cannot be assigned in C. Wrapping it in a
+             * record makes the decision result assignable as a whole. */
+            reader_fail(reader,
+                "an accepted octet array must be wrapped in a record");
+            return;
+        }
+    }
     module->variant_position = read_declared_position(reader, module,
         DECODED_DECL_VARIANT, "rejection must be a declared variant");
     rejection_count = read_u32(reader);
@@ -1141,9 +1235,6 @@ text_put_indent(struct text_buffer *output, unsigned depth)
 static void print_expression(struct text_buffer *output,
     const struct restricted_module *module, uint32_t index);
 
-static void resolve_representation(const struct restricted_module *module,
-    uint8_t tag, uint32_t declared, uint8_t *out_tag, uint32_t *out_length);
-
 static void print_type_name(struct text_buffer *output,
     const struct restricted_module *module, uint8_t tag, uint32_t length,
     uint32_t declared, int *is_array, uint32_t *array_length);
@@ -1263,6 +1354,33 @@ print_expression(struct text_buffer *output,
             " && " : " || ");
         print_logical_operand(output, module, expression->b);
         break;
+    case RESTRICTED_RECORD: {
+        uint32_t entry;
+        int is_array = 0;
+        uint32_t array_length = 0U;
+        const struct decoded_declaration *declaration;
+        if ((size_t)expression->a >= module->declaration_count) {
+            output->failed = 1;
+            return;
+        }
+        declaration = &module->declarations[expression->a];
+        text_put(output, "(");
+        print_type_name(output, module, 21U, 0U, expression->a, &is_array,
+            &array_length);
+        text_put(output, "){");
+        for (entry = 0U; entry < expression->field_count; entry += 1U) {
+            text_put(output, entry == 0U ? " ." : ", .");
+            if (!uses_e0_compatibility_abi(module)) {
+                text_put(output, "seki_f_");
+            }
+            text_put_name(output, &declaration->fields[entry], 0);
+            text_put(output, " = ");
+            print_expression(output, module,
+                module->kernel.record_fields[expression->b + entry]);
+        }
+        text_put(output, " }");
+        break;
+    }
     case RESTRICTED_UNIT_LIT:
     case RESTRICTED_VARIANT:
     default:
@@ -1289,6 +1407,12 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         text_put(output, "result.tag = UINT8_C(0);\n");
         text_put_indent(output, depth);
         text_put(output, "result.reason = UINT8_C(0);\n");
+        if (module->kernel.accepted_tag != 0U) {
+            text_put_indent(output, depth);
+            text_put(output, "result.accepted = ");
+            print_expression(output, module, tail->a);
+            text_put(output, ";\n");
+        }
         break;
     case RESTRICTED_REJECT: {
         const struct restricted_expression *reason;
@@ -1565,8 +1689,20 @@ print_module(const struct restricted_module *module, char *c_source,
         "\n"
         "typedef struct {\n"
         "    uint8_t tag;\n"
-        "    uint8_t reason;\n"
-        "} ");
+        "    uint8_t reason;\n");
+    if (module->kernel.accepted_tag != 0U) {
+        /* `Unit` has no representation, so a Unit-accepting decision keeps
+         * exactly the established two-octet shape. */
+        int accepted_is_array = 0;
+        uint32_t accepted_array_length = 0U;
+        text_put(&output, "    ");
+        print_type_name(&output, module, module->kernel.accepted_tag,
+            module->kernel.accepted_length,
+            module->kernel.accepted_declaration, &accepted_is_array,
+            &accepted_array_length);
+        text_put(&output, " accepted;\n");
+    }
+    text_put(&output, "} ");
     text_put_prefix(&output, module);
     text_put(&output, "_decision;\n");
     if (module_compares_octets(module)) {
