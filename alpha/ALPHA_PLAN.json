@@ -44,6 +44,7 @@
   "syntax_nesting_bounded": true,
   "restricted_c_ast_ready": true,
   "nested_kernel_control_ready": true,
+  "unsigned_field_widths_ready": true,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

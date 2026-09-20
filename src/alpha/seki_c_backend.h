@@ -14,7 +14,14 @@ struct seki_backend_error {
 
 struct seki_core_inspection {
     uint32_t profile_version;
-    uint8_t threshold;
+    /*
+     * The first integer literal the kernel body evaluates, with its SCB-0
+     * integer type tag. It is a reporting aid, not a semantic summary: a
+     * kernel with several literals has more than one.
+     */
+    uint64_t first_literal;
+    uint8_t first_literal_type;
+    int has_literal;
 };
 
 int seki_core_to_c(const unsigned char *core, size_t core_length,

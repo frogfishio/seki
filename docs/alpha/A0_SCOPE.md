@@ -146,10 +146,16 @@ a module stating a different obligation set still projects to C.
 `build` additionally requires the restricted-C projection, whose slice is
 currently narrower. A module can therefore pass `check` and fail `build` with a
 stable `A0-BACKEND-*` diagnostic and no output file. At revision
-`0.0.0-alpha.6` the known cases are non-`U8` record fields, payload-bearing
-variant cases, and modules declaring more than one record and one variant.
-`inspect` reports the two boundaries separately as `frontend=alpha-decision`
-and `backend=alpha-u8-decision`.
+`0.0.0-alpha.6` the known cases are payload-bearing variant cases and modules
+declaring more than one record and one variant. `inspect` reports the two
+boundaries as `frontend=alpha-decision` and `backend=alpha-decision`, and
+reports `first_literal=<value>:<type>` when the kernel has an integer literal.
+
+Record fields carry their own unsigned width through both directions: `U8`,
+`U16`, `U32`, and `U64` project to the matching exact-width C type, and integer
+literals encode in exactly their type's octet count, most significant first.
+Surface literals remain checked `U32`, so a `U64` field can be compared against
+values up to 4294967295; a wider literal fails closed as `A0-LEX-0001`.
 
 Closing that gap is A0-03 work, not a defect in either direction: both fail
 closed, and `build` writes no artifact unless every stage succeeds.

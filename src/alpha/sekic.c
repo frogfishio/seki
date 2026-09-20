@@ -230,13 +230,21 @@ inspect_command(const char *input_path)
      * requires the narrower restricted-C projection. A module can satisfy the
      * first and not yet the second.
      */
-    (void)printf(
-        "frontend=alpha-decision\n"
-        "backend=alpha-u8-decision\n"
-        "profile=c11_bounded@%u\n"
-        "threshold_u8=%u\n"
-        "authority=none\n",
-        (unsigned)inspection.profile_version, (unsigned)inspection.threshold);
+    {
+        static const char *const integer_names[] = {"u8", "u16", "u32", "u64"};
+        (void)printf(
+            "frontend=alpha-decision\n"
+            "backend=alpha-decision\n"
+            "profile=c11_bounded@%u\n",
+            (unsigned)inspection.profile_version);
+        if (inspection.has_literal && inspection.first_literal_type >= 2U &&
+            inspection.first_literal_type <= 5U) {
+            (void)printf("first_literal=%llu:%s\n",
+                (unsigned long long)inspection.first_literal,
+                integer_names[inspection.first_literal_type - 2U]);
+        }
+        (void)printf("authority=none\n");
+    }
     return EXIT_OK;
 }
 

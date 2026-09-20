@@ -271,6 +271,43 @@ try {
     `-I${temporary}`, nestedHarness, "-o", nestedExe], { stdio: "inherit" });
   assert.equal(execFileSync(nestedExe, { encoding: "utf8" }), "0\n");
 
+  // Record fields carry their own unsigned width through both directions, and
+  // an integer literal wider than one octet round-trips big-endian.
+  const wideSource = path.join(temporary, "wide.seki");
+  const wideCore = path.join(temporary, "wide.scb0");
+  const wideC = path.join(temporary, "wide.c");
+  fs.writeFileSync(wideSource, [
+    "module gate::wide @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export record Meter { count: U32, level: U16 }.",
+    "export variant Fault [ TooHigh @ 2. ].",
+    "",
+    "export kernel gauge meter: Meter",
+    "-> Decision[Unit, Fault] arithmetic: checked",
+    "bounded steps: 128 liveBits: 1024 controlDepth: 64 workspaceBits: 0",
+    "rejects: Fault::TooHigh",
+    "publication: none [ (meter count) > 70000",
+    "  ifTrue: [ reject Fault::TooHigh ] ifFalse: [ accept unit ] ].",
+    "",
+  ].join("\n"));
+  const wide = run(["build", "--core", wideCore, "--c", wideC, wideSource]);
+  assert.equal(wide.status, 0, wide.stderr);
+  const wideDecoded = decodeModule(fs.readFileSync(wideCore));
+  checkTypedCore(wideDecoded);
+  // IntLit(U32, 70000) occupies exactly four octets, most significant first.
+  const wideLiteral = wideDecoded.kernels[0][1].body[1].term[3].term;
+  assert.equal(wideLiteral[1], 2);
+  assert.deepEqual([...wideLiteral[2]], [0x00, 0x01, 0x11, 0x70]);
+  const wideText = fs.readFileSync(wideC, "utf8");
+  assert.match(wideText, /uint32_t seki_f_count;/u);
+  assert.match(wideText, /uint16_t seki_f_level;/u);
+  assert.match(wideText, /seki_f_count > UINT32_C\(70000\)/u);
+  execFileSync("cc", [...strictFlags, "-c", wideC, "-o",
+    path.join(temporary, "wide.o")], { stdio: "inherit" });
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -308,9 +345,9 @@ try {
   assert.equal(inspected.stderr, "");
   assert.equal(inspected.stdout,
     "frontend=alpha-decision\n" +
-    "backend=alpha-u8-decision\n" +
+    "backend=alpha-decision\n" +
     "profile=c11_bounded@1\n" +
-    "threshold_u8=18\n" +
+    "first_literal=18:u8\n" +
     "authority=none\n");
 
   const badMagicPath = path.join(temporary, "bad-magic.scb0");
@@ -344,7 +381,8 @@ try {
     "seki_alpha_cli=verified version=0.0.0-alpha.6 commands=4 connected=3 " +
     "slice=u8-decision fields=2 rejections=2 renamed=yes overwrite=reject " +
     "operators=4 source_order=canonical table_order=name-derived " +
-    "header_vectors=general nested_control=yes exhaustive=65536",
+    "header_vectors=general nested_control=yes exhaustive=65536 " +
+    "widths=u8,u16,u32,u64",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

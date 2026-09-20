@@ -276,6 +276,16 @@
   agrees with the stated policy on all 65,536 input pairs under
   AddressSanitizer and UndefinedBehaviorSanitizer. Boolean literal conditions
   also project. The minimum-age C remains byte-identical.
+- Record fields carry their own unsigned width end to end. `U8`, `U16`, `U32`,
+  and `U64` fields project to the matching exact-width C type, and integer
+  literals encode in exactly their type's octet count, most significant first.
+  The independent decoder confirms `IntLit(U32, 70000)` as `00 01 11 70` and
+  the `U64` boundary as eight octets. Surface literals remain checked `U32`, so
+  a `U64` field compares against values up to 4294967295 and a wider literal
+  fails closed as `A0-LEX-0001`.
+- `inspect` no longer reports a minimum-age-shaped `threshold_u8`. It reports
+  `first_literal=<value>:<type>` when the kernel has one, and both boundaries
+  now read `alpha-decision`.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
@@ -326,9 +336,10 @@ make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 
 Local and pinned Linux/amd64 seed, status, bootstrap-closure, JSON,
 encoding-vector, semantic-coverage, strict-C11, sanitizer, and whitespace checks
-passed on 2026-09-20. The alpha compiler additionally passed 1,500 source and
-1,500 typed-core mutation cases across the minimum-age and nested three-premise
-kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
-after the two stack-exhaustion defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
+passed on 2026-09-20. The alpha compiler additionally passed 2,000 source and
+2,500 typed-core mutation cases across the minimum-age, nested three-premise,
+and wide-integer kernels under AddressSanitizer and UndefinedBehaviorSanitizer
+with no finding, after the two stack-exhaustion defects that earlier sweeps
+found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.

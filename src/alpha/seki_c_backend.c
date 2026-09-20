@@ -45,6 +45,9 @@ enum restricted_term {
 struct restricted_expression {
     enum restricted_term kind;
     enum restricted_compare compare;
+    /* INT_LIT: the literal's value and its SCB-0 integer type tag. */
+    uint64_t value;
+    uint8_t integer_type;
     /*
      * LOCAL    a = environment slot
      * PROJECT  a = record expression, b = field index
@@ -85,9 +88,11 @@ struct restricted_kernel {
     struct restricted_tail tails[RESTRICTED_MAX_TAILS];
     size_t tail_count;
     uint32_t body_root;
-    /* First projected field and first constructed rejection, retained only for
-     * the E0 compatibility-ABI test and the `inspect` threshold report. */
-    uint8_t threshold;
+    /* First integer literal and first constructed rejection, retained for the
+     * E0 compatibility-ABI test and the `inspect` report. */
+    uint64_t first_literal;
+    uint8_t first_literal_type;
+    int has_literal;
     uint8_t rejection_tag;
 };
 
@@ -105,6 +110,8 @@ struct restricted_module {
     struct decoded_name record_name;
     struct decoded_name field_name;
     struct decoded_name fields[DECODED_FIELD_CAPACITY];
+    /* SCB-0 `Type` tag per field: 2..5 for U8, U16, U32, U64. */
+    uint8_t field_types[DECODED_FIELD_CAPACITY];
     size_t field_count;
     struct decoded_name variant_name;
     struct decoded_name case_name;
@@ -338,7 +345,13 @@ decode_header(struct reader *reader, struct restricted_module *module)
                 declaration_index < field_count && !reader->failed;
                 declaration_index += 1U) {
                 read_name(reader, &module->fields[declaration_index]);
-                expect_u8(reader, 2U, "input field must be U8");
+                module->field_types[declaration_index] = read_u8(reader);
+                if (!reader->failed &&
+                    (module->field_types[declaration_index] < 2U ||
+                     module->field_types[declaration_index] > 5U)) {
+                    reader_fail(reader,
+                        "input field must be U8, U16, U32, or U64");
+                }
                 if (!reader->failed && declaration_index != 0U &&
                     !decoded_name_precedes(
                         &module->fields[declaration_index - 1U],
@@ -443,6 +456,9 @@ expect_claimed_type(struct reader *reader, struct restricted_module *module)
     case 0U:
     case 1U:
     case 2U:
+    case 3U:
+    case 4U:
+    case 5U:
         return;
     case 19U:
         expect_u8(reader, 0U, "decision result must accept Unit");
@@ -492,14 +508,27 @@ decode_expression(struct reader *reader, struct restricted_module *module)
         expression.a = value;
         break;
     }
-    case 2U:
-        expect_u8(reader, 0U, "integer literal family must be U8");
+    case 2U: {
+        const uint8_t family = read_u8(reader);
+        unsigned octet;
+        unsigned width;
+        if (!reader->failed && family > 3U) {
+            reader_fail(reader, "integer literal must be an unsigned family");
+            return 0U;
+        }
+        width = 1U << family;
         expression.kind = RESTRICTED_INT_LIT;
-        expression.a = read_u8(reader);
-        if (module->kernel.threshold == 0U) {
-            module->kernel.threshold = (uint8_t)expression.a;
+        expression.integer_type = (uint8_t)(family + 2U);
+        for (octet = 0U; octet < width && !reader->failed; octet += 1U) {
+            expression.value = (expression.value << 8) | read_u8(reader);
+        }
+        if (!module->kernel.has_literal && !reader->failed) {
+            module->kernel.has_literal = 1;
+            module->kernel.first_literal = expression.value;
+            module->kernel.first_literal_type = expression.integer_type;
         }
         break;
+    }
     case 4U:
         expression.kind = RESTRICTED_LOCAL;
         expression.a = read_u32(reader);
@@ -786,18 +815,21 @@ text_put(struct text_buffer *buffer, const char *text)
 }
 
 static void
-text_put_u8(struct text_buffer *buffer, uint8_t value)
+text_put_unsigned(struct text_buffer *buffer, uint64_t value)
 {
-    char reversed[3];
-    size_t length = 0U;
-    size_t index;
+    char digits[20];
+    size_t count = 0U;
     do {
-        reversed[length++] = (char)('0' + (value % 10U));
-        value = (uint8_t)(value / 10U);
+        digits[count++] = (char)('0' + (int)(value % 10U));
+        value /= 10U;
     } while (value != 0U);
-    for (index = length; index > 0U; index -= 1U) {
-        const char digit[2] = {reversed[index - 1U], '\0'};
-        text_put(buffer, digit);
+    while (count != 0U) {
+        count -= 1U;
+        if (buffer->failed || buffer->length == buffer->capacity) {
+            buffer->failed = 1;
+            return;
+        }
+        buffer->bytes[buffer->length++] = digits[count];
     }
 }
 
@@ -862,6 +894,24 @@ text_put_parameter_identifier(struct text_buffer *buffer,
 }
 
 static const char *
+restricted_integer_type(uint8_t tag)
+{
+    static const char *const spellings[] = {
+        "uint8_t", "uint16_t", "uint32_t", "uint64_t"
+    };
+    return tag >= 2U && tag <= 5U ? spellings[tag - 2U] : "uint8_t";
+}
+
+static const char *
+restricted_integer_macro(uint8_t tag)
+{
+    static const char *const spellings[] = {
+        "UINT8_C(", "UINT16_C(", "UINT32_C(", "UINT64_C("
+    };
+    return tag >= 2U && tag <= 5U ? spellings[tag - 2U] : "UINT8_C(";
+}
+
+static const char *
 restricted_compare_text(enum restricted_compare compare)
 {
     static const char *const spellings[] = {
@@ -907,8 +957,8 @@ print_expression(struct text_buffer *output,
         text_put_name(output, &module->fields[expression->b], 0);
         break;
     case RESTRICTED_INT_LIT:
-        text_put(output, "UINT8_C(");
-        text_put_u8(output, (uint8_t)expression->a);
+        text_put(output, restricted_integer_macro(expression->integer_type));
+        text_put_unsigned(output, expression->value);
         text_put(output, ")");
         break;
     case RESTRICTED_BOOL_LIT:
@@ -957,7 +1007,7 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         text_put(output, "result.tag = UINT8_C(1);\n");
         text_put_indent(output, depth);
         text_put(output, "result.reason = UINT8_C(");
-        text_put_u8(output, (uint8_t)reason->a);
+        text_put_unsigned(output, (uint64_t)reason->a);
         text_put(output, ");\n");
         break;
     }
@@ -991,7 +1041,10 @@ print_module(const struct restricted_module *module, char *c_source,
         "typedef struct {\n");
     for (field_index = 0U; field_index < module->field_count;
         field_index += 1U) {
-        text_put(&output, "    uint8_t ");
+        text_put(&output, "    ");
+        text_put(&output,
+            restricted_integer_type(module->field_types[field_index]));
+        text_put(&output, " ");
         if (!uses_e0_compatibility_abi(module)) {
             text_put(&output, "seki_f_");
         }
@@ -1087,6 +1140,8 @@ seki_inspect_core(const unsigned char *core, size_t core_length,
         return 0;
     }
     inspection->profile_version = module.profile_version;
-    inspection->threshold = module.kernel.threshold;
+    inspection->first_literal = module.kernel.first_literal;
+    inspection->first_literal_type = module.kernel.first_literal_type;
+    inspection->has_literal = module.kernel.has_literal;
     return 1;
 }
