@@ -146,10 +146,17 @@ a module stating a different obligation set still projects to C.
 `build` additionally requires the restricted-C projection, whose slice is
 currently narrower. A module can therefore pass `check` and fail `build` with a
 stable `A0-BACKEND-*` diagnostic and no output file. At revision
-`0.0.0-alpha.6` the known cases are payload-bearing variant cases and alias or
-nominal declarations. `inspect` reports the two
+`0.0.0-alpha.6` the known case is payload-bearing variant cases. `inspect`
+reports the two
 boundaries as `frontend=alpha-decision` and `backend=alpha-decision`, and
 reports `first_literal=<value>:<type>` when the kernel has an integer literal.
+
+Alias and nominal declarations project to C typedefs, emitted in the module's
+type dependency order so a typedef precedes its use. Nominals are not
+substitutable even when they share a representation, and that distinction
+survives into the generated C by construction: the projection resolves through
+them when choosing a C form, so an octet identity behind a nominal is still
+compared by content rather than by address.
 
 A module may declare any number of records and variants. Each record becomes a
 C struct in canonical order, a variant contributes no type of its own because

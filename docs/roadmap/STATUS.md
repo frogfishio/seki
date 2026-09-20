@@ -310,6 +310,20 @@
   three-field kernel derives `(18,56,7,0)`, which the independent checker
   reproduces, and its generated C agrees with the stated policy on 692,224
   sampled input triples.
+- Alias and nominal declarations now reach C. A nominal becomes a typedef over
+  its representation, and declarations are emitted in the module's own type
+  dependency order rather than canonical name order, so a typedef always
+  precedes its use. The typed core's derivation bundle supplies that order
+  directly.
+- Nominal types are not substitutable even when they share a representation:
+  two distinct nominals over `Digest[sha256, 32]` do not compare, which is the
+  property a handoff needs from distinct evidence identities. The checker
+  already enforced this; it now survives to C.
+- An octet array reached through a nominal is still an octet array. Comparing
+  two of them with a C operator would have compared addresses, always differed,
+  and rejected every input while compiling without a warning. Type resolution
+  follows alias and nominal declarations before choosing a C form, and a
+  regression case asserts the constant-time helper is used rather than `!=`.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
@@ -377,10 +391,11 @@ make check-e0-manifest
 
 Local and pinned Linux/amd64 seed, status, bootstrap-closure, JSON,
 encoding-vector, semantic-coverage, strict-C11, sanitizer, and whitespace checks
-passed on 2026-09-20. The alpha compiler additionally passed 3,800 source and
-4,300 typed-core mutation cases across the minimum-age, nested three-premise,
-wide-integer, four-declaration, two-digest, and short-circuit Boolean kernels
-under AddressSanitizer and UndefinedBehaviorSanitizer with no finding, after
-the two stack-exhaustion defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
+passed on 2026-09-20, including the E0 Lean proof under the pinned toolchain.
+The alpha compiler additionally passed 4,400 source and 4,900 typed-core
+mutation cases across the minimum-age, nested three-premise, wide-integer,
+four-declaration, two-digest, short-circuit Boolean, and nominal-identity
+kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
+after the two stack-exhaustion defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.

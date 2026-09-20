@@ -454,6 +454,65 @@ try {
   assert.equal(boolBadRun.status, 65);
   assert.match(boolBadRun.stderr, /^A0-CHECK-0018:/u);
 
+  // Nominal types are not substitutable even when they share a representation,
+  // which is the property a handoff needs from distinct evidence identities.
+  const nominalSource = path.join(temporary, "nominal.seki");
+  const nominalCore = path.join(temporary, "nominal.scb0");
+  const nominalC = path.join(temporary, "nominal.c");
+  fs.writeFileSync(nominalSource, [
+    "module grit::identity @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export nominal ArtifactId := Digest[sha256, 32].",
+    "export nominal PackId := Digest[sha256, 32].",
+    "",
+    "export record Handoff {",
+    "  artifact: ArtifactId, expected: ArtifactId, pack: PackId",
+    "}.",
+    "export variant Refusal [ ArtifactMismatch @ 1. ].",
+    "",
+    "export kernel publish handoff: Handoff",
+    "-> Decision[Unit, Refusal] arithmetic: checked",
+    "bounded steps: 128 liveBits: 8192 controlDepth: 64 workspaceBits: 0",
+    "rejects: Refusal::ArtifactMismatch",
+    "publication: none [ (handoff artifact) != (handoff expected)",
+    "  ifTrue: [ reject Refusal::ArtifactMismatch ] ifFalse: [ accept unit ] ].",
+    "",
+  ].join("\n"));
+  const nominal = run([
+    "build", "--core", nominalCore, "--c", nominalC, nominalSource,
+  ]);
+  assert.equal(nominal.status, 0, nominal.stderr);
+  const nominalDecoded = decodeModule(fs.readFileSync(nominalCore));
+  checkTypedCore(nominalDecoded);
+  // A typedef must precede its use, so declarations follow the module's own
+  // dependency order rather than canonical name order.
+  assert.deepEqual(nominalDecoded.derivations.typeOrder, [0, 2, 1, 3]);
+  const nominalText = fs.readFileSync(nominalC, "utf8");
+  assert.ok(nominalText.indexOf("} seki_a0_identity_handoff;") >
+    nominalText.indexOf("typedef uint8_t seki_a0_identity_artifactid[32];"),
+    "a typedef was emitted after the struct that uses it");
+  // An octet array reached through a nominal is still an octet array.
+  // Comparing two of them with a C operator would compare addresses, always
+  // differ, and reject every input.
+  assert.match(nominalText,
+    /!seki_a0_identity_octets_equal\(seki_p_handoff\.seki_f_artifact, /u);
+  assert.ok(!/seki_f_artifact != seki_p_handoff/u.test(nominalText),
+    "octet identities were compared as pointers");
+  execFileSync("cc", [...strictFlags, "-c", nominalC, "-o",
+    path.join(temporary, "nominal.o")], { stdio: "inherit" });
+
+  // Two nominals over the same representation do not compare.
+  const nominalSub = path.join(temporary, "nominal-sub.seki");
+  fs.writeFileSync(nominalSub, fs.readFileSync(nominalSource, "utf8")
+    .replace("(handoff expected)", "(handoff pack)"));
+  const substituted = run(["check", nominalSub]);
+  assert.equal(substituted.status, 65);
+  assert.match(substituted.stderr,
+    /^A0-CHECK-0004:.*comparison operands are incompatible\n$/u);
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -529,7 +588,7 @@ try {
     "operators=4 source_order=canonical table_order=name-derived " +
     "header_vectors=general nested_control=yes exhaustive=65536 " +
     "widths=u8,u16,u32,u64 declarations=n octets=constant-time " +
-    "boolean=short-circuit",
+    "boolean=short-circuit nominals=non-substitutable",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

@@ -56,6 +56,7 @@ struct restricted_expression {
      * length. The printer uses these to choose a C form. */
     uint8_t type_tag;
     uint32_t type_length;
+    uint32_t type_declaration;
     /*
      * LOCAL    a = environment slot
      * PROJECT  a = record expression, b = field index
@@ -119,6 +120,14 @@ enum decoded_declaration_kind {
 struct decoded_declaration {
     enum decoded_declaration_kind kind;
     struct decoded_name name;
+    /*
+     * For an alias or nominal: the SCB-0 type it stands for. When that is
+     * itself a declaration, `representation_declaration` names it and the
+     * chain is followed at print time.
+     */
+    uint8_t representation_tag;
+    uint32_t representation_length;
+    uint32_t representation_declaration;
     struct decoded_name fields[DECODED_FIELD_CAPACITY];
     /*
      * SCB-0 `Type` tag per field: 2..5 for U8, U16, U32, U64; 11 for
@@ -127,6 +136,8 @@ struct decoded_declaration {
      */
     uint8_t field_types[DECODED_FIELD_CAPACITY];
     uint32_t field_lengths[DECODED_FIELD_CAPACITY];
+    /* Declaration position when the field's type tag is `Declared`. */
+    uint32_t field_declarations[DECODED_FIELD_CAPACITY];
     size_t field_count;
     struct decoded_name cases[DECODED_CASE_CAPACITY];
     uint32_t case_tags[DECODED_CASE_CAPACITY];
@@ -149,6 +160,12 @@ struct restricted_module {
      * E0 compatibility-ABI test. */
     struct decoded_name field_name;
     struct decoded_name case_name;
+    /*
+     * The module's own type dependency order. A C typedef must precede its
+     * use, and the canonical table is ordered by name, so declarations are
+     * emitted in this order instead.
+     */
+    uint32_t type_order[DECODED_DECL_CAPACITY];
     struct restricted_kernel kernel;
 };
 
@@ -307,7 +324,7 @@ expect_bounds(struct reader *reader, uint32_t steps, uint32_t live_bits,
 
 static void read_claimed_type(struct reader *reader,
     struct restricted_module *module, uint8_t *type_tag,
-    uint32_t *type_length);
+    uint32_t *type_length, uint32_t *declared);
 
 static void
 decode_header(struct reader *reader, struct restricted_module *module)
@@ -385,15 +402,16 @@ decode_header(struct reader *reader, struct restricted_module *module)
                 read_name(reader, &declaration->fields[declaration_index]);
                 read_claimed_type(reader, module,
                     &declaration->field_types[declaration_index],
-                    &declaration->field_lengths[declaration_index]);
+                    &declaration->field_lengths[declaration_index],
+                    &declaration->field_declarations[declaration_index]);
                 if (!reader->failed) {
                     const uint8_t kind =
                         declaration->field_types[declaration_index];
                     if (!((kind >= 2U && kind <= 5U) || kind == 11U ||
-                        kind == 13U)) {
+                        kind == 13U || kind == 21U)) {
                         reader_fail(reader,
                             "record field must be an unsigned integer, "
-                            "Bytes, or Digest");
+                            "Bytes, Digest, or a declared type");
                         return;
                     }
                 }
@@ -436,8 +454,25 @@ decode_header(struct reader *reader, struct restricted_module *module)
                     return;
                 }
             }
+        } else if (body == 0U || body == 1U) {
+            declaration->kind = body == 0U ?
+                DECODED_DECL_ALIAS : DECODED_DECL_NOMINAL;
+            read_claimed_type(reader, module,
+                &declaration->representation_tag,
+                &declaration->representation_length,
+                &declaration->representation_declaration);
+            if (!reader->failed) {
+                const uint8_t kind = declaration->representation_tag;
+                if (!((kind >= 2U && kind <= 5U) || kind == 11U ||
+                    kind == 13U || kind == 21U)) {
+                    reader_fail(reader,
+                        "alias or nominal must stand for an unsigned "
+                        "integer, Bytes, Digest, or a declared type");
+                    return;
+                }
+            }
         } else {
-            reader_fail(reader, "declaration must be a record or a variant");
+            reader_fail(reader, "unknown type declaration body");
             return;
         }
     }
@@ -522,11 +557,12 @@ add_expression(struct reader *reader, struct restricted_module *module,
  */
 static void
 read_claimed_type(struct reader *reader, struct restricted_module *module,
-    uint8_t *type_tag, uint32_t *type_length)
+    uint8_t *type_tag, uint32_t *type_length, uint32_t *declared)
 {
     const uint8_t tag = read_u8(reader);
     *type_tag = tag;
     *type_length = 0U;
+    *declared = UINT32_MAX;
     if (reader->failed) {
         return;
     }
@@ -559,9 +595,9 @@ read_claimed_type(struct reader *reader, struct restricted_module *module,
     case 21U: {
         const uint8_t local = read_u8(reader);
         const uint32_t position = read_u32(reader);
+        *declared = position;
         if (!reader->failed && (local != 0U ||
-            (position != module->record_position &&
-             position != module->variant_position))) {
+            (size_t)position >= module->declaration_count)) {
             reader_fail(reader, "declared type is outside the module");
         }
         return;
@@ -582,7 +618,7 @@ decode_expression(struct reader *reader, struct restricted_module *module)
         return 0U;
     }
     read_claimed_type(reader, module, &expression.type_tag,
-        &expression.type_length);
+        &expression.type_length, &expression.type_declaration);
     term = read_u8(reader);
     if (reader->failed) {
         return 0U;
@@ -852,7 +888,7 @@ expect_tag_vector(struct reader *reader, uint8_t maximum, const char *what)
 }
 
 static void
-decode_footer(struct reader *reader, const struct restricted_module *module)
+decode_footer(struct reader *reader, struct restricted_module *module)
 {
     uint32_t index;
     expect_u32(reader, 0U, "exported domains must be empty");
@@ -882,15 +918,30 @@ decode_footer(struct reader *reader, const struct restricted_module *module)
     expect_bounds(reader, 16777216U, 8388608U, 256U, 8388608U);
     expect_u32(reader, 0U, "derivation schema changed");
     /*
-     * With no local type referring to another, the canonical greedy
-     * topological order is the table order. A record whose field names another
-     * declaration is outside this projection, so a different permutation here
-     * means the module is not the one the projection decoded.
+     * The module carries its own type dependency order, and a C typedef must
+     * precede its use. Read it and check it is a permutation rather than
+     * assuming the canonical table order, which is by name.
      */
     expect_u32(reader, (uint32_t)module->declaration_count,
         "type derivation count changed");
-    for (index = 0U; index < (uint32_t)module->declaration_count; index += 1U) {
-        expect_u32(reader, index, "type derivation order changed");
+    {
+        int seen[DECODED_DECL_CAPACITY];
+        memset(seen, 0, sizeof seen);
+        for (index = 0U; index < (uint32_t)module->declaration_count &&
+            !reader->failed; index += 1U) {
+            const uint32_t position = read_u32(reader);
+            if (reader->failed) {
+                return;
+            }
+            if ((size_t)position >= module->declaration_count ||
+                seen[position]) {
+                reader_fail(reader,
+                    "type derivation order is not a permutation");
+                return;
+            }
+            seen[position] = 1;
+            module->type_order[index] = position;
+        }
     }
     expect_u32(reader, 0U, "function derivations must be empty");
 }
@@ -1046,6 +1097,9 @@ text_put_indent(struct text_buffer *output, unsigned depth)
 static void print_expression(struct text_buffer *output,
     const struct restricted_module *module, uint32_t index);
 
+static void resolve_representation(const struct restricted_module *module,
+    uint8_t tag, uint32_t declared, uint8_t *out_tag, uint32_t *out_length);
+
 /*
  * Parenthesises an operand that is itself a short-circuit node, so the printed
  * C groups exactly as the decoded tree does rather than relying on the reader
@@ -1105,12 +1159,22 @@ print_expression(struct text_buffer *output,
         break;
     case RESTRICTED_COMPARE: {
         const struct restricted_expression *left;
+        uint8_t left_tag = 0U;
+        uint32_t left_length = 0U;
         if ((size_t)expression->a >= module->kernel.expression_count) {
             output->failed = 1;
             return;
         }
         left = &module->kernel.expressions[expression->a];
-        if (left->type_tag == 11U || left->type_tag == 13U) {
+        /*
+         * Resolve through alias and nominal declarations: an octet array
+         * reached through a nominal is still an octet array, and comparing
+         * two of them with a C operator would compare addresses rather than
+         * contents.
+         */
+        resolve_representation(module, left->type_tag, left->type_declaration,
+            &left_tag, &left_length);
+        if (left_tag == 11U || left_tag == 13U) {
             /* Octet arrays are not comparable with a C operator. Only
              * equality reaches here: ordered comparison on them is rejected
              * by the checker. */
@@ -1128,7 +1192,7 @@ print_expression(struct text_buffer *output,
             text_put(output, ", ");
             print_expression(output, module, expression->b);
             text_put(output, ", UINT32_C(");
-            text_put_unsigned(output, left->type_length);
+            text_put_unsigned(output, left_length);
             text_put(output, "))");
             break;
         }
@@ -1204,6 +1268,66 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
     }
 }
 
+/*
+ * Follows alias and nominal declarations to the representation they stand for.
+ * The descent is bounded by the declaration count, so a cyclic module fails
+ * closed here rather than looping.
+ */
+static void
+resolve_representation(const struct restricted_module *module, uint8_t tag,
+    uint32_t declared, uint8_t *out_tag, uint32_t *out_length)
+{
+    size_t step;
+    *out_tag = tag;
+    *out_length = 0U;
+    for (step = 0U; step <= module->declaration_count; step += 1U) {
+        const struct decoded_declaration *declaration;
+        if (*out_tag != 21U) {
+            return;
+        }
+        if ((size_t)declared >= module->declaration_count) {
+            *out_tag = 0U;
+            return;
+        }
+        declaration = &module->declarations[declared];
+        if (declaration->kind != DECODED_DECL_ALIAS &&
+            declaration->kind != DECODED_DECL_NOMINAL) {
+            return;
+        }
+        *out_tag = declaration->representation_tag;
+        *out_length = declaration->representation_length;
+        declared = declaration->representation_declaration;
+    }
+    *out_tag = 0U;
+}
+
+/* Prints the C type name a field or representation uses. */
+static void
+print_type_name(struct text_buffer *output,
+    const struct restricted_module *module, uint8_t tag, uint32_t length,
+    uint32_t declared, int *is_array, uint32_t *array_length)
+{
+    *is_array = 0;
+    *array_length = 0U;
+    if (tag == 21U) {
+        if ((size_t)declared >= module->declaration_count) {
+            output->failed = 1;
+            return;
+        }
+        text_put_prefix(output, module);
+        text_put(output, "_");
+        text_put_name(output, &module->declarations[declared].name, 1);
+        return;
+    }
+    if (tag == 11U || tag == 13U) {
+        text_put(output, "uint8_t");
+        *is_array = 1;
+        *array_length = length;
+        return;
+    }
+    text_put(output, restricted_integer_type(tag));
+}
+
 /* True when the kernel compares two octet arrays, which needs the helper. */
 static int
 module_compares_octets(const struct restricted_module *module)
@@ -1218,9 +1342,15 @@ module_compares_octets(const struct restricted_module *module)
         if ((size_t)expression->a >= module->kernel.expression_count) {
             continue;
         }
-        if (module->kernel.expressions[expression->a].type_tag == 11U ||
-            module->kernel.expressions[expression->a].type_tag == 13U) {
-            return 1;
+        {
+            const struct restricted_expression *left =
+                &module->kernel.expressions[expression->a];
+            uint8_t tag; uint32_t length;
+            resolve_representation(module, left->type_tag,
+                left->type_declaration, &tag, &length);
+            if (tag == 11U || tag == 13U) {
+                return 1;
+            }
         }
     }
     return 0;
@@ -1256,38 +1386,63 @@ print_module(const struct restricted_module *module, char *c_source,
 {
     struct text_buffer output = {c_source, c_capacity, 0U, 0};
     size_t field_index;
-    size_t declaration_index;
+    size_t order_index;
     text_put(&output, "#include <stdint.h>\n");
     /*
-     * Every declared record becomes a struct, in canonical table order. A
-     * variant contributes no type of its own: its cases are the `reason`
-     * octet of the decision result.
+     * Declarations are emitted in the module's own type dependency order, not
+     * canonical name order, so a typedef always precedes its use. A variant
+     * contributes no type: its cases are the `reason` octet of the decision
+     * result.
      */
-    for (declaration_index = 0U;
-        declaration_index < module->declaration_count;
-        declaration_index += 1U) {
-        const struct decoded_declaration *declaration =
-            &module->declarations[declaration_index];
-        if (declaration->kind != DECODED_DECL_RECORD) {
+    for (order_index = 0U; order_index < module->declaration_count;
+        order_index += 1U) {
+        const uint32_t position = module->type_order[order_index];
+        const struct decoded_declaration *declaration;
+        int is_array = 0;
+        uint32_t array_length = 0U;
+        if ((size_t)position >= module->declaration_count) {
+            return 0;
+        }
+        declaration = &module->declarations[position];
+        if (declaration->kind == DECODED_DECL_VARIANT) {
+            continue;
+        }
+        if (declaration->kind == DECODED_DECL_ALIAS ||
+            declaration->kind == DECODED_DECL_NOMINAL) {
+            text_put(&output, "\ntypedef ");
+            print_type_name(&output, module, declaration->representation_tag,
+                declaration->representation_length,
+                declaration->representation_declaration, &is_array,
+                &array_length);
+            text_put(&output, " ");
+            text_put_prefix(&output, module);
+            text_put(&output, "_");
+            text_put_name(&output, &declaration->name, 1);
+            if (is_array) {
+                text_put(&output, "[");
+                text_put_unsigned(&output, array_length);
+                text_put(&output, "]");
+            }
+            text_put(&output, ";\n");
             continue;
         }
         text_put(&output, "\ntypedef struct {\n");
         for (field_index = 0U; field_index < declaration->field_count;
             field_index += 1U) {
-            const uint8_t kind = declaration->field_types[field_index];
-            const int is_octets = kind == 11U || kind == 13U;
             text_put(&output, "    ");
-            text_put(&output, is_octets ? "uint8_t" :
-                restricted_integer_type(kind));
+            print_type_name(&output, module,
+                declaration->field_types[field_index],
+                declaration->field_lengths[field_index],
+                declaration->field_declarations[field_index], &is_array,
+                &array_length);
             text_put(&output, " ");
             if (!uses_e0_compatibility_abi(module)) {
                 text_put(&output, "seki_f_");
             }
             text_put_name(&output, &declaration->fields[field_index], 0);
-            if (is_octets) {
+            if (is_array) {
                 text_put(&output, "[");
-                text_put_unsigned(&output,
-                    declaration->field_lengths[field_index]);
+                text_put_unsigned(&output, array_length);
                 text_put(&output, "]");
             }
             text_put(&output, ";\n");

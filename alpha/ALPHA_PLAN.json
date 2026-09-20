@@ -49,6 +49,8 @@
   "octet_identity_fields_ready": true,
   "constant_time_identity_comparison": true,
   "short_circuit_boolean_ready": true,
+  "alias_nominal_declarations_ready": true,
+  "dependency_ordered_c_emission": true,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",
