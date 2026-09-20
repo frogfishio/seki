@@ -171,5 +171,50 @@ main(void)
         "A0-PARSE-0034")) {
         return 13;
     }
+    /*
+     * Stack-exhaustion regressions, both found by source mutation fuzzing
+     * under AddressSanitizer.
+     *
+     * Deeply nested parentheses consume no expression-arena slot per level, so
+     * before the nesting ceiling existed they recursed until the host stack was
+     * gone.
+     */
+    {
+        static char deep[8192];
+        const size_t depth = 2000U;
+        size_t index;
+        size_t at = 0U;
+        static const char head[] =
+            "module a @ 1 profile: p @ 1 claims: c requires: r. "
+            "export variant R [ Bad @ 1. ]. "
+            "export kernel k -> Decision[Unit, R] arithmetic: checked "
+            "bounded steps: 1 liveBits: 1 controlDepth: 1 workspaceBits: 0 "
+            "rejects: R::Bad publication: none [ accept ";
+        memcpy(deep, head, sizeof head - 1U);
+        at = sizeof head - 1U;
+        for (index = 0U; index < depth && at < sizeof deep - 1U; index += 1U) {
+            deep[at++] = '(';
+        }
+        deep[at] = '\0';
+        if (!rejects_module(deep, "A0-PARSE-0035")) {
+            return 14;
+        }
+    }
+    /*
+     * A lexer failure leaves the parser's current token stale. A stale `ifTrue`
+     * used to drive the conditional production forever; the original lexer
+     * diagnostic must survive instead.
+     */
+    if (!rejects_module(
+        "module a @ 1 profile: p @ 1 claims: c requires: r. "
+        "export record D { v: U8 }. "
+        "export variant R [ Bad @ 1. ]. "
+        "export kernel k d: D -> Decision[Unit, R] arithmetic: checked "
+        "bounded steps: 1 liveBits: 1 controlDepth: 1 workspaceBits: 0 "
+        "rejects: R::Bad publication: none [ (d v) < 18 "
+        "ifTrue\x01 [ reject R::Bad ] ifFalse: [ accept unit ] ].",
+        "A0-LEX-0003")) {
+        return 15;
+    }
     return 0;
 }

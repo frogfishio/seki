@@ -23,7 +23,8 @@ try {
   console.log(
     "seki_alpha_parser=verified header=general " +
     "declarations=alias,nominal,record,variant " +
-    "kernel=envelope,tail-ast complete-module=yes positive=3 hostile=9",
+    "kernel=envelope,tail-ast complete-module=yes positive=3 hostile=11 " +
+    "nesting=bounded",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

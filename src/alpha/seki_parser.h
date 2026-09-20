@@ -17,6 +17,14 @@
 #define SEKI_KERNEL_MAX_REJECTIONS 32U
 #define SEKI_KERNEL_MAX_EXPRESSIONS 256U
 
+/*
+ * Syntactic nesting ceiling, matching `maximum_nesting` in the
+ * `c11_bounded @ 1` profile. Recursive descent is bounded by this rather than
+ * by the host stack: a source nested more deeply than admission would accept
+ * is rejected while parsing instead of exhausting the stack.
+ */
+#define SEKI_MAX_NESTING 256U
+
 struct seki_name {
     const unsigned char *bytes;
     size_t length;

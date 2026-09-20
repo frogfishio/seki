@@ -8,6 +8,7 @@ struct parser {
     struct seki_lexer lexer;
     struct seki_token current;
     struct seki_parse_error *error;
+    size_t depth;
     int failed;
 };
 
@@ -42,6 +43,35 @@ parser_fail(struct parser *parser, const char *code, const char *message)
         parser->error->message = message;
         parser->error->line = parser->current.line;
         parser->error->column = parser->current.column;
+    }
+}
+
+/*
+ * Enters one level of syntactic nesting. Returns zero when the parser has
+ * already failed or the nesting ceiling is reached, in which case the caller
+ * must not descend. Every recursive production is guarded by this, so no input
+ * can drive descent deeper than the profile admits.
+ */
+static int
+enter_nesting(struct parser *parser)
+{
+    if (parser->failed) {
+        return 0;
+    }
+    if (parser->depth == SEKI_MAX_NESTING) {
+        parser_fail(parser, "A0-PARSE-0035",
+            "syntax nesting exceeds the profile ceiling");
+        return 0;
+    }
+    parser->depth += 1U;
+    return 1;
+}
+
+static void
+leave_nesting(struct parser *parser)
+{
+    if (parser->depth != 0U) {
+        parser->depth -= 1U;
     }
 }
 
@@ -503,10 +533,14 @@ parse_primary_expression(struct parser *parser,
         expression.value.name = take_value_name(parser);
         result = add_expression(parser, kernel, &expression);
     } else if (parser->current.kind == SEKI_TOKEN_LPAREN) {
+        if (!enter_nesting(parser)) {
+            return UINT32_MAX;
+        }
         advance(parser);
         result = parse_value_expression(parser, kernel);
         expect_kind(parser, SEKI_TOKEN_RPAREN,
             "expected parenthesized expression close");
+        leave_nesting(parser);
     } else {
         parser_fail(parser, "A0-PARSE-0031", "expected value expression");
     }
@@ -600,39 +634,53 @@ static uint32_t
 parse_kernel_tail(struct parser *parser, struct seki_kernel_decl *kernel)
 {
     struct seki_expression expression;
+    uint32_t result = UINT32_MAX;
     memset(&expression, 0, sizeof expression);
+    /*
+     * A failed parser never advances, so its current token is stale. Without
+     * this guard a stale `ifTrue` would drive the conditional production
+     * forever instead of reporting the original diagnostic.
+     */
+    if (!enter_nesting(parser)) {
+        return UINT32_MAX;
+    }
     if (token_is(&parser->current, "accept")) {
         advance(parser);
         expression.kind = SEKI_EXPR_ACCEPT;
         expression.value.accept.value = parse_value_expression(parser, kernel);
-        return add_expression(parser, kernel, &expression);
-    }
-    if (token_is(&parser->current, "reject")) {
+        result = add_expression(parser, kernel, &expression);
+    } else if (token_is(&parser->current, "reject")) {
         advance(parser);
         expression.kind = SEKI_EXPR_REJECT;
         expression.value.rejection = parse_variant_ref(parser);
-        return add_expression(parser, kernel, &expression);
+        result = add_expression(parser, kernel, &expression);
+    } else {
+        expression.kind = SEKI_EXPR_IF;
+        expression.value.conditional.condition =
+            parse_value_expression(parser, kernel);
+        if (!token_is(&parser->current, "ifTrue")) {
+            parser_fail(parser, "A0-PARSE-0032",
+                "expected kernel ifTrue branch");
+        } else {
+            advance(parser);
+            expect_kind(parser, SEKI_TOKEN_COLON, "expected ifTrue colon");
+            expression.value.conditional.if_true =
+                parse_kernel_block(parser, kernel);
+            if (!token_is(&parser->current, "ifFalse")) {
+                parser_fail(parser, "A0-PARSE-0033",
+                    "expected kernel ifFalse branch");
+            } else {
+                advance(parser);
+                expect_kind(parser, SEKI_TOKEN_COLON,
+                    "expected ifFalse colon");
+                expression.value.conditional.if_false =
+                    parse_kernel_block(parser, kernel);
+                result = add_expression(parser, kernel, &expression);
+            }
+        }
     }
-    expression.kind = SEKI_EXPR_IF;
-    expression.value.conditional.condition =
-        parse_value_expression(parser, kernel);
-    if (!token_is(&parser->current, "ifTrue")) {
-        parser_fail(parser, "A0-PARSE-0032",
-            "expected kernel ifTrue branch");
-        return UINT32_MAX;
-    }
-    advance(parser);
-    expect_kind(parser, SEKI_TOKEN_COLON, "expected ifTrue colon");
-    expression.value.conditional.if_true = parse_kernel_block(parser, kernel);
-    if (!token_is(&parser->current, "ifFalse")) {
-        parser_fail(parser, "A0-PARSE-0033",
-            "expected kernel ifFalse branch");
-        return UINT32_MAX;
-    }
-    advance(parser);
-    expect_kind(parser, SEKI_TOKEN_COLON, "expected ifFalse colon");
-    expression.value.conditional.if_false = parse_kernel_block(parser, kernel);
-    return add_expression(parser, kernel, &expression);
+    leave_nesting(parser);
+    return result;
 }
 
 static void
