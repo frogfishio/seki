@@ -1052,6 +1052,62 @@ cost_of_kernel_tail(struct checker *checker, uint32_t expression_index,
     return cost;
 }
 
+/*
+ * `check_order` from the typed-core model, section 8.7. Rejection indices
+ * strictly increase along every sequentially reachable continuation, so the
+ * declared `rejects:` order is the order premises are actually checked rather
+ * than an inventory the body may contradict. Mutually exclusive branches may
+ * each begin at an unrelated index because only one of them runs.
+ */
+static void
+check_rejection_order(struct checker *checker, uint32_t expression_index,
+    uint32_t floor)
+{
+    const struct seki_expression *expression;
+    const struct seki_expr_info *info;
+    if (checker->failed ||
+        (size_t)expression_index >= checker->kernel->expression_count) {
+        return;
+    }
+    expression = &checker->kernel->expressions[expression_index];
+    info = &checker->kernel_elaboration->expressions[expression_index];
+    switch (expression->kind) {
+    case SEKI_EXPR_ACCEPT:
+        break;
+    case SEKI_EXPR_REJECT:
+        if (info->c < floor) {
+            check_fail(checker, "A0-CHECK-0023",
+                "rejection precedence must increase along each path");
+        }
+        break;
+    case SEKI_EXPR_REQUIRE:
+        if (info->c < floor) {
+            check_fail(checker, "A0-CHECK-0023",
+                "rejection precedence must increase along each path");
+            return;
+        }
+        if (info->c == UINT32_MAX) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return;
+        }
+        check_rejection_order(checker, expression->value.require.continuation,
+            info->c + 1U);
+        break;
+    case SEKI_EXPR_LET:
+        check_rejection_order(checker, expression->value.let.body, floor);
+        break;
+    case SEKI_EXPR_IF:
+        check_rejection_order(checker, expression->value.conditional.if_true,
+            floor);
+        check_rejection_order(checker, expression->value.conditional.if_false,
+            floor);
+        break;
+    default:
+        break;
+    }
+}
+
 static void
 check_kernel(struct checker *checker, size_t kernel_index)
 {
@@ -1119,6 +1175,10 @@ check_kernel(struct checker *checker, size_t kernel_index)
     environment.count = kernel->parameter_count;
 
     check_kernel_tail(checker, kernel->body_root, &environment);
+    if (checker->failed) {
+        return;
+    }
+    check_rejection_order(checker, kernel->body_root, 0U);
     if (checker->failed) {
         return;
     }

@@ -694,6 +694,39 @@ try {
   execFileSync("cc", [...strictFlags, "-c", exampleC, "-o",
     path.join(temporary, "access_permit.o")], { stdio: "inherit" });
 
+  // Rejection precedence is structural, not an inventory the body may
+  // contradict: typed-core `check_order` requires indices to increase along
+  // every sequentially reachable continuation. Admission rejects a module that
+  // violates it, so the compiler must too.
+  const outOfOrder = path.join(temporary, "out-of-order.seki");
+  fs.writeFileSync(outOfOrder, [
+    "module t::prec @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "export record D { a: U8, b: U8 }.",
+    "export variant R [ First @ 1. Second @ 2. ].",
+    "export kernel k d: D -> Decision[Unit, R] arithmetic: checked",
+    "bounded steps: 128 liveBits: 1024 controlDepth: 32 workspaceBits: 0",
+    "rejects: R::First, R::Second publication: none [",
+    "  require (d b) >= 1 else: R::Second.",
+    "  require (d a) >= 1 else: R::First.",
+    "  accept unit ].",
+    "",
+  ].join("\n"));
+  const ordered = run(["check", outOfOrder]);
+  assert.equal(ordered.status, 65);
+  assert.match(ordered.stderr, /^A0-CHECK-0023:/u);
+
+  // Stable tag 0 is reserved so a rejection tag of 0 always means "no
+  // rejection" and never names a case.
+  const zeroTag = path.join(temporary, "zero-tag.seki");
+  fs.writeFileSync(zeroTag,
+    fs.readFileSync(outOfOrder, "utf8").replace("First @ 1.", "First @ 0."));
+  const zeroed = run(["check", zeroTag]);
+  assert.equal(zeroed.status, 65);
+  assert.match(zeroed.stderr, /^A0-PARSE-0039:/u);
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -771,7 +804,8 @@ try {
     "widths=u8,u16,u32,u64 declarations=n octets=constant-time " +
     "boolean=short-circuit nominals=non-substitutable require=precedence " +
     "bindings=scoped accepted=value records=constructed " +
-    "aliases=expanded example=access_permit",
+    "aliases=expanded example=access_permit " +
+    "precedence=structural tag0=reserved",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

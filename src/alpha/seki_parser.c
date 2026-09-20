@@ -455,6 +455,13 @@ parse_variant(struct parser *parser, struct seki_type_decl *declaration)
         }
         expect_kind(parser, SEKI_TOKEN_AT, "expected variant tag marker");
         item.tag = take_number(parser);
+        if (!parser->failed && item.tag == 0U) {
+            /* Zero is reserved so a decision's rejection tag of 0 always
+             * means "no rejection" and never names a case. */
+            parser_fail(parser, "A0-PARSE-0039",
+                "variant stable tag 0 is reserved");
+            return;
+        }
         if (variant_has_case(variant, &item.name, item.tag)) {
             parser_fail(parser, "A0-PARSE-0015",
                 "duplicate variant case name or tag");
