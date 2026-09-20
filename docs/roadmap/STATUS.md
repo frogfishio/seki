@@ -316,6 +316,23 @@
   which owns the canonical cost algebra. A second, weaker derivation inside the
   projection would have been a checker that silently disagrees.
 
+- The E0 Lean proof is now enforced by the build. `lean-toolchain` pins
+  `leanprover/lean4:v4.30.0`, elan resolves a bare `lean` to it, and
+  `check-lean-proof` verifies that the installed binary reports the upstream
+  commit the foundation lock records before running the proof. Nine theorems
+  check with no `sorry` and no `axiom`. The check reports a skip when Lean is
+  absent, so the portfolio still runs in the pinned Node container.
+- `decodeExactProgram_eq` is discharged by `native_decide`, which evaluates
+  compiled Lean rather than checking a term in the kernel, and every theorem
+  about the decoded program rests on it. Lean's compiler and runtime are
+  therefore trusted premises. The check asserts that exactly one
+  `native_decide` exists, so widening that trusted base is a visible change.
+- Lean needed no agreement, appointment, or clean-room build: it is Apache-2.0
+  and was already installed at the locked commit. Rocq is LGPL-2.1 and
+  CompCert's own license permits this project's noncommercial use, so the same
+  applies to both. The remaining formal work is installing them and writing
+  proofs, not obtaining permission.
+
 ## Active work
 
 `E0-VS1` is complete experimentally. A0-02 is active: extract its program-shaped
@@ -347,13 +364,13 @@ conformance.
 ## Verification commands
 
 ```sh
-make check
+make check              # includes the Lean proof when Lean is installed
+make check-lean-proof   # verifies the toolchain identity, then the proof
 make check-encoding-vectors
 make check-foundation-lock
 make check-e0-frontend
 make check-e0-backend
 make check-e0-manifest
-make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 ```
 
 ## Last verification

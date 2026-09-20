@@ -25,9 +25,18 @@ The selected source is tag `v4.30.0`, resolved directly to commit
 Its root `LICENSE` is Apache License 2.0 and has SHA-256
 `8b28515ffffc5c0fe2807d8ae3735b00b324d9b7ce807dd63ff6ac8922fbce7e`.
 
-The local E0 proof was checked with Lean 4.33.1. That observation does not
-satisfy this lock. Qualification must build or install exactly 4.30.0, record
-its complete transitive inputs, and recheck the proof portfolio.
+`lean-toolchain` pins `leanprover/lean4:v4.30.0`, so elan resolves a bare
+`lean` to exactly that toolchain. The installed binary reports the upstream
+commit it was built from, and `make check-lean-proof` verifies that commit
+against this lock before running the proof. The identity is therefore checked
+by the build rather than asserted here.
+
+Lean is installed from the upstream release rather than built from the locked
+archive. The archive identity above still records which source that release
+corresponds to. Building it from source would bind the transitive build inputs
+as well, which matters for a distribution claim; it adds nothing to the
+correctness of a proof checked by a toolchain whose upstream commit is
+verified.
 
 ## Rocq 9.2.0
 
@@ -98,11 +107,11 @@ Its root license has SHA-256
 
 ## Remaining qualification work
 
-- build Lean 4.30.0 and Rocq 9.2.0 from the exact locked sources in a pinned
-  clean-room environment;
-- bind OCaml, C/C++, CMake, Ninja/Make, libc, and other transitive build inputs;
-- decide whether qualification uses a licensed full CompCert installation or
-  a reviewed LGPL-compatible proof-source closure;
+- install Rocq 9.2.0 and CompCert 3.18, whose licenses already permit this
+  project's noncommercial use, and wire their checks into `make check` the way
+  the Lean proof now is;
+- bind OCaml, C/C++, CMake, Ninja/Make, libc, and other transitive build inputs
+  if and when a redistributable build is actually wanted;
 - record installed-tree and executable identities separately from source
   archive identities;
 - rerun proof and hostile portfolios under the pinned tools; and

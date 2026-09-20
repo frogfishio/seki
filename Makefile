@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := check
 
-.PHONY: alpha check verify-seed verify-status check-bootstrap-closure check-alpha-plan check-alpha-cli check-alpha-lexer check-alpha-parser check-alpha-checker check-f0-candidate check-foundation-lock check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-e0-lean check-encoding-vectors check-diff
+.PHONY: alpha check check-lean-proof verify-seed verify-status check-bootstrap-closure check-alpha-plan check-alpha-cli check-alpha-lexer check-alpha-parser check-alpha-checker check-f0-candidate check-foundation-lock check-lean-proof check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-e0-lean check-encoding-vectors check-diff
 
 A0_CFLAGS = -std=c11 -pedantic -Wall -Wextra -Werror -Wconversion -Wsign-conversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wformat=2
 A0_SOURCES = src/alpha/sekic.c src/alpha/seki_lexer.c src/alpha/seki_parser.c \
@@ -15,7 +15,7 @@ build/sekic: $(A0_SOURCES) src/alpha/seki_lexer.h src/alpha/seki_parser.h \
 	mkdir -p build
 	$(CC) $(A0_CFLAGS) -Isrc/alpha $(A0_SOURCES) -o $@
 
-check: verify-seed verify-status check-bootstrap-closure check-alpha-plan check-alpha-cli check-alpha-lexer check-alpha-parser check-alpha-checker check-f0-candidate check-foundation-lock check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-encoding-vectors check-diff
+check: verify-seed verify-status check-bootstrap-closure check-alpha-plan check-alpha-cli check-alpha-lexer check-alpha-parser check-alpha-checker check-f0-candidate check-foundation-lock check-lean-proof check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-encoding-vectors check-diff
 
 verify-seed:
 	./SEKI_V0_3_PROJECT_SEED/VERIFY.sh
@@ -60,10 +60,15 @@ check-e0-backend:
 check-e0-manifest:
 	node tools/check_e0_manifest.mjs
 
-# Deliberately not part of `check` until the exact Lean 4.30.0 foundation is
-# bound. Local execution is experimental evidence only.
-check-e0-lean:
-	lean formal/lean/E0/MinimumAge.lean
+# `lean-toolchain` pins the toolchain the foundation lock names, so elan
+# resolves a bare `lean` to it. The check verifies that the installed binary
+# was built from the locked commit before running the proof, and reports a
+# skip when Lean is absent so the portfolio still runs in the pinned Node
+# container.
+check-lean-proof:
+	node tools/check_lean_proof.mjs
+
+check-e0-lean: check-lean-proof
 
 check-encoding-vectors:
 	./tools/encoding/check_minimal_vector.sh

@@ -12,7 +12,12 @@ const { lean, rocq, compcert } = lock.foundations;
 assert.equal(lean.version, "4.30.0");
 assert.equal(lean.tag, "v4.30.0");
 assert.equal(lean.primary_license, "Apache-2.0");
-assert.equal(lean.installed_for_qualification, false);
+// Lean is installed at the locked commit and `check-lean-proof` verifies the
+// binary's identity before running the proof. Rocq and CompCert are not.
+assert.equal(lean.installed_for_qualification, true);
+assert.equal(lean.toolchain_pin, "lean-toolchain");
+assert.equal(fs.readFileSync("lean-toolchain", "utf8").trim(),
+  `leanprover/lean4:v${lean.version}`);
 assert.equal(rocq.version, "9.2.0");
 assert.equal(rocq.tag, "V9.2.0");
 assert.equal(rocq.primary_license, "LGPL-2.1-only");
@@ -44,5 +49,6 @@ console.log(
   `foundation_lock=verified lean=${lean.version}@${lean.commit.slice(0, 12)} ` +
   `rocq=${rocq.version}@${rocq.commit.slice(0, 12)} ` +
   `compcert=${compcert.version}@${compcert.commit.slice(0, 12)} ` +
-  "installed=false qualified=false",
+  "lean_installed=true rocq_installed=false compcert_installed=false " +
+  "qualified=false",
 );

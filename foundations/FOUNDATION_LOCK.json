@@ -17,9 +17,11 @@
       "primary_license": "Apache-2.0",
       "license_path": "LICENSE",
       "license_sha256": "8b28515ffffc5c0fe2807d8ae3735b00b324d9b7ce807dd63ff6ac8922fbce7e",
-      "installed_for_qualification": false,
-      "observed_local_version": "4.33.1",
-      "qualification_status": "source-bound-not-installed"
+      "installed_for_qualification": true,
+      "observed_local_version": "4.30.0",
+      "qualification_status": "installed-proof-checks",
+      "toolchain_pin": "lean-toolchain",
+      "installed_via": "elan"
     },
     "rocq": {
       "version": "9.2.0",
