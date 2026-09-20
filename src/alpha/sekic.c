@@ -18,6 +18,17 @@
 #define SEKI_A0_VERSION "0.0.0-alpha.6"
 #define SEKI_A0_SOURCE_CAPACITY 65536U
 
+/*
+ * The parsed module and its elaboration are large fixed-capacity workspaces.
+ * The host owns one instance for the whole process and lends it to the
+ * compiler core, so no component below `main` carries them on its own frame
+ * and the core imposes no allocation policy of its own.
+ */
+struct seki_workspace {
+    struct seki_module_prefix module;
+    struct seki_elaboration elaboration;
+};
+
 enum exit_status {
     EXIT_OK = 0,
     EXIT_USAGE = 64,
@@ -109,11 +120,11 @@ print_backend_error(const char *path, const struct seki_backend_error *error)
 }
 
 static int
-compile_source(const char *path, unsigned char *core, size_t *core_length)
+compile_source(struct seki_workspace *workspace, const char *path,
+    unsigned char *core, size_t *core_length)
 {
     unsigned char source[SEKI_A0_SOURCE_CAPACITY];
     size_t source_length = 0U;
-    struct seki_module_prefix module;
     struct seki_parse_error parse_error;
     struct seki_check_error check_error;
     struct seki_core_error core_error;
@@ -124,19 +135,20 @@ compile_source(const char *path, unsigned char *core, size_t *core_length)
             path, (unsigned)sizeof source);
         return EXIT_IO;
     }
-    if (!seki_parse_module(source, source_length, &module,
+    if (!seki_parse_module(source, source_length, &workspace->module,
         &parse_error)) {
         (void)fprintf(stderr, "%s:%s:%zu:%zu: %s\n", parse_error.code,
             path, parse_error.line, parse_error.column, parse_error.message);
         return EXIT_DATA;
     }
-    if (!seki_check_module(&module, &check_error)) {
+    if (!seki_check_module(&workspace->module, &workspace->elaboration,
+        &check_error)) {
         (void)fprintf(stderr, "%s:%s: %s\n", check_error.code, path,
             check_error.message);
         return EXIT_DATA;
     }
-    if (!seki_emit_core(&module, core, SEKI_CORE_CAPACITY, core_length,
-        &core_error)) {
+    if (!seki_emit_core(&workspace->module, &workspace->elaboration, core,
+        SEKI_CORE_CAPACITY, core_length, &core_error)) {
         (void)fprintf(stderr, "%s:%s: %s\n", core_error.code, path,
             core_error.message);
         return EXIT_DATA;
@@ -145,17 +157,17 @@ compile_source(const char *path, unsigned char *core, size_t *core_length)
 }
 
 static int
-check_command(const char *input_path)
+check_command(struct seki_workspace *workspace, const char *input_path)
 {
     unsigned char core[SEKI_CORE_CAPACITY];
     size_t core_length = 0U;
 
-    return compile_source(input_path, core, &core_length);
+    return compile_source(workspace, input_path, core, &core_length);
 }
 
 static int
-build_command(const char *input_path, const char *core_path,
-    const char *c_path)
+build_command(struct seki_workspace *workspace, const char *input_path,
+    const char *core_path, const char *c_path)
 {
     unsigned char core[SEKI_CORE_CAPACITY];
     char c_source[SEKI_C_SOURCE_CAPACITY];
@@ -170,7 +182,7 @@ build_command(const char *input_path, const char *core_path,
             "A0-IO-0002: output paths must be distinct and not already exist\n");
         return EXIT_IO;
     }
-    status = compile_source(input_path, core, &core_length);
+    status = compile_source(workspace, input_path, core, &core_length);
     if (status != EXIT_OK) {
         return status;
     }
@@ -212,8 +224,14 @@ inspect_command(const char *input_path)
         print_backend_error(input_path, &backend_error);
         return EXIT_DATA;
     }
+    /*
+     * The two boundaries are deliberately reported separately: `check`
+     * validates source and typed-core construction, while `build` additionally
+     * requires the narrower restricted-C projection. A module can satisfy the
+     * first and not yet the second.
+     */
     (void)printf(
-        "frontend=alpha-u8-decision\n"
+        "frontend=alpha-decision\n"
         "backend=alpha-u8-decision\n"
         "profile=c11_bounded@%u\n"
         "threshold_u8=%u\n"
@@ -225,6 +243,9 @@ inspect_command(const char *input_path)
 int
 main(int argc, char **argv)
 {
+    static struct seki_workspace host_workspace;
+    struct seki_workspace *const workspace = &host_workspace;
+
     if (argc == 2 && command_is(argv[1], "--version")) {
         (void)printf("sekic %s (provisional, authority=none)\n",
             SEKI_A0_VERSION);
@@ -235,11 +256,11 @@ main(int argc, char **argv)
         return EXIT_OK;
     }
     if (argc == 3 && command_is(argv[1], "check")) {
-        return check_command(argv[2]);
+        return check_command(workspace, argv[2]);
     }
     if (argc == 7 && command_is(argv[1], "build") &&
         command_is(argv[2], "--core") && command_is(argv[4], "--c")) {
-        return build_command(argv[6], argv[3], argv[5]);
+        return build_command(workspace, argv[6], argv[3], argv[5]);
     }
     if (argc == 3 && command_is(argv[1], "inspect")) {
         return inspect_command(argv[2]);

@@ -28,7 +28,7 @@ expect(alpha.development_assurance_model === "internal-self-attestation",
 expect(alpha.cli_version === "0.0.0-alpha.6", "alpha CLI version drift");
 expect(alpha.connected_commands.join(",") === "check,build,inspect",
   "connected alpha commands drift");
-expect(alpha.compiler_core === "alpha-u8-decision-frontend+backend",
+expect(alpha.compiler_core === "alpha-decision-frontend+backend",
   "unexpected provisional compiler core");
 expect(alpha.general_compiler_core_ready === false,
   "A0-02 cannot close while the general core remains incomplete");
@@ -68,6 +68,18 @@ expect(alpha.u8_decision_multiple_rejections === true,
   "U8-decision rejection-inventory progress record lost");
 expect(alpha.u8_decision_independent_semantic_recheck === true,
   "U8-decision lost independent semantic rechecking");
+expect(alpha.shared_elaboration_ready === true,
+  "checker and emitter no longer share one elaboration");
+expect(alpha.general_core_traversal_ready === true,
+  "typed-core construction regained a fixed program shape");
+expect(alpha.general_resource_derivation_ready === true,
+  "exact resource bounds are no longer derived from the cost algebra");
+expect(alpha.canonical_table_ordering_ready === true,
+  "canonical table ordering progress record lost");
+expect(alpha.general_comparison_operators_ready === true,
+  "comparison lowering narrowed back to one operator");
+expect(alpha.syntax_nesting_bounded === true,
+  "recursive descent is no longer bounded by the profile nesting ceiling");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",

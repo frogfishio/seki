@@ -15,6 +15,7 @@ const sources = [
   "src/alpha/sekic.c",
   "src/alpha/seki_lexer.c",
   "src/alpha/seki_parser.c",
+  "src/alpha/seki_types.c",
   "src/alpha/seki_checker.c",
   "src/alpha/seki_core.c",
   "src/alpha/seki_c_backend.c",
@@ -118,13 +119,106 @@ try {
   execFileSync("cc", [...strictFlags, "-c", renamedC, "-o",
     path.join(temporary, "gate_policy.o")], { stdio: "inherit" });
 
-  const outsideSliceSource = path.join(temporary, "outside-slice.seki");
-  fs.writeFileSync(outsideSliceSource,
-    fs.readFileSync(canonicalSource, "utf8").replace("< 18", "> 18"));
-  const outsideSlice = run(["check", outsideSliceSource]);
-  assert.equal(outsideSlice.status, 65);
-  assert.match(outsideSlice.stderr,
-    /^A0-CORE-0001:.*: module is outside the U8-decision core slice\n$/u);
+  // Every ordered comparison now lowers through the general emitter rather
+  // than one hardcoded `less` shape.
+  for (const [operator, expected] of [[">", 2], [">=", 3], ["<=", 1]]) {
+    const operatorSource = path.join(temporary, `operator${expected}.seki`);
+    const operatorCore = path.join(temporary, `operator${expected}.scb0`);
+    const operatorC = path.join(temporary, `operator${expected}.c`);
+    fs.writeFileSync(operatorSource,
+      fs.readFileSync(canonicalSource, "utf8").replace("< 18", `${operator} 18`));
+    const built = run([
+      "build", "--core", operatorCore, "--c", operatorC, operatorSource,
+    ]);
+    assert.equal(built.status, 0, built.stderr);
+    const decoded = decodeModule(fs.readFileSync(operatorCore));
+    checkTypedCore(decoded);
+    assert.equal(decoded.kernels[0][1].body[1].term[1], expected);
+  }
+
+  // Source order is a developer convenience: declaring the variant first must
+  // produce exactly the canonical bytes, not a different module.
+  const reorderedSource = path.join(temporary, "reordered.seki");
+  const reorderedCore = path.join(temporary, "reordered.scb0");
+  const reorderedC = path.join(temporary, "reordered.c");
+  const canonicalText = fs.readFileSync(canonicalSource, "utf8");
+  const recordBlock = "export record Applicant {\n  age: U8\n}.\n\n";
+  const variantBlock = "export variant Rejection [\n  Underage @ 1.\n].\n\n";
+  assert.ok(canonicalText.includes(recordBlock + variantBlock));
+  fs.writeFileSync(reorderedSource,
+    canonicalText.replace(recordBlock + variantBlock, variantBlock + recordBlock));
+  const reordered = run([
+    "build", "--core", reorderedCore, "--c", reorderedC, reorderedSource,
+  ]);
+  assert.equal(reordered.status, 0, reordered.stderr);
+  assert.deepEqual(fs.readFileSync(reorderedCore), fs.readFileSync(corePath));
+
+  // Canonical positions depend on the program's own identifiers. When the
+  // variant name sorts before the record name the type table order flips, and
+  // both directions must follow it rather than assuming a fixed 0/1 layout.
+  const flippedSource = path.join(temporary, "flipped.seki");
+  const flippedCore = path.join(temporary, "flipped.scb0");
+  const flippedC = path.join(temporary, "flipped.c");
+  fs.writeFileSync(flippedSource, canonicalText
+    .replaceAll("Applicant", "Zeta").replaceAll("Rejection", "Alpha"));
+  const flipped = run([
+    "build", "--core", flippedCore, "--c", flippedC, flippedSource,
+  ]);
+  assert.equal(flipped.status, 0, flipped.stderr);
+  const flippedDecoded = decodeModule(fs.readFileSync(flippedCore));
+  checkTypedCore(flippedDecoded);
+  assert.equal(flippedDecoded.types[0][0], "Alpha");
+  assert.equal(flippedDecoded.types[1][0], "Zeta");
+  execFileSync("cc", [...strictFlags, "-c", flippedC, "-o",
+    path.join(temporary, "flipped.o")], { stdio: "inherit" });
+
+  // The header vectors are general: a module stating one claim and one
+  // obligation builds, where the backend previously required the exact
+  // minimum-age lists.
+  const minimalHeaderSource = path.join(temporary, "minimal-header.seki");
+  const minimalHeaderCore = path.join(temporary, "minimal-header.scb0");
+  const minimalHeaderC = path.join(temporary, "minimal-header.c");
+  fs.writeFileSync(minimalHeaderSource, [
+    "module probe @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export record D { v: U8 }.",
+    "export variant R [ Bad @ 1. ].",
+    "export kernel k d: D -> Decision[Unit, R] arithmetic: checked",
+    "bounded steps: 64 liveBits: 512 controlDepth: 32 workspaceBits: 0",
+    "rejects: R::Bad publication: none [ (d v) < 18",
+    "  ifTrue: [ reject R::Bad ] ifFalse: [ accept unit ] ].",
+    "",
+  ].join("\n"));
+  const minimalHeader = run([
+    "build", "--core", minimalHeaderCore, "--c", minimalHeaderC,
+    minimalHeaderSource,
+  ]);
+  assert.equal(minimalHeader.status, 0, minimalHeader.stderr);
+  checkTypedCore(decodeModule(fs.readFileSync(minimalHeaderCore)));
+  execFileSync("cc", [...strictFlags, "-c", minimalHeaderC, "-o",
+    path.join(temporary, "minimal-header.o")], { stdio: "inherit" });
+
+  // A claim the registry does not define has no tag, so the module cannot be
+  // encoded at all.
+  const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
+  fs.writeFileSync(unknownClaimSource,
+    canonicalText.replace("lean_projection", "telepathy"));
+  const unknownClaim = run(["check", unknownClaimSource]);
+  assert.equal(unknownClaim.status, 65);
+  assert.match(unknownClaim.stderr,
+    /^A0-CORE-0001:.*: module is outside the alpha typed-core subset\n$/u);
+
+  // A declared ceiling below the derived exact bound is rejected by the
+  // checker before any artifact is constructed.
+  const lowCeilingSource = path.join(temporary, "low-ceiling.seki");
+  fs.writeFileSync(lowCeilingSource,
+    canonicalText.replace("bounded steps: 32", "bounded steps: 7"));
+  const lowCeiling = run(["check", lowCeilingSource]);
+  assert.equal(lowCeiling.status, 65);
+  assert.match(lowCeiling.stderr, /^A0-CHECK-0017:/u);
 
   const variantSource = path.join(temporary, "minimum_age_19.seki");
   const variantCore = path.join(temporary, "minimum_age_19.scb0");
@@ -143,7 +237,7 @@ try {
   assert.equal(inspected.status, 0, inspected.stderr);
   assert.equal(inspected.stderr, "");
   assert.equal(inspected.stdout,
-    "frontend=alpha-u8-decision\n" +
+    "frontend=alpha-decision\n" +
     "backend=alpha-u8-decision\n" +
     "profile=c11_bounded@1\n" +
     "threshold_u8=18\n" +
@@ -178,7 +272,9 @@ try {
 
   console.log(
     "seki_alpha_cli=verified version=0.0.0-alpha.6 commands=4 connected=3 " +
-    "slice=u8-decision fields=2 rejections=2 renamed=yes overwrite=reject",
+    "slice=u8-decision fields=2 rejections=2 renamed=yes overwrite=reject " +
+    "operators=4 source_order=canonical table_order=name-derived " +
+    "header_vectors=general",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

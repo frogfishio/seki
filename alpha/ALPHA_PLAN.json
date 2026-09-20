@@ -16,7 +16,7 @@
     "build",
     "inspect"
   ],
-  "compiler_core": "alpha-u8-decision-frontend+backend",
+  "compiler_core": "alpha-decision-frontend+backend",
   "general_compiler_core_ready": false,
   "e0_frontend_adapter_active": false,
   "e0_backend_adapter_active": false,
@@ -36,6 +36,12 @@
   "u8_decision_multiple_fields": true,
   "u8_decision_multiple_rejections": true,
   "u8_decision_independent_semantic_recheck": true,
+  "shared_elaboration_ready": true,
+  "general_core_traversal_ready": true,
+  "general_resource_derivation_ready": true,
+  "canonical_table_ordering_ready": true,
+  "general_comparison_operators_ready": true,
+  "syntax_nesting_bounded": true,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

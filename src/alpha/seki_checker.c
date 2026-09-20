@@ -2,26 +2,46 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
-enum inferred_kind {
-    INFER_INVALID,
-    INFER_UNIT,
-    INFER_BOOL,
-    INFER_UNSIGNED,
-    INFER_NATURAL,
-    INFER_NAMED
+/*
+ * Environment slots follow the typed-core convention: slot zero is the
+ * innermost binding. Kernel parameters are therefore installed in reverse
+ * declaration order, and `Let` prepends. The emitter writes these indices
+ * directly as `Local` references.
+ */
+#define SEKI_ENV_CAPACITY \
+    (SEKI_CALLABLE_MAX_PARAMETERS + SEKI_KERNEL_MAX_EXPRESSIONS)
+
+struct environment {
+    uint32_t slots[SEKI_ENV_CAPACITY];
+    size_t count;
 };
 
-struct inferred_type {
-    enum inferred_kind kind;
-    uint32_t width;
+struct cost {
+    uint32_t steps;
+    uint32_t live;
+    uint32_t depth;
+    uint32_t workspace;
+};
+
+/*
+ * An integer literal carries no type of its own; it adopts one from the
+ * position it appears in. `is_natural` marks a node still awaiting that
+ * context, so a literal compared against nothing concrete fails closed rather
+ * than defaulting to a width the source never stated.
+ */
+struct inferred {
+    uint32_t type;
+    int is_natural;
     uint32_t natural;
-    struct seki_name name;
 };
 
 struct checker {
     const struct seki_module_prefix *module;
     const struct seki_kernel_decl *kernel;
+    struct seki_elaboration *elaboration;
+    struct seki_kernel_elab *kernel_elaboration;
     struct seki_check_error *error;
     int failed;
 };
@@ -36,79 +56,79 @@ check_fail(struct checker *checker, const char *code, const char *message)
     }
 }
 
-static const struct seki_type_decl *
-find_type(const struct seki_module_prefix *module, const struct seki_name *name)
+static uint32_t
+declaration_index(const struct seki_module_prefix *module,
+    const struct seki_name *name)
 {
     size_t index;
     for (index = 0U; index < module->declaration_count; index += 1U) {
         if (seki_name_equal(&module->declarations[index].name, name)) {
-            return &module->declarations[index];
+            return (uint32_t)index;
         }
     }
-    return NULL;
+    return SEKI_TYPE_INVALID;
 }
 
-static struct inferred_type
-infer_type_ref(const struct seki_type_ref *type)
+static uint32_t
+resolve(struct checker *checker, const struct seki_type_ref *reference)
 {
-    struct inferred_type inferred = {INFER_INVALID, 0U, 0U, {NULL, 0U}};
-    if (type->kind != SEKI_TYPE_NAMED) {
-        return inferred;
+    const uint32_t type = seki_type_resolve(checker->module,
+        &checker->elaboration->types, reference);
+    if (type == SEKI_TYPE_INVALID) {
+        check_fail(checker, "A0-CHECK-0012",
+            "type is unknown or outside the alpha subset");
     }
-    if (seki_name_is(&type->name, "Unit")) {
-        inferred.kind = INFER_UNIT;
-    } else if (seki_name_is(&type->name, "Bool")) {
-        inferred.kind = INFER_BOOL;
-    } else if (seki_name_is(&type->name, "U8")) {
-        inferred.kind = INFER_UNSIGNED;
-        inferred.width = 8U;
-    } else if (seki_name_is(&type->name, "U16")) {
-        inferred.kind = INFER_UNSIGNED;
-        inferred.width = 16U;
-    } else if (seki_name_is(&type->name, "U32")) {
-        inferred.kind = INFER_UNSIGNED;
-        inferred.width = 32U;
-    } else if (seki_name_is(&type->name, "U64")) {
-        inferred.kind = INFER_UNSIGNED;
-        inferred.width = 64U;
-    } else {
-        inferred.kind = INFER_NAMED;
-        inferred.name = type->name;
-    }
-    return inferred;
+    return type;
 }
 
-static const struct seki_type_ref *
-find_parameter_type(const struct seki_kernel_decl *kernel,
-    const struct seki_name *name)
+static uint32_t
+width_of(struct checker *checker, uint32_t type)
 {
-    size_t index;
-    for (index = 0U; index < kernel->parameter_count; index += 1U) {
-        if (seki_name_equal(&kernel->parameters[index].label, name)) {
-            return &kernel->parameters[index].type;
-        }
+    uint32_t bits = 0U;
+    if (type == SEKI_TYPE_INVALID) {
+        return 0U;
     }
-    return NULL;
+    if (!seki_type_value_bits(checker->module, &checker->elaboration->types,
+        type, &bits)) {
+        check_fail(checker, "A0-CHECK-0013",
+            "semantic value width is unbounded or overflows U32");
+        return 0U;
+    }
+    return bits;
 }
 
-static const struct seki_type_ref *
-find_record_field(const struct checker *checker,
-    const struct seki_name *owner, const struct seki_name *field)
+static int
+type_is_unsigned(const struct seki_elaboration *elaboration, uint32_t type)
 {
-    const struct seki_type_decl *declaration =
-        find_type(checker->module, owner);
-    size_t index;
-    if (declaration == NULL || declaration->kind != SEKI_DECL_RECORD) {
-        return NULL;
+    if (type >= elaboration->types.count) {
+        return 0;
     }
-    for (index = 0U; index < declaration->value.record.field_count;
-        index += 1U) {
-        if (seki_name_equal(&declaration->value.record.fields[index].name,
-            field)) {
-            return &declaration->value.record.fields[index].type;
-        }
+    switch (elaboration->types.entries[type].kind) {
+    case SEKI_T_U8:
+    case SEKI_T_U16:
+    case SEKI_T_U32:
+    case SEKI_T_U64:
+        return 1;
+    default:
+        break;
     }
-    return NULL;
+    return 0;
+}
+
+static uint32_t
+unsigned_width(const struct seki_elaboration *elaboration, uint32_t type)
+{
+    switch (elaboration->types.entries[type].kind) {
+    case SEKI_T_U8:
+        return 8U;
+    case SEKI_T_U16:
+        return 16U;
+    case SEKI_T_U32:
+        return 32U;
+    default:
+        break;
+    }
+    return 64U;
 }
 
 static int
@@ -120,41 +140,128 @@ natural_fits(uint32_t value, uint32_t width)
     return value < (UINT32_C(1) << width);
 }
 
-static int
-types_comparable(const struct inferred_type *left,
-    const struct inferred_type *right)
+/* Declaration field and payload types are resolved before any kernel body, so
+ * a malformed declaration is reported against the declaration rather than the
+ * first expression that happens to touch it. */
+static void
+resolve_declarations(struct checker *checker)
 {
-    if (left->kind == INFER_UNSIGNED && right->kind == INFER_NATURAL) {
-        return natural_fits(right->natural, left->width);
+    size_t index;
+    for (index = 0U; index < checker->module->declaration_count &&
+        !checker->failed; index += 1U) {
+        const struct seki_type_decl *declaration =
+            &checker->module->declarations[index];
+        size_t field;
+        switch (declaration->kind) {
+        case SEKI_DECL_ALIAS:
+        case SEKI_DECL_NOMINAL:
+            (void)resolve(checker, &declaration->value.target);
+            break;
+        case SEKI_DECL_RECORD:
+            for (field = 0U; field < declaration->value.record.field_count &&
+                !checker->failed; field += 1U) {
+                (void)resolve(checker,
+                    &declaration->value.record.fields[field].type);
+            }
+            break;
+        case SEKI_DECL_VARIANT:
+            for (field = 0U; field < declaration->value.variant.case_count &&
+                !checker->failed; field += 1U) {
+                const struct seki_variant_case *item =
+                    &declaration->value.variant.cases[field];
+                size_t payload;
+                for (payload = 0U; payload < item->payload_count &&
+                    !checker->failed; payload += 1U) {
+                    (void)resolve(checker, &item->payload[payload].type);
+                }
+            }
+            break;
+        default:
+            break;
+        }
+        if (!checker->failed) {
+            /* Reject a declaration whose width cannot be derived, which is how
+             * a recursive declaration surfaces at this stage. */
+            const uint32_t type = seki_type_intern(
+                &checker->elaboration->types, SEKI_T_DECLARED,
+                (uint32_t)index, 0U);
+            if (type == SEKI_TYPE_INVALID) {
+                check_fail(checker, "A0-CHECK-0014",
+                    "module exceeds the fixed type-table capacity");
+            } else {
+                (void)width_of(checker, type);
+            }
+        }
     }
-    if (left->kind == INFER_NATURAL && right->kind == INFER_UNSIGNED) {
-        return natural_fits(left->natural, right->width);
+}
+
+static const struct seki_type_ref *
+find_record_field(const struct checker *checker, uint32_t owner_declaration,
+    const struct seki_name *field, uint32_t *field_index)
+{
+    const struct seki_type_decl *declaration;
+    size_t index;
+    if (owner_declaration >= checker->module->declaration_count) {
+        return NULL;
     }
-    if (left->kind != right->kind) {
+    declaration = &checker->module->declarations[owner_declaration];
+    if (declaration->kind != SEKI_DECL_RECORD) {
+        return NULL;
+    }
+    for (index = 0U; index < declaration->value.record.field_count;
+        index += 1U) {
+        if (seki_name_equal(&declaration->value.record.fields[index].name,
+            field)) {
+            *field_index = (uint32_t)index;
+            return &declaration->value.record.fields[index].type;
+        }
+    }
+    return NULL;
+}
+
+static void
+record_info(struct checker *checker, uint32_t expression_index, uint32_t type,
+    uint32_t a, uint32_t b, uint32_t c)
+{
+    struct seki_expr_info *info =
+        &checker->kernel_elaboration->expressions[expression_index];
+    info->type = type;
+    info->a = a;
+    info->b = b;
+    info->c = c;
+}
+
+static struct inferred
+infer_expression(struct checker *checker, uint32_t expression_index,
+    const struct environment *environment);
+
+/*
+ * Assigns a concrete integer type to a literal that was inferred without one.
+ * Returns zero when the literal does not fit the adopted width.
+ */
+static int
+adopt_natural(struct checker *checker, uint32_t expression_index,
+    struct inferred *value, uint32_t type)
+{
+    if (!value->is_natural) {
+        return 1;
+    }
+    if (!type_is_unsigned(checker->elaboration, type) ||
+        !natural_fits(value->natural,
+            unsigned_width(checker->elaboration, type))) {
         return 0;
     }
-    if (left->kind == INFER_UNSIGNED) {
-        return left->width == right->width;
-    }
-    if (left->kind == INFER_NAMED) {
-        return seki_name_equal(&left->name, &right->name);
-    }
-    return left->kind != INFER_INVALID;
+    value->type = type;
+    value->is_natural = 0;
+    record_info(checker, expression_index, type, 0U, 0U, 0U);
+    return 1;
 }
 
-static int
-type_is_numeric(const struct inferred_type *type)
+static struct inferred
+infer_expression(struct checker *checker, uint32_t expression_index,
+    const struct environment *environment)
 {
-    return type->kind == INFER_UNSIGNED || type->kind == INFER_NATURAL;
-}
-
-static struct inferred_type infer_expression(struct checker *checker,
-    uint32_t expression_index);
-
-static struct inferred_type
-infer_expression(struct checker *checker, uint32_t expression_index)
-{
-    struct inferred_type inferred = {INFER_INVALID, 0U, 0U, {NULL, 0U}};
+    struct inferred inferred = {SEKI_TYPE_INVALID, 0, 0U};
     const struct seki_expression *expression;
     if (checker->failed) {
         return inferred;
@@ -166,57 +273,105 @@ infer_expression(struct checker *checker, uint32_t expression_index)
     expression = &checker->kernel->expressions[expression_index];
     switch (expression->kind) {
     case SEKI_EXPR_VALUE_NAME: {
-        const struct seki_type_ref *type = find_parameter_type(checker->kernel,
-            &expression->value.name);
-        if (type == NULL) {
+        size_t index;
+        int found = 0;
+        for (index = 0U; index < checker->kernel->parameter_count; index += 1U) {
+            if (seki_name_equal(&checker->kernel->parameters[index].label,
+                &expression->value.name)) {
+                /* Parameters occupy the outermost slots in reverse order. */
+                const uint32_t slot = (uint32_t)(environment->count - 1U -
+                    index);
+                inferred.type = environment->slots[slot];
+                record_info(checker, expression_index, inferred.type, slot,
+                    0U, 0U);
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
             check_fail(checker, "A0-CHECK-0002", "unknown value name");
-        } else {
-            inferred = infer_type_ref(type);
         }
         break;
     }
     case SEKI_EXPR_BOOL:
-        inferred.kind = INFER_BOOL;
+        inferred.type = seki_type_intern(&checker->elaboration->types,
+            SEKI_T_BOOL, 0U, 0U);
+        record_info(checker, expression_index, inferred.type, 0U, 0U, 0U);
         break;
     case SEKI_EXPR_UNIT:
-        inferred.kind = INFER_UNIT;
+        inferred.type = seki_type_intern(&checker->elaboration->types,
+            SEKI_T_UNIT, 0U, 0U);
+        record_info(checker, expression_index, inferred.type, 0U, 0U, 0U);
         break;
     case SEKI_EXPR_NATURAL:
-        inferred.kind = INFER_NATURAL;
+        inferred.is_natural = 1;
         inferred.natural = expression->value.natural;
         break;
     case SEKI_EXPR_FIELD: {
-        const struct inferred_type receiver = infer_expression(checker,
-            expression->value.field.receiver);
+        const struct inferred receiver = infer_expression(checker,
+            expression->value.field.receiver, environment);
         const struct seki_type_ref *field_type = NULL;
-        if (receiver.kind == INFER_NAMED) {
-            field_type = find_record_field(checker, &receiver.name,
-                &expression->value.field.field);
+        uint32_t field_index = 0U;
+        uint32_t owner = SEKI_TYPE_INVALID;
+        if (checker->failed) {
+            break;
+        }
+        owner = seki_type_expand(checker->module, &checker->elaboration->types,
+            receiver.type);
+        if (owner != SEKI_TYPE_INVALID &&
+            owner < checker->elaboration->types.count &&
+            checker->elaboration->types.entries[owner].kind ==
+                SEKI_T_DECLARED) {
+            field_type = find_record_field(checker,
+                checker->elaboration->types.entries[owner].a,
+                &expression->value.field.field, &field_index);
         }
         if (field_type == NULL) {
             check_fail(checker, "A0-CHECK-0003",
                 "field does not belong to receiver record");
-        } else {
-            inferred = infer_type_ref(field_type);
+            break;
         }
+        inferred.type = resolve(checker, field_type);
+        record_info(checker, expression_index, inferred.type,
+            checker->elaboration->types.entries[owner].a, field_index, 0U);
         break;
     }
     case SEKI_EXPR_COMPARE: {
-        const struct inferred_type left = infer_expression(checker,
-            expression->value.compare.left);
-        const struct inferred_type right = infer_expression(checker,
-            expression->value.compare.right);
-        if (!checker->failed && !types_comparable(&left, &right)) {
+        const uint32_t left_index = expression->value.compare.left;
+        const uint32_t right_index = expression->value.compare.right;
+        struct inferred left = infer_expression(checker, left_index,
+            environment);
+        struct inferred right = infer_expression(checker, right_index,
+            environment);
+        const int ordered = expression->value.compare.operator <=
+            SEKI_COMPARE_GREATER_EQUAL;
+        if (checker->failed) {
+            break;
+        }
+        if (left.is_natural && right.is_natural) {
+            check_fail(checker, "A0-CHECK-0015",
+                "integer literal has no inferred integer type");
+            break;
+        }
+        if (!adopt_natural(checker, left_index, &left, right.type) ||
+            !adopt_natural(checker, right_index, &right, left.type)) {
             check_fail(checker, "A0-CHECK-0004",
                 "comparison operands are incompatible");
-        } else if (!checker->failed &&
-            expression->value.compare.operator <= SEKI_COMPARE_GREATER_EQUAL &&
-            (!type_is_numeric(&left) || !type_is_numeric(&right))) {
+            break;
+        }
+        if (left.type != right.type) {
+            check_fail(checker, "A0-CHECK-0004",
+                "comparison operands are incompatible");
+            break;
+        }
+        if (ordered && !type_is_unsigned(checker->elaboration, left.type)) {
             check_fail(checker, "A0-CHECK-0004",
                 "ordered comparison requires numeric operands");
-        } else {
-            inferred.kind = INFER_BOOL;
+            break;
         }
+        inferred.type = seki_type_intern(&checker->elaboration->types,
+            SEKI_T_BOOL, 0U, 0U);
+        record_info(checker, expression_index, inferred.type, 0U, 0U, 0U);
         break;
     }
     default:
@@ -224,40 +379,32 @@ infer_expression(struct checker *checker, uint32_t expression_index)
             "kernel control used as a value expression");
         break;
     }
+    if (!checker->failed && !inferred.is_natural &&
+        inferred.type == SEKI_TYPE_INVALID) {
+        check_fail(checker, "A0-CHECK-0012",
+            "type is unknown or outside the alpha subset");
+    }
     return inferred;
 }
 
 static int
-type_matches_argument(const struct inferred_type *type,
-    const struct seki_type_arg *argument)
+variant_case_tag(const struct seki_module_prefix *module,
+    uint32_t variant_declaration, const struct seki_name *item, uint32_t *tag)
 {
-    if (argument->kind != SEKI_TYPE_ARG_TYPE_NAME) {
+    const struct seki_type_decl *declaration;
+    size_t index;
+    if (variant_declaration >= module->declaration_count) {
         return 0;
     }
-    if (seki_name_is(&argument->name, "Unit")) {
-        return type->kind == INFER_UNIT;
-    }
-    if (seki_name_is(&argument->name, "Bool")) {
-        return type->kind == INFER_BOOL;
-    }
-    return type->kind == INFER_NAMED &&
-        seki_name_equal(&type->name, &argument->name);
-}
-
-static int
-variant_has_item(const struct seki_module_prefix *module,
-    const struct seki_variant_ref *reference)
-{
-    const struct seki_type_decl *declaration =
-        find_type(module, &reference->owner);
-    size_t index;
-    if (declaration == NULL || declaration->kind != SEKI_DECL_VARIANT) {
+    declaration = &module->declarations[variant_declaration];
+    if (declaration->kind != SEKI_DECL_VARIANT) {
         return 0;
     }
     for (index = 0U; index < declaration->value.variant.case_count;
         index += 1U) {
         if (seki_name_equal(&declaration->value.variant.cases[index].name,
-            &reference->item)) {
+            item)) {
+            *tag = declaration->value.variant.cases[index].tag;
             return 1;
         }
     }
@@ -265,8 +412,8 @@ variant_has_item(const struct seki_module_prefix *module,
 }
 
 static int
-kernel_declares_rejection(const struct seki_kernel_decl *kernel,
-    const struct seki_variant_ref *reference)
+kernel_precedence_index(const struct seki_kernel_decl *kernel,
+    const struct seki_variant_ref *reference, uint32_t *precedence)
 {
     size_t index;
     for (index = 0U; index < kernel->rejection_count; index += 1U) {
@@ -274,6 +421,7 @@ kernel_declares_rejection(const struct seki_kernel_decl *kernel,
             &reference->owner) &&
             seki_name_equal(&kernel->rejections[index].item,
                 &reference->item)) {
+            *precedence = (uint32_t)index;
             return 1;
         }
     }
@@ -281,7 +429,8 @@ kernel_declares_rejection(const struct seki_kernel_decl *kernel,
 }
 
 static void
-check_kernel_tail(struct checker *checker, uint32_t expression_index)
+check_kernel_tail(struct checker *checker, uint32_t expression_index,
+    const struct environment *environment)
 {
     const struct seki_expression *expression;
     if (checker->failed) {
@@ -292,77 +441,414 @@ check_kernel_tail(struct checker *checker, uint32_t expression_index)
         return;
     }
     expression = &checker->kernel->expressions[expression_index];
+    record_info(checker, expression_index, SEKI_TYPE_INVALID, 0U, 0U, 0U);
     if (expression->kind == SEKI_EXPR_ACCEPT) {
-        const struct inferred_type value = infer_expression(checker,
-            expression->value.accept.value);
-        if (!checker->failed && !type_matches_argument(&value,
-            &checker->kernel->result.arguments[0])) {
+        const uint32_t value_index = expression->value.accept.value;
+        struct inferred value = infer_expression(checker, value_index,
+            environment);
+        if (checker->failed) {
+            return;
+        }
+        (void)adopt_natural(checker, value_index, &value,
+            checker->kernel_elaboration->accepted_type);
+        if (value.type != checker->kernel_elaboration->accepted_type) {
             check_fail(checker, "A0-CHECK-0006",
                 "accepted value does not match Decision result");
         }
     } else if (expression->kind == SEKI_EXPR_REJECT) {
         const struct seki_variant_ref *reference =
             &expression->value.rejection;
-        if (!seki_name_equal(&reference->owner,
-            &checker->kernel->result.arguments[1].name) ||
-            !variant_has_item(checker->module, reference)) {
+        const uint32_t rejection = checker->kernel_elaboration->rejection_type;
+        uint32_t variant_declaration = SEKI_TYPE_INVALID;
+        uint32_t tag = 0U;
+        uint32_t precedence = 0U;
+        if (rejection < checker->elaboration->types.count &&
+            checker->elaboration->types.entries[rejection].kind ==
+                SEKI_T_DECLARED) {
+            variant_declaration =
+                checker->elaboration->types.entries[rejection].a;
+        }
+        if (variant_declaration == SEKI_TYPE_INVALID ||
+            declaration_index(checker->module, &reference->owner) !=
+                variant_declaration ||
+            !variant_case_tag(checker->module, variant_declaration,
+                &reference->item, &tag)) {
             check_fail(checker, "A0-CHECK-0007",
                 "rejection does not belong to Decision result");
-        } else if (!kernel_declares_rejection(checker->kernel, reference)) {
+            return;
+        }
+        if (!kernel_precedence_index(checker->kernel, reference, &precedence)) {
             check_fail(checker, "A0-CHECK-0008",
                 "rejection is absent from ordered inventory");
+            return;
         }
+        record_info(checker, expression_index, SEKI_TYPE_INVALID,
+            variant_declaration, tag, precedence);
     } else if (expression->kind == SEKI_EXPR_IF) {
-        const struct inferred_type condition = infer_expression(checker,
-            expression->value.conditional.condition);
-        if (!checker->failed && condition.kind != INFER_BOOL) {
+        const struct inferred condition = infer_expression(checker,
+            expression->value.conditional.condition, environment);
+        const uint32_t boolean = seki_type_intern(&checker->elaboration->types,
+            SEKI_T_BOOL, 0U, 0U);
+        if (!checker->failed && (condition.is_natural ||
+            boolean == SEKI_TYPE_INVALID || condition.type != boolean)) {
             check_fail(checker, "A0-CHECK-0009",
                 "kernel condition must have type Bool");
         }
-        check_kernel_tail(checker, expression->value.conditional.if_true);
-        check_kernel_tail(checker, expression->value.conditional.if_false);
+        check_kernel_tail(checker, expression->value.conditional.if_true,
+            environment);
+        check_kernel_tail(checker, expression->value.conditional.if_false,
+            environment);
     } else {
         check_fail(checker, "A0-CHECK-0010",
             "kernel path lacks terminal accept or reject");
     }
 }
 
-static void
-check_kernel(struct checker *checker)
+/*
+ * Section 3 of the resource-cost algebra. `base` is the summed width of the
+ * live environment slots at this point in the fixed evaluation schedule.
+ */
+static struct cost
+cost_of_expression(struct checker *checker, uint32_t expression_index,
+    const struct environment *environment, uint32_t base);
+
+static struct cost
+cost_strict(struct checker *checker, const uint32_t *children,
+    size_t child_count, uint32_t result_type,
+    const struct environment *environment, uint32_t base)
 {
-    if (checker->kernel->result.kind != SEKI_TYPE_APPLIED ||
-        !seki_name_is(&checker->kernel->result.name, "Decision") ||
-        checker->kernel->result.argument_count != 2U ||
-        checker->kernel->result.arguments[0].kind !=
-            SEKI_TYPE_ARG_TYPE_NAME ||
-        checker->kernel->result.arguments[1].kind !=
-            SEKI_TYPE_ARG_TYPE_NAME) {
+    struct cost total = {1U, base, 1U, 0U};
+    uint32_t retained = 0U;
+    uint32_t peak = 0U;
+    size_t index;
+    for (index = 0U; index < child_count; index += 1U) {
+        uint32_t child_base = 0U;
+        struct cost child;
+        if (!seki_checked_add(base, retained, &child_base)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return total;
+        }
+        child = cost_of_expression(checker, children[index], environment,
+            child_base);
+        if (!seki_checked_add(total.steps, child.steps, &total.steps)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return total;
+        }
+        if (child.live > total.live) {
+            total.live = child.live;
+        }
+        if (child.depth + 1U > total.depth) {
+            total.depth = child.depth + 1U;
+        }
+        if (child.workspace > total.workspace) {
+            total.workspace = child.workspace;
+        }
+        if (!seki_checked_add(retained,
+            width_of(checker, checker->kernel_elaboration
+                ->expressions[children[index]].type), &retained)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return total;
+        }
+    }
+    if (!seki_checked_add(base, retained, &peak) ||
+        !seki_checked_add(peak, width_of(checker, result_type), &peak)) {
+        check_fail(checker, "A0-CHECK-0013",
+            "semantic value width is unbounded or overflows U32");
+        return total;
+    }
+    if (peak > total.live) {
+        total.live = peak;
+    }
+    return total;
+}
+
+static struct cost
+cost_of_expression(struct checker *checker, uint32_t expression_index,
+    const struct environment *environment, uint32_t base)
+{
+    struct cost cost = {1U, base, 1U, 0U};
+    const struct seki_expression *expression;
+    uint32_t result_type;
+    if (checker->failed ||
+        (size_t)expression_index >= checker->kernel->expression_count) {
+        return cost;
+    }
+    expression = &checker->kernel->expressions[expression_index];
+    result_type =
+        checker->kernel_elaboration->expressions[expression_index].type;
+    switch (expression->kind) {
+    case SEKI_EXPR_VALUE_NAME:
+    case SEKI_EXPR_BOOL:
+    case SEKI_EXPR_UNIT:
+    case SEKI_EXPR_NATURAL:
+        if (!seki_checked_add(base, width_of(checker, result_type),
+            &cost.live)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+        }
+        break;
+    case SEKI_EXPR_FIELD: {
+        const uint32_t receiver = expression->value.field.receiver;
+        const struct cost child = cost_of_expression(checker, receiver,
+            environment, base);
+        uint32_t peak = 0U;
+        cost.steps = child.steps + 1U;
+        cost.live = child.live;
+        cost.depth = child.depth + 1U;
+        cost.workspace = child.workspace;
+        /* Projection retains the complete record while allocating the field. */
+        if (!seki_checked_add(base, width_of(checker,
+            checker->kernel_elaboration->expressions[receiver].type),
+            &peak) || !seki_checked_add(peak,
+                width_of(checker, result_type), &peak)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            break;
+        }
+        if (peak > cost.live) {
+            cost.live = peak;
+        }
+        break;
+    }
+    case SEKI_EXPR_COMPARE: {
+        const uint32_t children[2] = {
+            expression->value.compare.left, expression->value.compare.right
+        };
+        cost = cost_strict(checker, children, 2U, result_type, environment,
+            base);
+        break;
+    }
+    default:
+        check_fail(checker, "A0-CHECK-0005",
+            "kernel control used as a value expression");
+        break;
+    }
+    return cost;
+}
+
+static struct cost
+cost_of_kernel_tail(struct checker *checker, uint32_t expression_index,
+    const struct environment *environment, uint32_t base, uint32_t result_type)
+{
+    struct cost cost = {1U, base, 1U, 0U};
+    const struct seki_expression *expression;
+    if (checker->failed ||
+        (size_t)expression_index >= checker->kernel->expression_count) {
+        return cost;
+    }
+    expression = &checker->kernel->expressions[expression_index];
+    if (expression->kind == SEKI_EXPR_ACCEPT ||
+        expression->kind == SEKI_EXPR_REJECT) {
+        /* KernelReject builds its reason term inline; KernelAccept evaluates
+         * the accepted value. Both retain that child while allocating the
+         * enclosing Decision result. */
+        const int is_accept = expression->kind == SEKI_EXPR_ACCEPT;
+        const uint32_t child_index = is_accept ?
+            expression->value.accept.value : UINT32_MAX;
+        struct cost child = {1U, base, 1U, 0U};
+        uint32_t child_width = 0U;
+        uint32_t peak = 0U;
+        if (is_accept) {
+            child = cost_of_expression(checker, child_index, environment,
+                base);
+            child_width = width_of(checker, checker->kernel_elaboration
+                ->expressions[child_index].type);
+        } else {
+            /* The rejection reason is one variant construction with no
+             * arguments: a single step whose result is the rejection type. */
+            child_width = width_of(checker,
+                checker->kernel_elaboration->rejection_type);
+            if (!seki_checked_add(base, child_width, &child.live)) {
+                check_fail(checker, "A0-CHECK-0013",
+                    "semantic value width is unbounded or overflows U32");
+                return cost;
+            }
+        }
+        cost.steps = child.steps + 1U;
+        cost.live = child.live;
+        cost.depth = child.depth + 1U;
+        cost.workspace = child.workspace;
+        if (!seki_checked_add(base, child_width, &peak) ||
+            !seki_checked_add(peak, width_of(checker, result_type), &peak)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return cost;
+        }
+        if (peak > cost.live) {
+            cost.live = peak;
+        }
+        return cost;
+    }
+    if (expression->kind == SEKI_EXPR_IF) {
+        const struct cost condition = cost_of_expression(checker,
+            expression->value.conditional.condition, environment, base);
+        const struct cost yes = cost_of_kernel_tail(checker,
+            expression->value.conditional.if_true, environment, base,
+            result_type);
+        const struct cost no = cost_of_kernel_tail(checker,
+            expression->value.conditional.if_false, environment, base,
+            result_type);
+        const uint32_t branch = yes.steps > no.steps ? yes.steps : no.steps;
+        uint32_t steps = 0U;
+        if (!seki_checked_add(condition.steps, branch, &steps) ||
+            !seki_checked_add(steps, 1U, &cost.steps)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return cost;
+        }
+        cost.live = condition.live;
+        if (yes.live > cost.live) {
+            cost.live = yes.live;
+        }
+        if (no.live > cost.live) {
+            cost.live = no.live;
+        }
+        cost.depth = condition.depth;
+        if (yes.depth > cost.depth) {
+            cost.depth = yes.depth;
+        }
+        if (no.depth > cost.depth) {
+            cost.depth = no.depth;
+        }
+        cost.depth += 1U;
+        cost.workspace = condition.workspace;
+        if (yes.workspace > cost.workspace) {
+            cost.workspace = yes.workspace;
+        }
+        if (no.workspace > cost.workspace) {
+            cost.workspace = no.workspace;
+        }
+        return cost;
+    }
+    check_fail(checker, "A0-CHECK-0010",
+        "kernel path lacks terminal accept or reject");
+    return cost;
+}
+
+static void
+check_kernel(struct checker *checker, size_t kernel_index)
+{
+    const struct seki_kernel_decl *kernel = checker->kernel;
+    struct seki_kernel_elab *elaboration =
+        &checker->elaboration->kernels[kernel_index];
+    struct environment environment;
+    struct cost cost;
+    uint32_t base = 0U;
+    size_t index;
+
+    checker->kernel_elaboration = elaboration;
+    memset(elaboration, 0, sizeof *elaboration);
+    elaboration->result_type = SEKI_TYPE_INVALID;
+    elaboration->accepted_type = SEKI_TYPE_INVALID;
+    elaboration->rejection_type = SEKI_TYPE_INVALID;
+    elaboration->parameter_count = kernel->parameter_count;
+    elaboration->expression_count = kernel->expression_count;
+    for (index = 0U; index < kernel->expression_count; index += 1U) {
+        elaboration->expressions[index].type = SEKI_TYPE_INVALID;
+    }
+
+    if (kernel->result.kind != SEKI_TYPE_APPLIED ||
+        !seki_name_is(&kernel->result.name, "Decision") ||
+        kernel->result.argument_count != 2U ||
+        kernel->result.arguments[0].kind != SEKI_TYPE_ARG_TYPE_NAME ||
+        kernel->result.arguments[1].kind != SEKI_TYPE_ARG_TYPE_NAME) {
         check_fail(checker, "A0-CHECK-0011",
             "kernel result must be Decision[A, R]");
         return;
     }
-    check_kernel_tail(checker, checker->kernel->body_root);
+    elaboration->result_type = resolve(checker, &kernel->result);
+    if (checker->failed) {
+        return;
+    }
+    elaboration->accepted_type =
+        checker->elaboration->types.entries[elaboration->result_type].a;
+    elaboration->rejection_type =
+        checker->elaboration->types.entries[elaboration->result_type].b;
+
+    memset(&environment, 0, sizeof environment);
+    if (kernel->parameter_count > SEKI_ENV_CAPACITY) {
+        check_fail(checker, "A0-CHECK-0016",
+            "kernel environment exceeds fixed capacity");
+        return;
+    }
+    /* Parameters occupy the outermost slots: the last declared parameter is
+     * environment slot zero. */
+    for (index = 0U; index < kernel->parameter_count; index += 1U) {
+        const size_t slot = kernel->parameter_count - 1U - index;
+        const uint32_t type = resolve(checker,
+            &kernel->parameters[index].type);
+        if (checker->failed) {
+            return;
+        }
+        elaboration->parameter_types[index] = type;
+        environment.slots[slot] = type;
+        if (!seki_checked_add(base, width_of(checker, type), &base)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return;
+        }
+    }
+    environment.count = kernel->parameter_count;
+
+    check_kernel_tail(checker, kernel->body_root, &environment);
+    if (checker->failed) {
+        return;
+    }
+    cost = cost_of_kernel_tail(checker, kernel->body_root, &environment, base,
+        elaboration->result_type);
+    if (checker->failed) {
+        return;
+    }
+    /* The root callable frame is charged one step and one frame of depth. */
+    if (!seki_checked_add(cost.steps, 1U, &cost.steps) ||
+        !seki_checked_add(cost.depth, 1U, &cost.depth)) {
+        check_fail(checker, "A0-CHECK-0013",
+            "semantic value width is unbounded or overflows U32");
+        return;
+    }
+    elaboration->exact.steps = cost.steps;
+    elaboration->exact.live_bits = cost.live;
+    elaboration->exact.control_depth = cost.depth;
+    elaboration->exact.workspace_bits = cost.workspace;
+
+    if (kernel->bounds.steps < cost.steps ||
+        kernel->bounds.live_bits < cost.live ||
+        kernel->bounds.control_depth < cost.depth ||
+        kernel->bounds.workspace_bits < cost.workspace) {
+        check_fail(checker, "A0-CHECK-0017",
+            "declared resource ceiling is below the derived exact bound");
+    }
 }
 
 int
 seki_check_module(const struct seki_module_prefix *module,
-    struct seki_check_error *error)
+    struct seki_elaboration *elaboration, struct seki_check_error *error)
 {
     struct checker checker;
     size_t index;
-    if (module == NULL || error == NULL) {
+    if (module == NULL || elaboration == NULL || error == NULL) {
         return 0;
     }
     error->code = "A0-CHECK-0000";
     error->message = "invalid checker state";
+    memset(elaboration, 0, sizeof *elaboration);
+    seki_type_table_init(&elaboration->types);
+    elaboration->kernel_count = module->kernel_count;
     checker.module = module;
     checker.kernel = NULL;
+    checker.elaboration = elaboration;
+    checker.kernel_elaboration = NULL;
     checker.error = error;
     checker.failed = 0;
+
+    resolve_declarations(&checker);
     for (index = 0U; index < module->kernel_count && !checker.failed;
         index += 1U) {
         checker.kernel = &module->kernels[index];
-        check_kernel(&checker);
+        check_kernel(&checker, index);
     }
     return !checker.failed;
 }

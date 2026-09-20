@@ -1,6 +1,6 @@
 # Seki execution status
 
-- Updated: 2026-09-19
+- Updated: 2026-09-20
 - Plan: `docs/roadmap/DELIVERY_PLAN.md` version 0.4
 - Current stage: A0 provisional alpha
 - Bootstrap status: complete
@@ -226,6 +226,49 @@
   declarations and trailing source reject instead of disappearing beyond a
   parsed prefix, closing a dependency that had previously been covered by the
   second E0 source parse.
+- The checker is now an elaborator. It records one resolved type, environment
+  slot, field position, variant tag, and precedence index per expression, and
+  the typed-core emitter reads that elaboration instead of resolving names a
+  second time. The two components can no longer disagree about what a program
+  means.
+- Typed-core construction is now a recursive traversal of the checked AST
+  rather than a fixed byte sequence guarded by a program-shape match. The
+  417-byte minimum-age artifact and its 524-byte C remain byte-identical.
+- Exact resource bounds are derived from the published cost algebra over
+  `value_bits`, the evaluation schedule, control depth, and workspace, instead
+  of a shape-specific live-bit formula. The minimum-age derivation reproduces
+  `(8,25,5,0)`, and a declared ceiling below the derived bound is now rejected
+  by the checker as `A0-CHECK-0017`.
+- Canonical table ordering moved into the compiler. Declarations, record
+  fields, and variant cases are sorted by their typed keys and every emitted
+  reference uses the canonical position, so source order no longer has to match
+  canonical order. Declaring the variant before the record emits identical
+  bytes. The derivation bundle records the greedy topological type order.
+- All six comparison forms lower through the general emitter and the
+  independent backend, which decodes the operator instead of requiring
+  `LessThan`. Each is reopened and revalidated by the separate JavaScript
+  decoder and semantic checker.
+- Two unbounded-recursion defects were found by source mutation fuzzing under
+  AddressSanitizer and fixed. Deeply nested parentheses consume no
+  expression-arena slot per level, and a stale token after a lexer failure
+  re-entered the conditional production forever; each exhausted the host stack
+  on a source well inside the 64 KiB limit. Recursive descent is now bounded by
+  the profile's `maximum_nesting` ceiling and reports `A0-PARSE-0035`. Both
+  inputs are pinned as parser regressions.
+- The host now owns the parsed module and elaboration workspace, so no
+  component below `main` carries a multi-megabyte frame.
+- The independent backend no longer assumes the record occupies type-table
+  position zero, nor one fixed theorem/claim vector. Canonical positions follow
+  the program's own identifiers and the obligation vectors are validated as
+  strictly increasing known tags, so a module whose variant name sorts first or
+  that states a different obligation set now compiles through both directions
+  instead of being accepted by `check` and refused by `build`.
+- The remaining `check`/`build` divergence is now enumerated in the A0 scope
+  rather than implicit: the typed-core direction is broader than the
+  restricted-C projection, and `inspect` reports the two boundaries separately
+  as `frontend=alpha-decision` and `backend=alpha-u8-decision`. Closing that
+  gap is A0-03 work; both directions fail closed and `build` writes no artifact
+  unless every stage succeeds.
 
 ## Active work
 
@@ -271,6 +314,9 @@ make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 
 Local and pinned Linux/amd64 seed, status, bootstrap-closure, JSON,
 encoding-vector, semantic-coverage, strict-C11, sanitizer, and whitespace checks
-passed on 2026-09-19. The container run used the mounted working tree and carries
+passed on 2026-09-20. The alpha compiler additionally passed 800 source and 800
+typed-core mutation cases under AddressSanitizer and UndefinedBehaviorSanitizer
+with no finding, after the two stack-exhaustion defects that earlier sweeps
+found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.

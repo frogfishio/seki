@@ -99,21 +99,60 @@ the ordered rejection inventory. `src/alpha/seki_core.c` then constructs SCB-0
 from that checked AST. It reproduces the 417-byte regression artifact exactly,
 while a threshold mutation changes both core and projected C. The core emitter
 and independent backend now recognize an identity-independent U8-decision shape:
-arbitrary module, declaration, field, case, kernel, and parameter names; an
-arbitrary U8 threshold; and an arbitrary U8-sized rejection tag. A wholly renamed
+arbitrary module, declaration, field, case, kernel, and parameter names; any of
+the six comparison forms; an arbitrary U8 threshold; and an arbitrary U8-sized
+rejection tag. A wholly renamed
 `gate_policy` program now exercises two ordered U8 fields, two ordered rejection
 cases, rejection tag 7, precedence index 1, and threshold 42. The emitter derives
 the selected field/constructor indices and the 40-bit exact live bound. The
 repository's separate general SCB decoder and semantic checker reopen and verify
 that emitted artifact, and its generated C compiles strictly. The original
-minimum-age artifacts remain byte-identical. Other comparison operators and data
-shapes fail closed; this is not yet the complete A0 expression language or a
-general compiler core.
+minimum-age artifacts remain byte-identical. Data shapes outside this slice fail closed; this is
+not yet the complete A0 expression language or a general compiler core. The
+remaining A0-02 work is the expression language itself: bindings, exhaustive
+match, record and variant construction, and Boolean operations, together with
+the general declaration parser.
 
-This slice currently requires type declarations, record fields, and variant tags
-to appear in canonical order. The emitter rejects noncanonical source ordering
-rather than silently emitting inadmissible SCB; later general elaboration may
-sort source declarations before assigning canonical indices.
+Canonical ordering is now the compiler's responsibility rather than the
+author's. Declarations, record fields, and variant cases are sorted by their
+typed keys, and every emitted reference uses the resulting canonical position,
+so a module whose source order differs from canonical order emits exactly the
+same bytes. The derivation bundle records the greedy topological type order that
+admission recomputes.
+
+The checker is now an elaborator: it records one resolved type, environment
+slot, field position, variant tag, and precedence index per expression node, and
+typed-core construction is a recursive traversal that reads only that
+elaboration. Exact resource bounds are derived from the published cost algebra
+rather than a shape-specific formula, and a declared ceiling below the derived
+exact bound is rejected as `A0-CHECK-0017`.
+
+Recursive descent is bounded by the profile's `maximum_nesting` ceiling and
+reports `A0-PARSE-0035` beyond it. This is a fail-closed host limit: source
+mutation fuzzing under AddressSanitizer found two inputs inside the 64 KiB
+source limit that could exhaust the host stack, and both are now pinned as
+parser regressions.
+
+Canonical positions follow the program's own identifiers in both directions.
+The independent backend locates the record and variant by declaration kind
+rather than assuming table positions zero and one, so a module whose variant
+name sorts first compiles end to end. Theorem and claim vectors are validated
+as strictly increasing vectors of known tags rather than as one fixed list, so
+a module stating a different obligation set still projects to C.
+
+### The two boundaries differ, deliberately
+
+`check` validates source, static semantics, and typed-core construction.
+`build` additionally requires the restricted-C projection, whose slice is
+currently narrower. A module can therefore pass `check` and fail `build` with a
+stable `A0-BACKEND-*` diagnostic and no output file. At revision
+`0.0.0-alpha.6` the known cases are non-`U8` record fields, payload-bearing
+variant cases, and a kernel tail whose false branch is another conditional
+rather than a terminal decision. `inspect` reports the two boundaries
+separately as `frontend=alpha-decision` and `backend=alpha-u8-decision`.
+
+Closing that gap is A0-03 work, not a defect in either direction: both fail
+closed, and `build` writes no artifact unless every stage succeeds.
 
 The live entry point requires end-of-file after the supported declarations.
 Unknown declarations and trailing tokens fail as `A0-PARSE-0034`; no later

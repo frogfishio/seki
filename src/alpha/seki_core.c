@@ -3,11 +3,74 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "seki_types.h"
+
+/*
+ * Ceilings of the `c11_bounded @ 1` profile, reproduced from
+ * spec/profiles/C11_BOUNDED_V0_DRAFT.md. They are written into every module's
+ * declared ceiling; admission compares the derived module observations against
+ * them.
+ */
+#define SEKI_PROFILE_MAX_TYPED_CORE_BYTES 1048576U
+#define SEKI_PROFILE_MAX_IMPORTS 32U
+#define SEKI_PROFILE_MAX_DECLARATIONS 4096U
+#define SEKI_PROFILE_MAX_EXPRESSION_NODES 65536U
+#define SEKI_PROFILE_MAX_NESTING 256U
+#define SEKI_PROFILE_MAX_CALL_DEPTH 32U
+#define SEKI_PROFILE_MAX_STEPS 16777216U
+#define SEKI_PROFILE_MAX_LIVE_BITS 8388608U
+#define SEKI_PROFILE_MAX_CONTROL_DEPTH 256U
+#define SEKI_PROFILE_MAX_WORKSPACE_BITS 8388608U
+
+/* SCB-0 `Term` discriminants used by the alpha subset. */
+#define SEKI_TERM_UNIT_LIT 0U
+#define SEKI_TERM_BOOL_LIT 1U
+#define SEKI_TERM_INT_LIT 2U
+#define SEKI_TERM_LOCAL 4U
+#define SEKI_TERM_PROJECT 7U
+#define SEKI_TERM_VARIANT 8U
+#define SEKI_TERM_EQUAL 14U
+#define SEKI_TERM_NOT_EQUAL 15U
+#define SEKI_TERM_COMPARE 19U
+
+/* SCB-0 `KernelExpr` discriminants used by the alpha subset. */
+#define SEKI_KERNEL_ACCEPT 0U
+#define SEKI_KERNEL_REJECT 1U
+#define SEKI_KERNEL_IF 4U
+
 struct core_buffer {
     unsigned char *bytes;
     size_t capacity;
     size_t length;
     int failed;
+};
+
+/*
+ * Canonical table layout.
+ *
+ * Source order is a developer convenience; the typed core orders every table by
+ * its typed key. This layout is the one place that translates between the two,
+ * so a declaration written in any order emits the same canonical bytes and
+ * every emitted reference uses the canonical position.
+ */
+struct seki_layout {
+    uint32_t type_position[SEKI_MODULE_MAX_DECLARATIONS];
+    uint32_t type_order[SEKI_MODULE_MAX_DECLARATIONS];
+    uint32_t field_position[SEKI_MODULE_MAX_DECLARATIONS]
+        [SEKI_RECORD_MAX_FIELDS];
+    uint32_t field_order[SEKI_MODULE_MAX_DECLARATIONS][SEKI_RECORD_MAX_FIELDS];
+    uint32_t case_order[SEKI_MODULE_MAX_DECLARATIONS][SEKI_VARIANT_MAX_CASES];
+    uint32_t kernel_order[SEKI_MODULE_MAX_KERNELS];
+    uint32_t dependency_order[SEKI_MODULE_MAX_DECLARATIONS];
+};
+
+struct emitter {
+    const struct seki_module_prefix *module;
+    struct seki_elaboration *elaboration;
+    const struct seki_layout *layout;
+    const struct seki_kernel_decl *kernel;
+    const struct seki_kernel_elab *kernel_elaboration;
+    struct core_buffer *buffer;
 };
 
 static void
@@ -37,6 +100,26 @@ put_u32(struct core_buffer *buffer, uint32_t value)
     put_raw(buffer, bytes, sizeof bytes);
 }
 
+/* Integer literals are written most-significant octet first, matching every
+ * other multi-octet field in the envelope. */
+static void
+put_integer(struct core_buffer *buffer, uint32_t value, uint32_t width_bits)
+{
+    unsigned char bytes[8];
+    const size_t width = width_bits / 8U;
+    size_t index;
+    if (width > sizeof bytes) {
+        buffer->failed = 1;
+        return;
+    }
+    for (index = 0U; index < width; index += 1U) {
+        const size_t shift = (width - 1U - index) * 8U;
+        bytes[index] = shift >= 32U ? 0U :
+            (unsigned char)(value >> shift);
+    }
+    put_raw(buffer, bytes, width);
+}
+
 static void
 put_name(struct core_buffer *buffer, const struct seki_name *name)
 {
@@ -49,71 +132,20 @@ put_name(struct core_buffer *buffer, const struct seki_name *name)
 }
 
 static void
-put_local_type_ref(struct core_buffer *buffer, uint32_t index)
+put_type_ref(struct core_buffer *buffer, uint32_t position)
 {
     put_u8(buffer, 0U);
-    put_u32(buffer, index);
+    put_u32(buffer, position);
 }
 
 static void
-put_declared(struct core_buffer *buffer, uint32_t index)
+put_bounds(struct core_buffer *buffer,
+    const struct seki_resource_bounds *bounds)
 {
-    put_u8(buffer, 21U);
-    put_local_type_ref(buffer, index);
-}
-
-static void put_input_record(struct core_buffer *buffer) { put_declared(buffer, 0U); }
-static void put_rejection_type(struct core_buffer *buffer) { put_declared(buffer, 1U); }
-static void put_unit(struct core_buffer *buffer) { put_u8(buffer, 0U); }
-static void put_bool(struct core_buffer *buffer) { put_u8(buffer, 1U); }
-static void put_type_u8(struct core_buffer *buffer) { put_u8(buffer, 2U); }
-
-static int
-variant_tag_for_name(const struct seki_variant_decl *variant,
-    const struct seki_name *name, uint32_t *tag)
-{
-    size_t index;
-    for (index = 0U; index < variant->case_count; index += 1U) {
-        if (seki_name_equal(&variant->cases[index].name, name)) {
-            *tag = variant->cases[index].tag;
-            return 1;
-        }
-    }
-    return 0;
-}
-
-static void
-put_bounds(struct core_buffer *buffer, uint32_t steps, uint32_t live,
-    uint32_t depth, uint32_t workspace)
-{
-    put_u32(buffer, steps);
-    put_u32(buffer, live);
-    put_u32(buffer, depth);
-    put_u32(buffer, workspace);
-}
-
-static int
-has_names(const struct seki_name *names, size_t count,
-    const char *const *expected, size_t expected_count)
-{
-    size_t index;
-    size_t candidate;
-    if (count != expected_count) {
-        return 0;
-    }
-    for (index = 0U; index < expected_count; index += 1U) {
-        int found = 0;
-        for (candidate = 0U; candidate < count; candidate += 1U) {
-            if (seki_name_is(&names[candidate], expected[index])) {
-                found = 1;
-                break;
-            }
-        }
-        if (!found) {
-            return 0;
-        }
-    }
-    return 1;
+    put_u32(buffer, bounds->steps);
+    put_u32(buffer, bounds->live_bits);
+    put_u32(buffer, bounds->control_depth);
+    put_u32(buffer, bounds->workspace_bits);
 }
 
 static int
@@ -121,383 +153,724 @@ name_precedes(const struct seki_name *left, const struct seki_name *right)
 {
     const size_t shared = left->length < right->length ?
         left->length : right->length;
-    const int comparison = memcmp(left->bytes, right->bytes, shared);
+    const int comparison = shared == 0U ? 0 :
+        memcmp(left->bytes, right->bytes, shared);
     return comparison < 0 || (comparison == 0 && left->length < right->length);
 }
 
-static int
-extract_u8_decision(const struct seki_module_prefix *module,
-    uint32_t *threshold, uint32_t *field_index, uint32_t *case_index,
-    uint32_t *precedence_index, uint32_t *exact_live_bits)
-{
-    static const char *const claims[] = {
-        "semantic_evaluation", "lean_projection", "restricted_c_source"
-    };
-    static const char *const requirements[] = {
-        "type_well_formed", "totality", "determinism", "resource_bounds",
-        "rejection_precedence"
-    };
-    const struct seki_kernel_decl *kernel;
-    const struct seki_expression *root;
-    const struct seki_expression *condition;
-    const struct seki_expression *left;
-    const struct seki_expression *receiver;
-    const struct seki_expression *right;
-    const struct seki_expression *if_true;
-    const struct seki_expression *if_false;
-    const struct seki_expression *accepted;
-    size_t index;
-    int found_field = 0;
-    int found_case = 0;
-    int found_precedence = 0;
+/* ---------------------------------------------------------------------- */
+/* Canonical layout                                                        */
+/* ---------------------------------------------------------------------- */
 
-    if (module->header.path_count == 0U ||
-        !seki_name_is(&module->header.profile, "c11_bounded") ||
-        module->header.profile_version != 1U ||
-        !has_names(module->header.claims, module->header.claim_count, claims,
-            sizeof claims / sizeof claims[0]) ||
-        !has_names(module->header.requirements,
-            module->header.requirement_count, requirements,
-            sizeof requirements / sizeof requirements[0]) ||
-        module->declaration_count != 2U || module->kernel_count != 1U) {
-        return 0;
+static void
+sort_by_name(const struct seki_name *keys, uint32_t *order, size_t count)
+{
+    size_t index;
+    for (index = 0U; index < count; index += 1U) {
+        order[index] = (uint32_t)index;
     }
-    if (module->declarations[0].kind != SEKI_DECL_RECORD ||
-        module->declarations[0].value.record.field_count == 0U ||
-        module->declarations[1].kind != SEKI_DECL_VARIANT ||
-        module->declarations[1].value.variant.case_count == 0U ||
-        !name_precedes(&module->declarations[0].name,
-            &module->declarations[1].name)) {
-        return 0;
-    }
-    for (index = 0U;
-        index < module->declarations[0].value.record.field_count; index += 1U) {
-        const struct seki_type_ref *type =
-            &module->declarations[0].value.record.fields[index].type;
-        if (type->kind != SEKI_TYPE_NAMED || !seki_name_is(&type->name, "U8")) {
-            return 0;
+    for (index = 1U; index < count; index += 1U) {
+        const uint32_t candidate = order[index];
+        size_t position = index;
+        while (position > 0U &&
+            name_precedes(&keys[candidate], &keys[order[position - 1U]])) {
+            order[position] = order[position - 1U];
+            position -= 1U;
         }
-        if (index != 0U && !name_precedes(
-            &module->declarations[0].value.record.fields[index - 1U].name,
-            &module->declarations[0].value.record.fields[index].name)) {
-            return 0;
-        }
+        order[position] = candidate;
     }
-    for (index = 0U;
-        index < module->declarations[1].value.variant.case_count; index += 1U) {
-        const struct seki_variant_case *item =
-            &module->declarations[1].value.variant.cases[index];
-        if (item->tag > UINT8_MAX || item->payload_count != 0U) {
-            return 0;
-        }
-        if (index != 0U &&
-            module->declarations[1].value.variant.cases[index - 1U].tag >=
-                item->tag) {
-            return 0;
-        }
+}
+
+static void
+build_type_layout(const struct seki_module_prefix *module,
+    struct seki_layout *layout)
+{
+    struct seki_name names[SEKI_MODULE_MAX_DECLARATIONS];
+    size_t index;
+    for (index = 0U; index < module->declaration_count; index += 1U) {
+        names[index] = module->declarations[index].name;
     }
-    kernel = &module->kernels[0];
-    if (kernel->parameter_count != 1U ||
-        kernel->parameters[0].type.kind != SEKI_TYPE_NAMED ||
-        !seki_name_equal(&kernel->parameters[0].type.name,
-            &module->declarations[0].name) ||
-        kernel->result.kind != SEKI_TYPE_APPLIED ||
-        !seki_name_is(&kernel->result.name, "Decision") ||
-        kernel->result.argument_count != 2U ||
-        kernel->result.arguments[0].kind != SEKI_TYPE_ARG_TYPE_NAME ||
-        !seki_name_is(&kernel->result.arguments[0].name, "Unit") ||
-        kernel->result.arguments[1].kind != SEKI_TYPE_ARG_TYPE_NAME ||
-        !seki_name_equal(&kernel->result.arguments[1].name,
-            &module->declarations[1].name) ||
-        !seki_name_is(&kernel->arithmetic_policy, "checked") ||
-        kernel->rejection_count == 0U ||
-        kernel->publication_eligible != 0 ||
-        kernel->bounds.steps < 8U || kernel->bounds.live_bits < 25U ||
-        kernel->bounds.control_depth < 5U ||
-        (size_t)kernel->body_root >= kernel->expression_count) {
-        return 0;
+    sort_by_name(names, layout->type_order, module->declaration_count);
+    for (index = 0U; index < module->declaration_count; index += 1U) {
+        layout->type_position[layout->type_order[index]] = (uint32_t)index;
     }
-    root = &kernel->expressions[kernel->body_root];
-    if (root->kind != SEKI_EXPR_IF ||
-        (size_t)root->value.conditional.condition >= kernel->expression_count ||
-        (size_t)root->value.conditional.if_true >= kernel->expression_count ||
-        (size_t)root->value.conditional.if_false >= kernel->expression_count) {
-        return 0;
-    }
-    condition = &kernel->expressions[root->value.conditional.condition];
-    if_true = &kernel->expressions[root->value.conditional.if_true];
-    if_false = &kernel->expressions[root->value.conditional.if_false];
-    if (condition->kind != SEKI_EXPR_COMPARE ||
-        condition->value.compare.operator != SEKI_COMPARE_LESS ||
-        if_true->kind != SEKI_EXPR_REJECT ||
-        !seki_name_equal(&if_true->value.rejection.owner,
-            &module->declarations[1].name) ||
-        if_false->kind != SEKI_EXPR_ACCEPT ||
-        (size_t)condition->value.compare.left >= kernel->expression_count ||
-        (size_t)condition->value.compare.right >= kernel->expression_count ||
-        (size_t)if_false->value.accept.value >= kernel->expression_count) {
-        return 0;
-    }
-    left = &kernel->expressions[condition->value.compare.left];
-    right = &kernel->expressions[condition->value.compare.right];
-    accepted = &kernel->expressions[if_false->value.accept.value];
-    if (left->kind != SEKI_EXPR_FIELD ||
-        (size_t)left->value.field.receiver >= kernel->expression_count ||
-        right->kind != SEKI_EXPR_NATURAL || right->value.natural > UINT8_MAX ||
-        accepted->kind != SEKI_EXPR_UNIT) {
-        return 0;
-    }
-    receiver = &kernel->expressions[left->value.field.receiver];
-    if (receiver->kind != SEKI_EXPR_VALUE_NAME ||
-        !seki_name_equal(&receiver->value.name,
-            &kernel->parameters[0].label)) {
-        return 0;
-    }
-    for (index = 0U;
-        index < module->declarations[0].value.record.field_count; index += 1U) {
-        if (seki_name_equal(&left->value.field.field,
-            &module->declarations[0].value.record.fields[index].name)) {
-            *field_index = (uint32_t)index;
-            found_field = 1;
-            break;
-        }
-    }
-    for (index = 0U;
-        index < module->declarations[1].value.variant.case_count; index += 1U) {
-        if (seki_name_equal(&if_true->value.rejection.item,
-            &module->declarations[1].value.variant.cases[index].name)) {
-            *case_index = (uint32_t)index;
-            found_case = 1;
-            break;
-        }
-    }
-    for (index = 0U; index < kernel->rejection_count; index += 1U) {
-        uint32_t ignored_tag = 0U;
-        size_t earlier;
-        if (!seki_name_equal(&kernel->rejections[index].owner,
-            &module->declarations[1].name) ||
-            !variant_tag_for_name(&module->declarations[1].value.variant,
-                &kernel->rejections[index].item, &ignored_tag)) {
-            return 0;
-        }
-        for (earlier = 0U; earlier < index; earlier += 1U) {
-            if (seki_name_equal(&kernel->rejections[earlier].item,
-                &kernel->rejections[index].item)) {
-                return 0;
+}
+
+static void
+build_member_layout(const struct seki_module_prefix *module,
+    struct seki_layout *layout)
+{
+    size_t index;
+    for (index = 0U; index < module->declaration_count; index += 1U) {
+        const struct seki_type_decl *declaration = &module->declarations[index];
+        if (declaration->kind == SEKI_DECL_RECORD) {
+            struct seki_name names[SEKI_RECORD_MAX_FIELDS];
+            const size_t count = declaration->value.record.field_count;
+            size_t field;
+            for (field = 0U; field < count; field += 1U) {
+                names[field] = declaration->value.record.fields[field].name;
+            }
+            sort_by_name(names, layout->field_order[index], count);
+            for (field = 0U; field < count; field += 1U) {
+                layout->field_position[index]
+                    [layout->field_order[index][field]] = (uint32_t)field;
+            }
+        } else if (declaration->kind == SEKI_DECL_VARIANT) {
+            /* Variant case keys are stable U32 tags, ordered numerically. */
+            const size_t count = declaration->value.variant.case_count;
+            size_t position;
+            size_t item;
+            for (item = 0U; item < count; item += 1U) {
+                layout->case_order[index][item] = (uint32_t)item;
+            }
+            for (item = 1U; item < count; item += 1U) {
+                const uint32_t candidate = layout->case_order[index][item];
+                position = item;
+                while (position > 0U &&
+                    declaration->value.variant.cases[candidate].tag <
+                    declaration->value.variant.cases
+                        [layout->case_order[index][position - 1U]].tag) {
+                    layout->case_order[index][position] =
+                        layout->case_order[index][position - 1U];
+                    position -= 1U;
+                }
+                layout->case_order[index][position] = candidate;
             }
         }
-        if (seki_name_equal(&kernel->rejections[index].item,
-            &if_true->value.rejection.item)) {
-            *precedence_index = (uint32_t)index;
-            found_precedence = 1;
+    }
+}
+
+static void
+build_kernel_layout(const struct seki_module_prefix *module,
+    struct seki_layout *layout)
+{
+    struct seki_name names[SEKI_MODULE_MAX_KERNELS];
+    size_t index;
+    for (index = 0U; index < module->kernel_count; index += 1U) {
+        names[index] = module->kernels[index].name;
+    }
+    sort_by_name(names, layout->kernel_order, module->kernel_count);
+}
+
+/*
+ * Records the canonical positions that one declaration's body depends on.
+ * Only locally declared types create an ordering obligation.
+ */
+static void
+declaration_dependencies(const struct seki_module_prefix *module,
+    const struct seki_layout *layout, size_t declaration, int *dependent)
+{
+    const struct seki_type_decl *entry = &module->declarations[declaration];
+    size_t index;
+    const struct seki_type_ref *references[SEKI_RECORD_MAX_FIELDS +
+        SEKI_VARIANT_MAX_CASES * SEKI_VARIANT_MAX_PAYLOAD_FIELDS + 1U];
+    size_t count = 0U;
+    switch (entry->kind) {
+    case SEKI_DECL_ALIAS:
+    case SEKI_DECL_NOMINAL:
+        references[count++] = &entry->value.target;
+        break;
+    case SEKI_DECL_RECORD:
+        for (index = 0U; index < entry->value.record.field_count;
+            index += 1U) {
+            references[count++] = &entry->value.record.fields[index].type;
+        }
+        break;
+    case SEKI_DECL_VARIANT:
+        for (index = 0U; index < entry->value.variant.case_count;
+            index += 1U) {
+            const struct seki_variant_case *item =
+                &entry->value.variant.cases[index];
+            size_t field;
+            for (field = 0U; field < item->payload_count; field += 1U) {
+                references[count++] = &item->payload[field].type;
+            }
+        }
+        break;
+    default:
+        break;
+    }
+    for (index = 0U; index < count; index += 1U) {
+        size_t candidate;
+        if (references[index]->kind != SEKI_TYPE_NAMED) {
+            continue;
+        }
+        for (candidate = 0U; candidate < module->declaration_count;
+            candidate += 1U) {
+            if (seki_name_equal(&module->declarations[candidate].name,
+                &references[index]->name)) {
+                dependent[layout->type_position[candidate]] = 1;
+                break;
+            }
         }
     }
-    if (!found_field || !found_case || !found_precedence) {
-        return 0;
+}
+
+/*
+ * The derivation bundle records the greedy topological order over the
+ * canonical type table: at each position, the lowest-indexed declaration whose
+ * dependencies are already placed. Admission recomputes it and rejects any
+ * other permutation, so this must match exactly.
+ */
+static int
+build_dependency_order(const struct seki_module_prefix *module,
+    struct seki_layout *layout)
+{
+    int dependencies[SEKI_MODULE_MAX_DECLARATIONS]
+        [SEKI_MODULE_MAX_DECLARATIONS];
+    int placed[SEKI_MODULE_MAX_DECLARATIONS];
+    size_t position;
+    memset(dependencies, 0, sizeof dependencies);
+    memset(placed, 0, sizeof placed);
+    for (position = 0U; position < module->declaration_count;
+        position += 1U) {
+        declaration_dependencies(module, layout, layout->type_order[position],
+            dependencies[position]);
     }
-    *threshold = right->value.natural;
-    {
-        const uint32_t record_bits =
-            (uint32_t)module->declarations[0].value.record.field_count * 8U;
-        const uint32_t projection_peak = record_bits * 2U + 8U;
-        const uint32_t comparison_peak = record_bits + 17U;
-        *exact_live_bits = projection_peak > comparison_peak ?
-            projection_peak : comparison_peak;
-    }
-    if (kernel->bounds.live_bits < *exact_live_bits) {
-        return 0;
+    for (position = 0U; position < module->declaration_count;
+        position += 1U) {
+        size_t candidate;
+        int selected = 0;
+        for (candidate = 0U; candidate < module->declaration_count;
+            candidate += 1U) {
+            size_t dependency;
+            int ready = 1;
+            if (placed[candidate]) {
+                continue;
+            }
+            for (dependency = 0U; dependency < module->declaration_count;
+                dependency += 1U) {
+                if (dependencies[candidate][dependency] &&
+                    !placed[dependency]) {
+                    ready = 0;
+                    break;
+                }
+            }
+            if (ready) {
+                layout->dependency_order[position] = (uint32_t)candidate;
+                placed[candidate] = 1;
+                selected = 1;
+                break;
+            }
+        }
+        if (!selected) {
+            /* Every remaining declaration depends on an unplaced one, which
+             * is a cycle. Typed-core formation rejects recursive types. */
+            return 0;
+        }
     }
     return 1;
 }
 
-static void
-put_kernel(struct core_buffer *buffer, const struct seki_module_prefix *module,
-    uint32_t threshold, uint32_t field_index, uint32_t case_index,
-    uint32_t precedence_index, uint32_t exact_live_bits)
+static int
+build_layout(const struct seki_module_prefix *module,
+    struct seki_layout *layout)
 {
-    const struct seki_kernel_decl *kernel = &module->kernels[0];
-    const struct seki_variant_decl *variant =
-        &module->declarations[1].value.variant;
-    size_t index;
-    uint32_t rejection_tag = variant->cases[case_index].tag;
-    put_name(buffer, &kernel->name);
-    put_u32(buffer, 1U);
-    put_name(buffer, &kernel->parameters[0].label);
-    put_u32(buffer, 1U);
-    put_input_record(buffer);
-    put_u8(buffer, 19U);
-    put_unit(buffer);
-    put_rejection_type(buffer);
-    put_u32(buffer, (uint32_t)kernel->rejection_count);
-    for (index = 0U; index < kernel->rejection_count; index += 1U) {
-        uint32_t ordered_tag = 0U;
-        if (!variant_tag_for_name(variant, &kernel->rejections[index].item,
-            &ordered_tag)) {
-            buffer->failed = 1;
-            return;
-        }
-        put_local_type_ref(buffer, 1U);
-        put_u32(buffer, ordered_tag);
-    }
-
-    put_u8(buffer, 4U);
-    put_bool(buffer);
-    put_u8(buffer, 19U);
-    put_u8(buffer, 0U);
-    put_type_u8(buffer);
-    put_u8(buffer, 7U);
-    put_input_record(buffer);
-    put_u8(buffer, 4U);
-    put_u32(buffer, 0U);
-    put_u8(buffer, 0U);
-    put_local_type_ref(buffer, 0U);
-    put_u32(buffer, field_index);
-    put_type_u8(buffer);
-    put_u8(buffer, 2U);
-    put_u8(buffer, 0U);
-    put_u8(buffer, (uint8_t)threshold);
-
-    put_u8(buffer, 1U);
-    put_rejection_type(buffer);
-    put_u8(buffer, 8U);
-    put_local_type_ref(buffer, 1U);
-    put_u32(buffer, rejection_tag);
-    put_u32(buffer, 0U);
-    put_u32(buffer, precedence_index);
-    put_u8(buffer, 0U);
-    put_unit(buffer);
-    put_u8(buffer, 0U);
-
-    put_bounds(buffer, kernel->bounds.steps, kernel->bounds.live_bits,
-        kernel->bounds.control_depth, kernel->bounds.workspace_bits);
-    put_bounds(buffer, 8U, exact_live_bits, 5U, 0U);
-    put_u8(buffer, 0U);
+    memset(layout, 0, sizeof *layout);
+    build_type_layout(module, layout);
+    build_member_layout(module, layout);
+    build_kernel_layout(module, layout);
+    return build_dependency_order(module, layout);
 }
 
-static int
-encode_u8_decision(const struct seki_module_prefix *module,
-    unsigned char *output, size_t capacity, size_t *output_length,
-    uint32_t threshold, uint32_t field_index, uint32_t case_index,
-    uint32_t precedence_index, uint32_t exact_live_bits)
+/* ---------------------------------------------------------------------- */
+/* Type values                                                             */
+/* ---------------------------------------------------------------------- */
+
+static void
+put_type_value(struct emitter *emitter, uint32_t type)
 {
-    unsigned char payload_bytes[SEKI_CORE_CAPACITY];
-    struct core_buffer payload = {
-        payload_bytes, sizeof payload_bytes, 0U, 0
-    };
-    struct core_buffer encoded = {output, capacity, 0U, 0};
-    static const unsigned char magic[4] = {'S', 'E', 'K', 'I'};
+    const struct seki_type *entry;
+    if (type >= emitter->elaboration->types.count) {
+        emitter->buffer->failed = 1;
+        return;
+    }
+    entry = &emitter->elaboration->types.entries[type];
+    put_u8(emitter->buffer, (uint8_t)entry->kind);
+    switch (entry->kind) {
+    case SEKI_T_BYTES:
+        put_u32(emitter->buffer, entry->a);
+        break;
+    case SEKI_T_DIGEST:
+        put_u8(emitter->buffer, 0U);
+        put_u32(emitter->buffer, entry->a);
+        break;
+    case SEKI_T_DECISION:
+        put_type_value(emitter, entry->a);
+        put_type_value(emitter, entry->b);
+        break;
+    case SEKI_T_DECLARED:
+        if (entry->a >= emitter->module->declaration_count) {
+            emitter->buffer->failed = 1;
+            return;
+        }
+        put_type_ref(emitter->buffer, emitter->layout->type_position[entry->a]);
+        break;
+    default:
+        break;
+    }
+}
+
+static void
+put_surface_type(struct emitter *emitter, const struct seki_type_ref *reference)
+{
+    const uint32_t type = seki_type_resolve(emitter->module,
+        &emitter->elaboration->types, reference);
+    if (type == SEKI_TYPE_INVALID) {
+        emitter->buffer->failed = 1;
+        return;
+    }
+    put_type_value(emitter, type);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Terms                                                                   */
+/* ---------------------------------------------------------------------- */
+
+static uint32_t
+integer_tag(const struct seki_elaboration *elaboration, uint32_t type,
+    uint32_t *width_bits)
+{
+    switch (elaboration->types.entries[type].kind) {
+    case SEKI_T_U8:
+        *width_bits = 8U;
+        return 0U;
+    case SEKI_T_U16:
+        *width_bits = 16U;
+        return 1U;
+    case SEKI_T_U32:
+        *width_bits = 32U;
+        return 2U;
+    case SEKI_T_U64:
+        *width_bits = 64U;
+        return 3U;
+    default:
+        break;
+    }
+    *width_bits = 0U;
+    return UINT32_MAX;
+}
+
+static void
+put_expression(struct emitter *emitter, uint32_t expression_index)
+{
+    const struct seki_expression *expression;
+    const struct seki_expr_info *info;
+    if (emitter->buffer->failed ||
+        (size_t)expression_index >= emitter->kernel->expression_count) {
+        emitter->buffer->failed = 1;
+        return;
+    }
+    expression = &emitter->kernel->expressions[expression_index];
+    info = &emitter->kernel_elaboration->expressions[expression_index];
+    put_type_value(emitter, info->type);
+    switch (expression->kind) {
+    case SEKI_EXPR_UNIT:
+        put_u8(emitter->buffer, SEKI_TERM_UNIT_LIT);
+        break;
+    case SEKI_EXPR_BOOL:
+        put_u8(emitter->buffer, SEKI_TERM_BOOL_LIT);
+        put_u8(emitter->buffer, expression->value.boolean ? 1U : 0U);
+        break;
+    case SEKI_EXPR_NATURAL: {
+        uint32_t width = 0U;
+        const uint32_t tag = integer_tag(emitter->elaboration, info->type,
+            &width);
+        if (tag == UINT32_MAX) {
+            emitter->buffer->failed = 1;
+            return;
+        }
+        put_u8(emitter->buffer, SEKI_TERM_INT_LIT);
+        put_u8(emitter->buffer, (uint8_t)tag);
+        put_integer(emitter->buffer, expression->value.natural, width);
+        break;
+    }
+    case SEKI_EXPR_VALUE_NAME:
+        put_u8(emitter->buffer, SEKI_TERM_LOCAL);
+        put_u32(emitter->buffer, info->a);
+        break;
+    case SEKI_EXPR_FIELD:
+        put_u8(emitter->buffer, SEKI_TERM_PROJECT);
+        put_expression(emitter, expression->value.field.receiver);
+        /* FieldRef: FieldOwnerRef(record_type, TypeRef) then field index. */
+        put_u8(emitter->buffer, 0U);
+        put_type_ref(emitter->buffer,
+            emitter->layout->type_position[info->a]);
+        put_u32(emitter->buffer,
+            emitter->layout->field_position[info->a][info->b]);
+        break;
+    case SEKI_EXPR_COMPARE: {
+        const enum seki_compare_operator operator =
+            expression->value.compare.operator;
+        if (operator == SEKI_COMPARE_EQUAL) {
+            put_u8(emitter->buffer, SEKI_TERM_EQUAL);
+        } else if (operator == SEKI_COMPARE_NOT_EQUAL) {
+            put_u8(emitter->buffer, SEKI_TERM_NOT_EQUAL);
+        } else {
+            put_u8(emitter->buffer, SEKI_TERM_COMPARE);
+            put_u8(emitter->buffer, (uint8_t)operator);
+        }
+        put_expression(emitter, expression->value.compare.left);
+        put_expression(emitter, expression->value.compare.right);
+        break;
+    }
+    default:
+        emitter->buffer->failed = 1;
+        break;
+    }
+}
+
+/* The rejection reason is a payload-free variant construction built inline;
+ * the surface has no expression node for it. */
+static void
+put_rejection_reason(struct emitter *emitter, const struct seki_expr_info *info)
+{
+    put_type_value(emitter, emitter->kernel_elaboration->rejection_type);
+    put_u8(emitter->buffer, SEKI_TERM_VARIANT);
+    put_type_ref(emitter->buffer, emitter->layout->type_position[info->a]);
+    put_u32(emitter->buffer, info->b);
+    put_u32(emitter->buffer, 0U);
+}
+
+static void
+put_kernel_expression(struct emitter *emitter, uint32_t expression_index)
+{
+    const struct seki_expression *expression;
+    const struct seki_expr_info *info;
+    if (emitter->buffer->failed ||
+        (size_t)expression_index >= emitter->kernel->expression_count) {
+        emitter->buffer->failed = 1;
+        return;
+    }
+    expression = &emitter->kernel->expressions[expression_index];
+    info = &emitter->kernel_elaboration->expressions[expression_index];
+    switch (expression->kind) {
+    case SEKI_EXPR_ACCEPT:
+        put_u8(emitter->buffer, SEKI_KERNEL_ACCEPT);
+        put_expression(emitter, expression->value.accept.value);
+        break;
+    case SEKI_EXPR_REJECT:
+        put_u8(emitter->buffer, SEKI_KERNEL_REJECT);
+        put_rejection_reason(emitter, info);
+        put_u32(emitter->buffer, info->c);
+        break;
+    case SEKI_EXPR_IF:
+        put_u8(emitter->buffer, SEKI_KERNEL_IF);
+        put_expression(emitter, expression->value.conditional.condition);
+        put_kernel_expression(emitter, expression->value.conditional.if_true);
+        put_kernel_expression(emitter, expression->value.conditional.if_false);
+        break;
+    default:
+        emitter->buffer->failed = 1;
+        break;
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Declarations and kernels                                                */
+/* ---------------------------------------------------------------------- */
+
+static void
+put_declaration(struct emitter *emitter, size_t declaration_index)
+{
+    const struct seki_type_decl *declaration =
+        &emitter->module->declarations[declaration_index];
+    size_t index;
+    put_name(emitter->buffer, &declaration->name);
+    switch (declaration->kind) {
+    case SEKI_DECL_ALIAS:
+        put_u8(emitter->buffer, 0U);
+        put_surface_type(emitter, &declaration->value.target);
+        break;
+    case SEKI_DECL_NOMINAL:
+        put_u8(emitter->buffer, 1U);
+        put_surface_type(emitter, &declaration->value.target);
+        break;
+    case SEKI_DECL_RECORD:
+        put_u8(emitter->buffer, 2U);
+        put_u32(emitter->buffer,
+            (uint32_t)declaration->value.record.field_count);
+        for (index = 0U; index < declaration->value.record.field_count;
+            index += 1U) {
+            const struct seki_field_decl *field =
+                &declaration->value.record.fields
+                    [emitter->layout->field_order[declaration_index][index]];
+            put_name(emitter->buffer, &field->name);
+            put_surface_type(emitter, &field->type);
+        }
+        break;
+    case SEKI_DECL_VARIANT:
+        put_u8(emitter->buffer, 3U);
+        put_u32(emitter->buffer,
+            (uint32_t)declaration->value.variant.case_count);
+        for (index = 0U; index < declaration->value.variant.case_count;
+            index += 1U) {
+            const struct seki_variant_case *item =
+                &declaration->value.variant.cases
+                    [emitter->layout->case_order[declaration_index][index]];
+            size_t payload;
+            put_u32(emitter->buffer, item->tag);
+            put_name(emitter->buffer, &item->name);
+            if (item->payload_count == 0U) {
+                put_u8(emitter->buffer, 0U);
+                continue;
+            }
+            put_u8(emitter->buffer, 1U);
+            put_u32(emitter->buffer, (uint32_t)item->payload_count);
+            for (payload = 0U; payload < item->payload_count; payload += 1U) {
+                put_name(emitter->buffer, &item->payload[payload].name);
+                put_surface_type(emitter, &item->payload[payload].type);
+            }
+        }
+        break;
+    default:
+        emitter->buffer->failed = 1;
+        break;
+    }
+}
+
+static void
+put_kernel(struct emitter *emitter, size_t kernel_index)
+{
+    const struct seki_kernel_decl *kernel =
+        &emitter->module->kernels[kernel_index];
+    const struct seki_kernel_elab *elaboration =
+        &emitter->elaboration->kernels[kernel_index];
     size_t index;
 
-    put_u32(&payload, 0U);
-    put_u32(&payload, (uint32_t)module->header.path_count);
-    for (index = 0U; index < module->header.path_count; index += 1U) {
-        put_name(&payload, &module->header.path[index]);
-    }
-    put_u32(&payload, module->header.module_version);
-    put_name(&payload, &module->header.profile);
-    put_u32(&payload, module->header.profile_version);
-    put_u32(&payload, 0U);
-    put_u32(&payload, 0U);
-    put_u32(&payload, 2U);
-    put_name(&payload, &module->declarations[0].name);
-    put_u8(&payload, 2U);
-    put_u32(&payload, (uint32_t)
-        module->declarations[0].value.record.field_count);
-    for (index = 0U;
-        index < module->declarations[0].value.record.field_count; index += 1U) {
-        put_name(&payload,
-            &module->declarations[0].value.record.fields[index].name);
-        put_type_u8(&payload);
-    }
-    put_name(&payload, &module->declarations[1].name);
-    put_u8(&payload, 3U);
-    put_u32(&payload, (uint32_t)
-        module->declarations[1].value.variant.case_count);
-    for (index = 0U;
-        index < module->declarations[1].value.variant.case_count; index += 1U) {
-        put_u32(&payload,
-            module->declarations[1].value.variant.cases[index].tag);
-        put_name(&payload,
-            &module->declarations[1].value.variant.cases[index].name);
-        put_u8(&payload, 0U);
-    }
-    put_u32(&payload, 0U);
-    put_u32(&payload, 1U);
-    put_kernel(&payload, module, threshold, field_index, case_index,
-        precedence_index, exact_live_bits);
-    put_u32(&payload, 0U);
-    put_u32(&payload, 2U);
-    put_u32(&payload, 0U);
-    put_u32(&payload, 1U);
-    put_u32(&payload, 0U);
-    put_u32(&payload, 1U);
-    put_u32(&payload, 0U);
-    put_u32(&payload, 5U);
-    put_u8(&payload, 0U);
-    put_u8(&payload, 1U);
-    put_u8(&payload, 2U);
-    put_u8(&payload, 3U);
-    put_u8(&payload, 4U);
-    put_u32(&payload, 3U);
-    put_u8(&payload, 0U);
-    put_u8(&payload, 1U);
-    put_u8(&payload, 3U);
-    put_u32(&payload, 1048576U);
-    put_u32(&payload, 32U);
-    put_u32(&payload, 4096U);
-    put_u32(&payload, 65536U);
-    put_u32(&payload, 256U);
-    put_u32(&payload, 32U);
-    put_bounds(&payload, 16777216U, 8388608U, 256U, 8388608U);
-    put_u32(&payload, 0U);
-    put_u32(&payload, 2U);
-    put_u32(&payload, 0U);
-    put_u32(&payload, 1U);
-    put_u32(&payload, 0U);
+    emitter->kernel = kernel;
+    emitter->kernel_elaboration = elaboration;
 
-    if (payload.failed || payload.length > UINT32_MAX) {
+    /* FunctionKey: base name then the ordered parameter labels. */
+    put_name(emitter->buffer, &kernel->name);
+    put_u32(emitter->buffer, (uint32_t)kernel->parameter_count);
+    for (index = 0U; index < kernel->parameter_count; index += 1U) {
+        put_name(emitter->buffer, &kernel->parameters[index].label);
+    }
+
+    put_u32(emitter->buffer, (uint32_t)kernel->parameter_count);
+    for (index = 0U; index < kernel->parameter_count; index += 1U) {
+        put_type_value(emitter, elaboration->parameter_types[index]);
+    }
+    put_type_value(emitter, elaboration->result_type);
+
+    put_u32(emitter->buffer, (uint32_t)kernel->rejection_count);
+    for (index = 0U; index < kernel->rejection_count; index += 1U) {
+        const struct seki_type *rejection =
+            &emitter->elaboration->types.entries[elaboration->rejection_type];
+        const struct seki_type_decl *declaration;
+        size_t item;
+        int found = 0;
+        if (rejection->kind != SEKI_T_DECLARED ||
+            rejection->a >= emitter->module->declaration_count) {
+            emitter->buffer->failed = 1;
+            return;
+        }
+        declaration = &emitter->module->declarations[rejection->a];
+        put_type_ref(emitter->buffer,
+            emitter->layout->type_position[rejection->a]);
+        for (item = 0U; item < declaration->value.variant.case_count;
+            item += 1U) {
+            if (seki_name_equal(&declaration->value.variant.cases[item].name,
+                &kernel->rejections[index].item)) {
+                put_u32(emitter->buffer,
+                    declaration->value.variant.cases[item].tag);
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            emitter->buffer->failed = 1;
+            return;
+        }
+    }
+
+    put_kernel_expression(emitter, kernel->body_root);
+
+    put_bounds(emitter->buffer, &kernel->bounds);
+    put_bounds(emitter->buffer, &elaboration->exact);
+    put_u8(emitter->buffer, kernel->publication_eligible ? 1U : 0U);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Header vectors                                                          */
+/* ---------------------------------------------------------------------- */
+
+static const char *const seki_theorem_names[] = {
+    "type_well_formed", "totality", "determinism", "resource_bounds",
+    "rejection_precedence", "representation", "publication_equivalence"
+};
+
+static const char *const seki_claim_names[] = {
+    "semantic_evaluation", "lean_projection", "representation_correspondence",
+    "restricted_c_source", "clight_refinement", "certified_lean_equivalence",
+    "installed_binary", "publication"
+};
+
+/*
+ * Theorem and claim vectors are strictly increasing by tag. Emitting them from
+ * the registry order rather than the source order makes the encoding
+ * insensitive to how the header was written, while an unknown name fails
+ * closed.
+ */
+static int
+put_tag_vector(struct core_buffer *buffer, const struct seki_name *names,
+    size_t name_count, const char *const *registry, size_t registry_count)
+{
+    uint32_t tags[SEKI_HEADER_MAX_REQUIREMENTS];
+    size_t count = 0U;
+    size_t index;
+    if (name_count > SEKI_HEADER_MAX_REQUIREMENTS) {
         return 0;
     }
+    for (index = 0U; index < registry_count; index += 1U) {
+        size_t candidate;
+        for (candidate = 0U; candidate < name_count; candidate += 1U) {
+            if (seki_name_is(&names[candidate], registry[index])) {
+                tags[count++] = (uint32_t)index;
+                break;
+            }
+        }
+    }
+    if (count != name_count) {
+        return 0;
+    }
+    put_u32(buffer, (uint32_t)count);
+    for (index = 0U; index < count; index += 1U) {
+        put_u8(buffer, (uint8_t)tags[index]);
+    }
+    return 1;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Module                                                                  */
+/* ---------------------------------------------------------------------- */
+
+static int
+encode_module(struct emitter *emitter, struct core_buffer *payload)
+{
+    const struct seki_module_prefix *module = emitter->module;
+    size_t index;
+
+    emitter->buffer = payload;
+
+    put_u32(payload, 0U);                       /* schema_version */
+                                                /* language: zero octets */
+    put_u32(payload, (uint32_t)module->header.path_count);
+    for (index = 0U; index < module->header.path_count; index += 1U) {
+        put_name(payload, &module->header.path[index]);
+    }
+    put_u32(payload, module->header.module_version);
+    put_name(payload, &module->header.profile);
+    put_u32(payload, module->header.profile_version);
+    put_u32(payload, 0U);                       /* imports */
+    put_u32(payload, 0U);                       /* domains */
+
+    put_u32(payload, (uint32_t)module->declaration_count);
+    for (index = 0U; index < module->declaration_count; index += 1U) {
+        put_declaration(emitter, emitter->layout->type_order[index]);
+    }
+
+    put_u32(payload, 0U);                       /* functions */
+    put_u32(payload, (uint32_t)module->kernel_count);
+    for (index = 0U; index < module->kernel_count; index += 1U) {
+        put_kernel(emitter, emitter->layout->kernel_order[index]);
+    }
+
+    /* Exports: every declaration and kernel in the surface is exported. */
+    put_u32(payload, 0U);
+    put_u32(payload, (uint32_t)module->declaration_count);
+    for (index = 0U; index < module->declaration_count; index += 1U) {
+        put_u32(payload, (uint32_t)index);
+    }
+    put_u32(payload, 0U);
+    put_u32(payload, (uint32_t)module->kernel_count);
+    for (index = 0U; index < module->kernel_count; index += 1U) {
+        put_u32(payload, (uint32_t)index);
+    }
+
+    if (!put_tag_vector(payload, module->header.requirements,
+        module->header.requirement_count, seki_theorem_names,
+        sizeof seki_theorem_names / sizeof seki_theorem_names[0])) {
+        return 0;
+    }
+    if (!put_tag_vector(payload, module->header.claims,
+        module->header.claim_count, seki_claim_names,
+        sizeof seki_claim_names / sizeof seki_claim_names[0])) {
+        return 0;
+    }
+
+    put_u32(payload, SEKI_PROFILE_MAX_TYPED_CORE_BYTES);
+    put_u32(payload, SEKI_PROFILE_MAX_IMPORTS);
+    put_u32(payload, SEKI_PROFILE_MAX_DECLARATIONS);
+    put_u32(payload, SEKI_PROFILE_MAX_EXPRESSION_NODES);
+    put_u32(payload, SEKI_PROFILE_MAX_NESTING);
+    put_u32(payload, SEKI_PROFILE_MAX_CALL_DEPTH);
+    put_u32(payload, SEKI_PROFILE_MAX_STEPS);
+    put_u32(payload, SEKI_PROFILE_MAX_LIVE_BITS);
+    put_u32(payload, SEKI_PROFILE_MAX_CONTROL_DEPTH);
+    put_u32(payload, SEKI_PROFILE_MAX_WORKSPACE_BITS);
+
+    put_u32(payload, 0U);                       /* derivation schema_version */
+    put_u32(payload, (uint32_t)module->declaration_count);
+    for (index = 0U; index < module->declaration_count; index += 1U) {
+        put_u32(payload, emitter->layout->dependency_order[index]);
+    }
+    put_u32(payload, 0U);                       /* function_dependency_order */
+    return !payload->failed;
+}
+
+int
+seki_emit_core(const struct seki_module_prefix *module,
+    struct seki_elaboration *elaboration, unsigned char *output,
+    size_t capacity, size_t *output_length, struct seki_core_error *error)
+{
+    unsigned char payload_bytes[SEKI_CORE_CAPACITY];
+    struct core_buffer payload = {payload_bytes, sizeof payload_bytes, 0U, 0};
+    struct core_buffer encoded = {output, capacity, 0U, 0};
+    static const unsigned char magic[4] = {'S', 'E', 'K', 'I'};
+    struct seki_layout layout;
+    struct emitter emitter;
+
+    if (module == NULL || elaboration == NULL || output == NULL ||
+        output_length == NULL || error == NULL) {
+        return 0;
+    }
+    error->code = "A0-CORE-0000";
+    error->message = "invalid core-emitter state";
+
+    if (module->declaration_count == 0U || module->kernel_count == 0U) {
+        error->code = "A0-CORE-0003";
+        error->message = "module declares no type or no kernel";
+        return 0;
+    }
+    if (!build_layout(module, &layout)) {
+        error->code = "A0-CORE-0004";
+        error->message = "type declarations are recursive";
+        return 0;
+    }
+
+    memset(&emitter, 0, sizeof emitter);
+    emitter.module = module;
+    emitter.elaboration = elaboration;
+    emitter.layout = &layout;
+
+    if (!encode_module(&emitter, &payload) || payload.length > UINT32_MAX) {
+        error->code = "A0-CORE-0001";
+        error->message = "module is outside the alpha typed-core subset";
+        return 0;
+    }
+
     put_raw(&encoded, magic, sizeof magic);
     put_u32(&encoded, 0U);
     put_u8(&encoded, 0U);
     put_u32(&encoded, (uint32_t)payload.length);
     put_raw(&encoded, payload.bytes, payload.length);
     if (encoded.failed) {
-        return 0;
-    }
-    *output_length = encoded.length;
-    return 1;
-}
-
-int
-seki_emit_core(const struct seki_module_prefix *module,
-    unsigned char *output, size_t capacity, size_t *output_length,
-    struct seki_core_error *error)
-{
-    uint32_t threshold = 0U;
-    uint32_t field_index = 0U;
-    uint32_t case_index = 0U;
-    uint32_t precedence_index = 0U;
-    uint32_t exact_live_bits = 0U;
-    if (module == NULL || output == NULL || output_length == NULL ||
-        error == NULL) {
-        return 0;
-    }
-    error->code = "A0-CORE-0000";
-    error->message = "invalid core-emitter state";
-    if (!extract_u8_decision(module, &threshold, &field_index, &case_index,
-        &precedence_index, &exact_live_bits)) {
-        error->code = "A0-CORE-0001";
-        error->message = "module is outside the U8-decision core slice";
-        return 0;
-    }
-    if (!encode_u8_decision(module, output, capacity, output_length,
-        threshold, field_index, case_index, precedence_index,
-        exact_live_bits)) {
         error->code = "A0-CORE-0002";
         error->message = "candidate typed-core output exceeds capacity";
         return 0;
     }
+    *output_length = encoded.length;
     return 1;
 }
