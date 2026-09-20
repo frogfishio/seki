@@ -45,6 +45,7 @@
   "restricted_c_ast_ready": true,
   "nested_kernel_control_ready": true,
   "unsigned_field_widths_ready": true,
+  "multiple_declarations_ready": true,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

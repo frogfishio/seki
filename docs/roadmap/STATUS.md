@@ -286,6 +286,11 @@
 - `inspect` no longer reports a minimum-age-shaped `threshold_u8`. It reports
   `first_literal=<value>:<type>` when the kernel has one, and both boundaries
   now read `alpha-decision`.
+- The C projection keeps a declaration table rather than one record and one
+  variant. A module may declare any number of records and variants; each record
+  becomes a struct in canonical order, and the kernel signature selects the
+  declarations it uses by reading their positions rather than assuming a
+  layout. Exports and the derivation order follow the declaration count.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
@@ -336,10 +341,10 @@ make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 
 Local and pinned Linux/amd64 seed, status, bootstrap-closure, JSON,
 encoding-vector, semantic-coverage, strict-C11, sanitizer, and whitespace checks
-passed on 2026-09-20. The alpha compiler additionally passed 2,000 source and
-2,500 typed-core mutation cases across the minimum-age, nested three-premise,
-and wide-integer kernels under AddressSanitizer and UndefinedBehaviorSanitizer
-with no finding, after the two stack-exhaustion defects that earlier sweeps
-found were fixed. The container run used the mounted working tree and carries
+passed on 2026-09-20. The alpha compiler additionally passed 2,600 source and
+3,100 typed-core mutation cases across the minimum-age, nested three-premise,
+wide-integer, and four-declaration kernels under AddressSanitizer and
+UndefinedBehaviorSanitizer with no finding, after the two stack-exhaustion
+defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.

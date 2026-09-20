@@ -308,6 +308,56 @@ try {
   execFileSync("cc", [...strictFlags, "-c", wideC, "-o",
     path.join(temporary, "wide.o")], { stdio: "inherit" });
 
+  // A module may declare more than one record and one variant. Every declared
+  // record becomes a struct in canonical order, and the kernel signature
+  // selects which declarations it uses by position rather than by a fixed
+  // layout: here the parameter record is second and the variant is last.
+  const multiSource = path.join(temporary, "multi.seki");
+  const multiCore = path.join(temporary, "multi.scb0");
+  const multiC = path.join(temporary, "multi.c");
+  fs.writeFileSync(multiSource, [
+    "module grit::multi @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export record Artifact { epoch: U32 }.",
+    "export record Candidate { pack: U32, vocabulary: U32 }.",
+    "export variant Refusal [ PackMismatch @ 1. VocabularyMismatch @ 2. ].",
+    "export record Receipt { issued: U8 }.",
+    "",
+    "export kernel publish candidate: Candidate",
+    "-> Decision[Unit, Refusal] arithmetic: checked",
+    "bounded steps: 128 liveBits: 1024 controlDepth: 64 workspaceBits: 0",
+    "rejects: Refusal::PackMismatch, Refusal::VocabularyMismatch",
+    "publication: none [",
+    "  (candidate pack) != 7",
+    "    ifTrue: [ reject Refusal::PackMismatch ]",
+    "    ifFalse: [ (candidate vocabulary) != 3",
+    "      ifTrue: [ reject Refusal::VocabularyMismatch ]",
+    "      ifFalse: [ accept unit ] ]",
+    "].",
+    "",
+  ].join("\n"));
+  const multi = run(["build", "--core", multiCore, "--c", multiC, multiSource]);
+  assert.equal(multi.status, 0, multi.stderr);
+  const multiDecoded = decodeModule(fs.readFileSync(multiCore));
+  checkTypedCore(multiDecoded);
+  // Source order was Artifact, Candidate, Refusal, Receipt; the table is
+  // ordered by name regardless.
+  assert.deepEqual(multiDecoded.types.map(([name]) => name),
+    ["Artifact", "Candidate", "Receipt", "Refusal"]);
+  const multiText = fs.readFileSync(multiC, "utf8");
+  for (const struct of ["artifact", "candidate", "receipt"]) {
+    assert.ok(multiText.includes(`} seki_a0_multi_${struct};`),
+      `missing struct seki_a0_multi_${struct}`);
+  }
+  // A variant contributes no struct of its own.
+  assert.ok(!multiText.includes("seki_a0_multi_refusal"));
+  assert.match(multiText, /seki_a0_multi_publish\(seki_a0_multi_candidate /u);
+  execFileSync("cc", [...strictFlags, "-c", multiC, "-o",
+    path.join(temporary, "multi.o")], { stdio: "inherit" });
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -382,7 +432,7 @@ try {
     "slice=u8-decision fields=2 rejections=2 renamed=yes overwrite=reject " +
     "operators=4 source_order=canonical table_order=name-derived " +
     "header_vectors=general nested_control=yes exhaustive=65536 " +
-    "widths=u8,u16,u32,u64",
+    "widths=u8,u16,u32,u64 declarations=n",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

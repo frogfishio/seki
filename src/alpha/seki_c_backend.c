@@ -6,6 +6,7 @@
 #define DECODED_NAME_CAPACITY 64U
 #define DECODED_FIELD_CAPACITY 32U
 #define DECODED_CASE_CAPACITY 32U
+#define DECODED_DECL_CAPACITY 32U
 #define RESTRICTED_MAX_EXPRESSIONS 256U
 #define RESTRICTED_MAX_TAILS 128U
 
@@ -96,28 +97,46 @@ struct restricted_kernel {
     uint8_t rejection_tag;
 };
 
-struct restricted_module {
-    uint32_t profile_version;
-    /*
-     * Canonical table positions of the two declarations. The typed core orders
-     * its type table by name, so whether the record or the variant comes first
-     * depends on the program's own identifiers. Every emitted reference uses
-     * these positions rather than a fixed 0/1 assumption.
-     */
-    uint32_t record_position;
-    uint32_t variant_position;
-    struct decoded_name module_name;
-    struct decoded_name record_name;
-    struct decoded_name field_name;
+/*
+ * One decoded type declaration. The projection keeps the whole table rather
+ * than a single record and variant, so a module may declare any mix the
+ * restricted-C slice can represent.
+ */
+enum decoded_declaration_kind {
+    DECODED_DECL_ALIAS,
+    DECODED_DECL_NOMINAL,
+    DECODED_DECL_RECORD,
+    DECODED_DECL_VARIANT
+};
+
+struct decoded_declaration {
+    enum decoded_declaration_kind kind;
+    struct decoded_name name;
     struct decoded_name fields[DECODED_FIELD_CAPACITY];
     /* SCB-0 `Type` tag per field: 2..5 for U8, U16, U32, U64. */
     uint8_t field_types[DECODED_FIELD_CAPACITY];
     size_t field_count;
-    struct decoded_name variant_name;
-    struct decoded_name case_name;
     struct decoded_name cases[DECODED_CASE_CAPACITY];
     uint32_t case_tags[DECODED_CASE_CAPACITY];
     size_t case_count;
+};
+
+struct restricted_module {
+    uint32_t profile_version;
+    struct decoded_name module_name;
+    struct decoded_declaration declarations[DECODED_DECL_CAPACITY];
+    size_t declaration_count;
+    /*
+     * Canonical table positions the kernel signature selects. The typed core
+     * orders its type table by name, so these follow the program's own
+     * identifiers rather than a fixed layout.
+     */
+    uint32_t record_position;
+    uint32_t variant_position;
+    /* First projected field and first constructed case, retained only for the
+     * E0 compatibility-ABI test. */
+    struct decoded_name field_name;
+    struct decoded_name case_name;
     struct restricted_kernel kernel;
 };
 
@@ -283,9 +302,9 @@ decode_header(struct reader *reader, struct restricted_module *module)
     uint32_t rejection_tag;
     uint32_t field_count = 0U;
     uint32_t case_count = 0U;
+    uint32_t declaration_total;
     uint32_t declaration_index;
     uint32_t position;
-    struct decoded_name previous;
     const uint32_t payload_length_expected =
         reader->length >= 13U ? (uint32_t)(reader->length - 13U) : 0U;
     expect_raw(reader, magic, sizeof magic, "bad SCB-0 magic");
@@ -309,72 +328,72 @@ decode_header(struct reader *reader, struct restricted_module *module)
     }
     expect_u32(reader, 0U, "imports must be empty");
     expect_u32(reader, 0U, "domains must be empty");
-    expect_u32(reader, 2U, "U8-decision slice requires two declarations");
+    declaration_total = read_u32(reader);
+    if (!reader->failed && (declaration_total == 0U ||
+        declaration_total > DECODED_DECL_CAPACITY)) {
+        reader_fail(reader, "declaration count exceeds backend capacity");
+        return;
+    }
+    module->declaration_count = (size_t)declaration_total;
     module->record_position = UINT32_MAX;
     module->variant_position = UINT32_MAX;
-    for (position = 0U; position < 2U && !reader->failed; position += 1U) {
-        struct decoded_name name;
+    for (position = 0U; position < declaration_total && !reader->failed;
+        position += 1U) {
+        struct decoded_declaration *declaration =
+            &module->declarations[position];
         uint8_t body;
-        read_name(reader, &name);
-        if (position == 1U && !reader->failed &&
-            !decoded_name_precedes(&previous, &name)) {
+        read_name(reader, &declaration->name);
+        if (position != 0U && !reader->failed &&
+            !decoded_name_precedes(&module->declarations[position - 1U].name,
+                &declaration->name)) {
             reader_fail(reader, "type declarations are not canonically ordered");
-            break;
+            return;
         }
-        previous = name;
         body = read_u8(reader);
         if (reader->failed) {
-            break;
+            return;
         }
         if (body == 2U) {
-            if (module->record_position != UINT32_MAX) {
-                reader_fail(reader, "slice requires exactly one record");
-                break;
-            }
-            module->record_position = position;
-            module->record_name = name;
+            declaration->kind = DECODED_DECL_RECORD;
             field_count = read_u32(reader);
             if (!reader->failed && (field_count == 0U ||
                 field_count > DECODED_FIELD_CAPACITY)) {
                 reader_fail(reader,
                     "record field count exceeds backend capacity");
-                break;
+                return;
             }
-            module->field_count = (size_t)field_count;
+            declaration->field_count = (size_t)field_count;
             for (declaration_index = 0U;
                 declaration_index < field_count && !reader->failed;
                 declaration_index += 1U) {
-                read_name(reader, &module->fields[declaration_index]);
-                module->field_types[declaration_index] = read_u8(reader);
+                read_name(reader, &declaration->fields[declaration_index]);
+                declaration->field_types[declaration_index] = read_u8(reader);
                 if (!reader->failed &&
-                    (module->field_types[declaration_index] < 2U ||
-                     module->field_types[declaration_index] > 5U)) {
+                    (declaration->field_types[declaration_index] < 2U ||
+                     declaration->field_types[declaration_index] > 5U)) {
                     reader_fail(reader,
                         "input field must be U8, U16, U32, or U64");
+                    return;
                 }
                 if (!reader->failed && declaration_index != 0U &&
                     !decoded_name_precedes(
-                        &module->fields[declaration_index - 1U],
-                        &module->fields[declaration_index])) {
+                        &declaration->fields[declaration_index - 1U],
+                        &declaration->fields[declaration_index])) {
                     reader_fail(reader,
                         "record fields are not canonically ordered");
+                    return;
                 }
             }
         } else if (body == 3U) {
-            if (module->variant_position != UINT32_MAX) {
-                reader_fail(reader, "slice requires exactly one variant");
-                break;
-            }
-            module->variant_position = position;
-            module->variant_name = name;
+            declaration->kind = DECODED_DECL_VARIANT;
             case_count = read_u32(reader);
             if (!reader->failed && (case_count == 0U ||
                 case_count > DECODED_CASE_CAPACITY)) {
                 reader_fail(reader,
                     "variant case count exceeds backend capacity");
-                break;
+                return;
             }
-            module->case_count = (size_t)case_count;
+            declaration->case_count = (size_t)case_count;
             for (declaration_index = 0U;
                 declaration_index < case_count && !reader->failed;
                 declaration_index += 1U) {
@@ -382,26 +401,59 @@ decode_header(struct reader *reader, struct restricted_module *module)
                 if (!reader->failed && rejection_tag > UINT8_MAX) {
                     reader_fail(reader,
                         "rejection tag exceeds C representation");
+                    return;
                 }
-                module->case_tags[declaration_index] = rejection_tag;
-                read_name(reader, &module->cases[declaration_index]);
+                declaration->case_tags[declaration_index] = rejection_tag;
+                read_name(reader, &declaration->cases[declaration_index]);
                 expect_u8(reader, 0U, "rejection case must have no payload");
                 if (!reader->failed && declaration_index != 0U &&
-                    module->case_tags[declaration_index - 1U] >=
+                    declaration->case_tags[declaration_index - 1U] >=
                         rejection_tag) {
                     reader_fail(reader,
                         "variant cases are not canonically ordered");
+                    return;
                 }
             }
         } else {
             reader_fail(reader, "declaration must be a record or a variant");
+            return;
         }
     }
-    if (!reader->failed && (module->record_position == UINT32_MAX ||
-        module->variant_position == UINT32_MAX)) {
-        reader_fail(reader, "slice requires one record and one variant");
-    }
     expect_u32(reader, 0U, "functions must be empty");
+}
+
+static const struct decoded_declaration *
+parameter_record(const struct restricted_module *module)
+{
+    return &module->declarations[module->record_position];
+}
+
+static const struct decoded_declaration *
+rejection_variant(const struct restricted_module *module)
+{
+    return &module->declarations[module->variant_position];
+}
+
+/*
+ * Reads a `Declared` type value from the kernel signature and binds it to a
+ * declaration of the expected kind. The signature selects which declarations
+ * the projection uses; nothing assumes a fixed table position.
+ */
+static uint32_t
+read_declared_position(struct reader *reader,
+    const struct restricted_module *module,
+    enum decoded_declaration_kind expected, const char *what)
+{
+    uint32_t position;
+    expect_u8(reader, 21U, what);
+    expect_u8(reader, 0U, what);
+    position = read_u32(reader);
+    if (!reader->failed && ((size_t)position >= module->declaration_count ||
+        module->declarations[position].kind != expected)) {
+        reader_fail(reader, what);
+        return 0U;
+    }
+    return position;
 }
 
 static int
@@ -409,8 +461,9 @@ case_index_for_tag(const struct restricted_module *module, uint32_t tag,
     size_t *case_index)
 {
     size_t index;
-    for (index = 0U; index < module->case_count; index += 1U) {
-        if (module->case_tags[index] == tag) {
+    for (index = 0U; index < rejection_variant(module)->case_count;
+        index += 1U) {
+        if (rejection_variant(module)->case_tags[index] == tag) {
             *case_index = index;
             return 1;
         }
@@ -545,12 +598,12 @@ decode_expression(struct reader *reader, struct restricted_module *module)
         expect_local_type(reader, module->record_position);
         expression.b = read_u32(reader);
         if (!reader->failed &&
-            (size_t)expression.b >= module->field_count) {
+            (size_t)expression.b >= parameter_record(module)->field_count) {
             reader_fail(reader, "projection field index is out of range");
             return 0U;
         }
         if (!reader->failed && module->field_name.length == 0U) {
-            module->field_name = module->fields[expression.b];
+            module->field_name = parameter_record(module)->fields[expression.b];
         }
         break;
     }
@@ -566,7 +619,7 @@ decode_expression(struct reader *reader, struct restricted_module *module)
         }
         expect_u32(reader, 0U, "rejection case takes no arguments");
         if (!reader->failed && module->case_name.length == 0U) {
-            module->case_name = module->cases[selected];
+            module->case_name = rejection_variant(module)->cases[selected];
             module->kernel.rejection_tag = (uint8_t)expression.a;
         }
         break;
@@ -673,10 +726,12 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
     expect_u32(reader, 1U, "kernel requires one parameter label");
     read_name(reader, &module->kernel.parameter_name);
     expect_u32(reader, 1U, "kernel requires one parameter type");
-    expect_declared_type(reader, module->record_position);
+    module->record_position = read_declared_position(reader, module,
+        DECODED_DECL_RECORD, "kernel parameter must be a declared record");
     expect_u8(reader, 19U, "kernel result must be a Decision");
     expect_u8(reader, 0U, "accepted result must be Unit");
-    expect_declared_type(reader, module->variant_position);
+    module->variant_position = read_declared_position(reader, module,
+        DECODED_DECL_VARIANT, "rejection must be a declared variant");
     rejection_count = read_u32(reader);
     if (!reader->failed && (rejection_count == 0U ||
         rejection_count > DECODED_CASE_CAPACITY)) {
@@ -750,12 +805,16 @@ expect_tag_vector(struct reader *reader, uint8_t maximum, const char *what)
 }
 
 static void
-decode_footer(struct reader *reader)
+decode_footer(struct reader *reader, const struct restricted_module *module)
 {
+    uint32_t index;
     expect_u32(reader, 0U, "exported domains must be empty");
-    expect_u32(reader, 2U, "both types must be exported");
-    expect_u32(reader, 0U, "first type export index changed");
-    expect_u32(reader, 1U, "second type export index changed");
+    /* Every declared type is exported, in canonical table order. */
+    expect_u32(reader, (uint32_t)module->declaration_count,
+        "every declared type must be exported");
+    for (index = 0U; index < (uint32_t)module->declaration_count; index += 1U) {
+        expect_u32(reader, index, "type export order changed");
+    }
     expect_u32(reader, 0U, "exported functions must be empty");
     expect_u32(reader, 1U, "the kernel must be exported");
     expect_u32(reader, 0U, "kernel export index changed");
@@ -775,9 +834,17 @@ decode_footer(struct reader *reader)
     expect_u32(reader, 32U, "call-depth profile changed");
     expect_bounds(reader, 16777216U, 8388608U, 256U, 8388608U);
     expect_u32(reader, 0U, "derivation schema changed");
-    expect_u32(reader, 2U, "type derivation count changed");
-    expect_u32(reader, 0U, "type derivation order changed");
-    expect_u32(reader, 1U, "type derivation order changed");
+    /*
+     * With no local type referring to another, the canonical greedy
+     * topological order is the table order. A record whose field names another
+     * declaration is outside this projection, so a different permutation here
+     * means the module is not the one the projection decoded.
+     */
+    expect_u32(reader, (uint32_t)module->declaration_count,
+        "type derivation count changed");
+    for (index = 0U; index < (uint32_t)module->declaration_count; index += 1U) {
+        expect_u32(reader, index, "type derivation order changed");
+    }
     expect_u32(reader, 0U, "function derivations must be empty");
 }
 
@@ -789,7 +856,7 @@ decode_module(const unsigned char *core, size_t core_length,
     memset(module, 0, sizeof *module);
     decode_header(&reader, module);
     decode_kernel(&reader, module);
-    decode_footer(&reader);
+    decode_footer(&reader, module);
     if (!reader.failed && reader.offset != reader.length) {
         reader_fail(&reader, "trailing SCB-0 bytes");
     }
@@ -862,9 +929,9 @@ static int
 uses_e0_compatibility_abi(const struct restricted_module *module)
 {
     return decoded_name_is(&module->module_name, "minimum_age") &&
-        decoded_name_is(&module->record_name, "Applicant") &&
+        decoded_name_is(&parameter_record(module)->name, "Applicant") &&
         decoded_name_is(&module->field_name, "age") &&
-        decoded_name_is(&module->variant_name, "Rejection") &&
+        decoded_name_is(&rejection_variant(module)->name, "Rejection") &&
         decoded_name_is(&module->case_name, "Underage") &&
         decoded_name_is(&module->kernel.name, "decide") &&
         decoded_name_is(&module->kernel.parameter_name, "applicant") &&
@@ -950,11 +1017,12 @@ print_expression(struct text_buffer *output,
         if (!uses_e0_compatibility_abi(module)) {
             text_put(output, "seki_f_");
         }
-        if ((size_t)expression->b >= module->field_count) {
+        if ((size_t)expression->b >= parameter_record(module)->field_count) {
             output->failed = 1;
             return;
         }
-        text_put_name(output, &module->fields[expression->b], 0);
+        text_put_name(output, &parameter_record(module)->fields[expression->b],
+            0);
         break;
     case RESTRICTED_INT_LIT:
         text_put(output, restricted_integer_macro(expression->integer_type));
@@ -1035,28 +1103,41 @@ print_module(const struct restricted_module *module, char *c_source,
 {
     struct text_buffer output = {c_source, c_capacity, 0U, 0};
     size_t field_index;
-    text_put(&output,
-        "#include <stdint.h>\n"
-        "\n"
-        "typedef struct {\n");
-    for (field_index = 0U; field_index < module->field_count;
-        field_index += 1U) {
-        text_put(&output, "    ");
-        text_put(&output,
-            restricted_integer_type(module->field_types[field_index]));
-        text_put(&output, " ");
-        if (!uses_e0_compatibility_abi(module)) {
-            text_put(&output, "seki_f_");
+    size_t declaration_index;
+    text_put(&output, "#include <stdint.h>\n");
+    /*
+     * Every declared record becomes a struct, in canonical table order. A
+     * variant contributes no type of its own: its cases are the `reason`
+     * octet of the decision result.
+     */
+    for (declaration_index = 0U;
+        declaration_index < module->declaration_count;
+        declaration_index += 1U) {
+        const struct decoded_declaration *declaration =
+            &module->declarations[declaration_index];
+        if (declaration->kind != DECODED_DECL_RECORD) {
+            continue;
         }
-        text_put_name(&output, &module->fields[field_index], 0);
+        text_put(&output, "\ntypedef struct {\n");
+        for (field_index = 0U; field_index < declaration->field_count;
+            field_index += 1U) {
+            text_put(&output, "    ");
+            text_put(&output, restricted_integer_type(
+                declaration->field_types[field_index]));
+            text_put(&output, " ");
+            if (!uses_e0_compatibility_abi(module)) {
+                text_put(&output, "seki_f_");
+            }
+            text_put_name(&output, &declaration->fields[field_index], 0);
+            text_put(&output, ";\n");
+        }
+        text_put(&output, "} ");
+        text_put_prefix(&output, module);
+        text_put(&output, "_");
+        text_put_name(&output, &declaration->name, 1);
         text_put(&output, ";\n");
     }
-    text_put(&output, "} ");
-    text_put_prefix(&output, module);
-    text_put(&output, "_");
-    text_put_name(&output, &module->record_name, 1);
     text_put(&output,
-        ";\n"
         "\n"
         "typedef struct {\n"
         "    uint8_t tag;\n"
@@ -1072,7 +1153,7 @@ print_module(const struct restricted_module *module, char *c_source,
     text_put(&output, "(");
     text_put_prefix(&output, module);
     text_put(&output, "_");
-    text_put_name(&output, &module->record_name, 1);
+    text_put_name(&output, &parameter_record(module)->name, 1);
     text_put(&output, " ");
     text_put_parameter_identifier(&output, module);
     text_put(&output, ");\n\n");
@@ -1084,7 +1165,7 @@ print_module(const struct restricted_module *module, char *c_source,
     text_put(&output, "(");
     text_put_prefix(&output, module);
     text_put(&output, "_");
-    text_put_name(&output, &module->record_name, 1);
+    text_put_name(&output, &parameter_record(module)->name, 1);
     text_put(&output, " ");
     text_put_parameter_identifier(&output, module);
     text_put(&output, ")\n{\n    ");
