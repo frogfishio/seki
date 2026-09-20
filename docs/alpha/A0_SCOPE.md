@@ -163,6 +163,11 @@ C struct in canonical order, a variant contributes no type of its own because
 its cases are the `reason` octet of the decision result, and the kernel
 signature selects the declarations it uses by position.
 
+`name := expr.` binds one fresh immutable local whose scope is the rest of the
+body. Bindings cannot shadow a visible local, and a binding has no type
+annotation, so a bare integer literal has nothing to take its width from and is
+rejected.
+
 `require C else: V::Case.` states one premise and the rejection that reports
 its failure, then continues. Several of them in sequence express a decision
 whose premises are checked in declared precedence order.

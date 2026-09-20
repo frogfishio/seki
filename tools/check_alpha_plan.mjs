@@ -102,6 +102,10 @@ expect(alpha.kernel_require_ready === true,
   "kernel require progress record lost");
 expect(alpha.selector_lookahead_from_grammar === true,
   "field selectors returned to an excluded-keyword list");
+expect(alpha.immutable_bindings_ready === true,
+  "immutable binding progress record lost");
+expect(alpha.lexical_scope_chain_ready === true,
+  "value names no longer resolve through a scope chain");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",

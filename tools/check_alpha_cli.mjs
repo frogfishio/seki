@@ -562,6 +562,59 @@ try {
   assert.equal(requireBadRun.status, 65);
   assert.match(requireBadRun.stderr, /^A0-CHECK-0007:/u);
 
+  // `name := expr.` binds one fresh immutable local whose scope is the rest of
+  // the body. The encoding erases binding names, so each is spelled in C by
+  // the order it was introduced and referenced by its environment slot.
+  const letSource = path.join(temporary, "let.seki");
+  const letCore = path.join(temporary, "let.scb0");
+  const letC = path.join(temporary, "let.c");
+  fs.writeFileSync(letSource, [
+    "module gate::binding @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export record Entry { age: U8, tier: U8 }.",
+    "export variant Denial [ TooYoung @ 1. TooLow @ 2. ].",
+    "",
+    "export kernel screen entry: Entry",
+    "-> Decision[Unit, Denial] arithmetic: checked",
+    "bounded steps: 256 liveBits: 2048 controlDepth: 64 workspaceBits: 0",
+    "rejects: Denial::TooYoung, Denial::TooLow",
+    "publication: none [",
+    "  age := entry age.",
+    "  tier := entry tier.",
+    "  require age >= 18 else: Denial::TooYoung.",
+    "  require tier >= 3 else: Denial::TooLow.",
+    "  accept unit",
+    "].",
+    "",
+  ].join("\n"));
+  const bound = run(["build", "--core", letCore, "--c", letC, letSource]);
+  assert.equal(bound.status, 0, bound.stderr);
+  const letDecoded = decodeModule(fs.readFileSync(letCore));
+  checkTypedCore(letDecoded);
+  assert.equal(letDecoded.kernels[0][1].body[0], 3);
+  assert.deepEqual(letDecoded.kernels[0][1].exact, [17, 49, 7, 0]);
+  const letText = fs.readFileSync(letC, "utf8");
+  // The second binding must read the second field, not the first: a slot
+  // resolved one place off would still compile and still be wrong.
+  assert.match(letText, /const uint8_t seki_b0 = seki_p_entry\.seki_f_age;/u);
+  assert.match(letText, /const uint8_t seki_b1 = seki_p_entry\.seki_f_tier;/u);
+  assert.match(letText, /!\(seki_b0 >= UINT8_C\(18\)\)/u);
+  assert.match(letText, /!\(seki_b1 >= UINT8_C\(3\)\)/u);
+  execFileSync("cc", [...strictFlags, "-c", letC, "-o",
+    path.join(temporary, "let.o")], { stdio: "inherit" });
+
+  // Locals are immutable and cannot shadow another visible local.
+  const shadowSource = path.join(temporary, "shadow.seki");
+  fs.writeFileSync(shadowSource, fs.readFileSync(letSource, "utf8")
+    .replace("tier := entry tier.", "age := entry tier.")
+    .replace("require tier >= 3", "require age >= 3"));
+  const shadowed = run(["check", shadowSource]);
+  assert.equal(shadowed.status, 65);
+  assert.match(shadowed.stderr, /^A0-CHECK-0019:/u);
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -637,7 +690,8 @@ try {
     "operators=4 source_order=canonical table_order=name-derived " +
     "header_vectors=general nested_control=yes exhaustive=65536 " +
     "widths=u8,u16,u32,u64 declarations=n octets=constant-time " +
-    "boolean=short-circuit nominals=non-substitutable require=precedence",
+    "boolean=short-circuit nominals=non-substitutable require=precedence " +
+    "bindings=scoped",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

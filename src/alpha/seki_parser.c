@@ -555,7 +555,7 @@ parse_primary_expression(struct parser *parser,
  * The lexer is a value, so peeking copies it instead of mutating the parser.
  */
 static int
-next_token_is_colon(const struct parser *parser)
+next_token_is(const struct parser *parser, enum seki_token_kind kind)
 {
     struct seki_lexer lookahead = parser->lexer;
     struct seki_token token;
@@ -563,7 +563,13 @@ next_token_is_colon(const struct parser *parser)
     if (!seki_lexer_next(&lookahead, &token, &error)) {
         return 0;
     }
-    return token.kind == SEKI_TOKEN_COLON;
+    return token.kind == kind;
+}
+
+static int
+next_token_is_colon(const struct parser *parser)
+{
+    return next_token_is(parser, SEKI_TOKEN_COLON);
 }
 
 static uint32_t
@@ -705,7 +711,20 @@ parse_kernel_tail(struct parser *parser, struct seki_kernel_decl *kernel)
     if (!enter_nesting(parser)) {
         return UINT32_MAX;
     }
-    if (token_is(&parser->current, "require")) {
+    if (parser->current.kind == SEKI_TOKEN_IDENT &&
+        parser->current.length != 0U && parser->current.start[0] >= 'a' &&
+        parser->current.start[0] <= 'z' &&
+        next_token_is(parser, SEKI_TOKEN_BIND)) {
+        /* `name := expr.` introduces one fresh immutable binding whose scope
+         * is the rest of the body. */
+        expression.kind = SEKI_EXPR_LET;
+        expression.value.let.name = take_value_name(parser);
+        expect_kind(parser, SEKI_TOKEN_BIND, "expected binding operator");
+        expression.value.let.value = parse_value_expression(parser, kernel);
+        expect_kind(parser, SEKI_TOKEN_DOT, "expected binding terminator");
+        expression.value.let.body = parse_kernel_tail(parser, kernel);
+        result = add_expression(parser, kernel, &expression);
+    } else if (token_is(&parser->current, "require")) {
         /*
          * `require C else: V::Case.` states one premise and the rejection that
          * reports its failure, then continues. It is the tail form for a

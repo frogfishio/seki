@@ -335,6 +335,15 @@
   keywords. The grammar spells it `ValueIdent !Colon`, so the parser now looks
   ahead for the colon. The list had already failed once: `else` was being eaten
   as a field name. A keyword added later cannot be silently absorbed now.
+- Immutable bindings are connected end to end as `KernelLet`. `name := expr.`
+  binds one fresh local whose scope is the rest of the body, and a binding that
+  shadows a visible local is rejected as `A0-CHECK-0019`. The checker now
+  resolves every value name through a real scope chain rather than the
+  parameter list, using the typed core's own innermost-first slot convention.
+  Binding names are erased by the encoding, so the projection spells each by
+  the order it was introduced and resolves references by slot. A two-binding
+  kernel derives `(17,49,7,0)`, which the independent checker reproduces, and
+  its generated C agrees with the stated policy on all 65,536 input pairs.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
@@ -405,8 +414,8 @@ encoding-vector, semantic-coverage, strict-C11, sanitizer, and whitespace checks
 passed on 2026-09-20, including the E0 Lean proof under the pinned toolchain.
 The alpha compiler additionally passed 4,400 source and 4,900 typed-core
 mutation cases across the minimum-age, nested three-premise, wide-integer,
-four-declaration, two-digest, short-circuit Boolean, nominal-identity, and
-require-premise kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
+four-declaration, two-digest, short-circuit Boolean, nominal-identity,
+require-premise, and binding kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
 after the two stack-exhaustion defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.

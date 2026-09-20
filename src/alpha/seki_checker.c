@@ -13,10 +13,30 @@
 #define SEKI_ENV_CAPACITY \
     (SEKI_CALLABLE_MAX_PARAMETERS + SEKI_KERNEL_MAX_EXPRESSIONS)
 
+/*
+ * Slot zero is the innermost binding. Parameters are installed in reverse
+ * declaration order and each binding prepends, which is the typed core's own
+ * convention, so a slot index is written straight out as a `Local` reference.
+ */
 struct environment {
     uint32_t slots[SEKI_ENV_CAPACITY];
+    struct seki_name names[SEKI_ENV_CAPACITY];
     size_t count;
 };
+
+/* Returns the slot holding `name`, innermost first, or SEKI_TYPE_INVALID. */
+static uint32_t
+environment_lookup(const struct environment *environment,
+    const struct seki_name *name)
+{
+    size_t index;
+    for (index = 0U; index < environment->count; index += 1U) {
+        if (seki_name_equal(&environment->names[index], name)) {
+            return (uint32_t)index;
+        }
+    }
+    return SEKI_TYPE_INVALID;
+}
 
 struct cost {
     uint32_t steps;
@@ -273,24 +293,14 @@ infer_expression(struct checker *checker, uint32_t expression_index,
     expression = &checker->kernel->expressions[expression_index];
     switch (expression->kind) {
     case SEKI_EXPR_VALUE_NAME: {
-        size_t index;
-        int found = 0;
-        for (index = 0U; index < checker->kernel->parameter_count; index += 1U) {
-            if (seki_name_equal(&checker->kernel->parameters[index].label,
-                &expression->value.name)) {
-                /* Parameters occupy the outermost slots in reverse order. */
-                const uint32_t slot = (uint32_t)(environment->count - 1U -
-                    index);
-                inferred.type = environment->slots[slot];
-                record_info(checker, expression_index, inferred.type, slot,
-                    0U, 0U);
-                found = 1;
-                break;
-            }
-        }
-        if (!found) {
+        const uint32_t slot = environment_lookup(environment,
+            &expression->value.name);
+        if (slot == SEKI_TYPE_INVALID) {
             check_fail(checker, "A0-CHECK-0002", "unknown value name");
+            break;
         }
+        inferred.type = environment->slots[slot];
+        record_info(checker, expression_index, inferred.type, slot, 0U, 0U);
         break;
     }
     case SEKI_EXPR_BOOL:
@@ -537,6 +547,43 @@ check_kernel_tail(struct checker *checker, uint32_t expression_index,
         }
         check_kernel_tail(checker, expression->value.require.continuation,
             environment);
+    } else if (expression->kind == SEKI_EXPR_LET) {
+        const uint32_t value_index = expression->value.let.value;
+        const struct inferred value = infer_expression(checker, value_index,
+            environment);
+        struct environment extended;
+        size_t index;
+        if (checker->failed) {
+            return;
+        }
+        if (value.is_natural) {
+            /* A binding has no annotation, so a bare literal has nothing to
+             * take its width from. */
+            check_fail(checker, "A0-CHECK-0015",
+                "integer literal has no inferred integer type");
+            return;
+        }
+        if (environment_lookup(environment, &expression->value.let.name) !=
+            SEKI_TYPE_INVALID) {
+            check_fail(checker, "A0-CHECK-0019",
+                "binding shadows a visible local");
+            return;
+        }
+        if (environment->count == SEKI_ENV_CAPACITY) {
+            check_fail(checker, "A0-CHECK-0016",
+                "kernel environment exceeds fixed capacity");
+            return;
+        }
+        /* The binding becomes slot zero and every visible local shifts out. */
+        extended.count = environment->count + 1U;
+        extended.slots[0] = value.type;
+        extended.names[0] = expression->value.let.name;
+        for (index = 0U; index < environment->count; index += 1U) {
+            extended.slots[index + 1U] = environment->slots[index];
+            extended.names[index + 1U] = environment->names[index];
+        }
+        record_info(checker, expression_index, SEKI_TYPE_INVALID, 0U, 0U, 0U);
+        check_kernel_tail(checker, expression->value.let.body, &extended);
     } else if (expression->kind == SEKI_EXPR_IF) {
         const struct inferred condition = infer_expression(checker,
             expression->value.conditional.condition, environment);
@@ -760,6 +807,48 @@ cost_of_kernel_tail(struct checker *checker, uint32_t expression_index,
         }
         return cost;
     }
+    if (expression->kind == SEKI_EXPR_LET) {
+        /*
+         * The value moves into the environment rather than being copied, so
+         * the body runs with the binding's width added to the base and the
+         * live peak is the maximum of the two phases, not their sum.
+         */
+        const uint32_t value_index = expression->value.let.value;
+        const struct cost value = cost_of_expression(checker, value_index,
+            environment, base);
+        const uint32_t value_width = width_of(checker,
+            checker->kernel_elaboration->expressions[value_index].type);
+        struct environment extended;
+        struct cost body;
+        uint32_t body_base = 0U;
+        size_t index;
+        if (!seki_checked_add(base, value_width, &body_base)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return cost;
+        }
+        extended.count = environment->count + 1U;
+        extended.slots[0] =
+            checker->kernel_elaboration->expressions[value_index].type;
+        extended.names[0] = expression->value.let.name;
+        for (index = 0U; index < environment->count; index += 1U) {
+            extended.slots[index + 1U] = environment->slots[index];
+            extended.names[index + 1U] = environment->names[index];
+        }
+        body = cost_of_kernel_tail(checker, expression->value.let.body,
+            &extended, body_base, result_type);
+        if (!seki_checked_add(value.steps, body.steps, &cost.steps) ||
+            !seki_checked_add(cost.steps, 1U, &cost.steps)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return cost;
+        }
+        cost.live = value.live > body.live ? value.live : body.live;
+        cost.depth = (value.depth > body.depth ? value.depth : body.depth) + 1U;
+        cost.workspace = value.workspace > body.workspace ?
+            value.workspace : body.workspace;
+        return cost;
+    }
     if (expression->kind == SEKI_EXPR_REQUIRE) {
         /*
          * The rejection reason is one variant construction: a single step
@@ -915,6 +1004,7 @@ check_kernel(struct checker *checker, size_t kernel_index)
         }
         elaboration->parameter_types[index] = type;
         environment.slots[slot] = type;
+        environment.names[slot] = kernel->parameters[index].label;
         if (!seki_checked_add(base, width_of(checker, type), &base)) {
             check_fail(checker, "A0-CHECK-0013",
                 "semantic value width is unbounded or overflows U32");

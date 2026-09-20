@@ -145,6 +145,7 @@ enum seki_expression_kind {
     SEKI_EXPR_ACCEPT,
     SEKI_EXPR_REJECT,
     SEKI_EXPR_REQUIRE,
+    SEKI_EXPR_LET,
     SEKI_EXPR_IF
 };
 
@@ -185,6 +186,11 @@ struct seki_expression {
             uint32_t continuation;
             struct seki_variant_ref rejection;
         } require;
+        struct {
+            struct seki_name name;
+            uint32_t value;
+            uint32_t body;
+        } let;
         struct {
             uint32_t condition;
             uint32_t if_true;

@@ -39,6 +39,7 @@
 #define SEKI_KERNEL_ACCEPT 0U
 #define SEKI_KERNEL_REJECT 1U
 #define SEKI_KERNEL_REQUIRE 2U
+#define SEKI_KERNEL_LET 3U
 #define SEKI_KERNEL_IF 4U
 
 struct core_buffer {
@@ -563,6 +564,11 @@ put_kernel_expression(struct emitter *emitter, uint32_t expression_index)
         put_u8(emitter->buffer, SEKI_KERNEL_REJECT);
         put_rejection_reason(emitter, info);
         put_u32(emitter->buffer, info->c);
+        break;
+    case SEKI_EXPR_LET:
+        put_u8(emitter->buffer, SEKI_KERNEL_LET);
+        put_expression(emitter, expression->value.let.value);
+        put_kernel_expression(emitter, expression->value.let.body);
         break;
     case SEKI_EXPR_REQUIRE:
         put_u8(emitter->buffer, SEKI_KERNEL_REQUIRE);

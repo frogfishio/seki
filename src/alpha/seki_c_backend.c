@@ -58,7 +58,8 @@ struct restricted_expression {
     uint32_t type_length;
     uint32_t type_declaration;
     /*
-     * LOCAL    a = environment slot
+     * LOCAL    a = environment slot, b = binding ordinal, or UINT32_MAX
+     *          when the slot is the kernel parameter
      * PROJECT  a = record expression, b = field index
      * INT_LIT  a = value
      * BOOL_LIT a = 0 or 1
@@ -73,6 +74,7 @@ enum restricted_tail_kind {
     RESTRICTED_ACCEPT,
     RESTRICTED_REJECT,
     RESTRICTED_REQUIRE,
+    RESTRICTED_LET,
     RESTRICTED_IF
 };
 
@@ -82,6 +84,7 @@ struct restricted_tail {
      * ACCEPT   a = accepted value expression
      * REJECT   a = reason expression, b = precedence index
      * REQUIRE  a = condition, b = reason expression, c = continuation tail
+     * LET      a = value expression, b = binding ordinal, c = body tail
      * IF       a = condition, b = when-true tail, c = when-false tail
      */
     uint32_t a;
@@ -611,7 +614,8 @@ read_claimed_type(struct reader *reader, struct restricted_module *module,
 }
 
 static uint32_t
-decode_expression(struct reader *reader, struct restricted_module *module)
+decode_expression(struct reader *reader, struct restricted_module *module,
+    uint32_t bindings)
 {
     struct restricted_expression expression;
     uint8_t term;
@@ -661,15 +665,29 @@ decode_expression(struct reader *reader, struct restricted_module *module)
         break;
     }
     case 4U:
+        /*
+         * Slots below `bindings` name a binding, innermost first; the rest
+         * name the kernel parameter. Binding names are erased by the encoding,
+         * so each is numbered by the order it was introduced.
+         */
         expression.kind = RESTRICTED_LOCAL;
         expression.a = read_u32(reader);
-        if (!reader->failed && expression.a != 0U) {
-            reader_fail(reader, "condition references unexpected parameter");
+        if (reader->failed) {
             return 0U;
+        }
+        if (expression.a < bindings) {
+            expression.b = bindings - 1U - expression.a;
+        } else {
+            expression.b = UINT32_MAX;
+            if (expression.a - bindings != 0U) {
+                reader_fail(reader,
+                    "expression references unexpected parameter");
+                return 0U;
+            }
         }
         break;
     case 7U: {
-        const uint32_t record = decode_expression(reader, module);
+        const uint32_t record = decode_expression(reader, module, bindings);
         expression.kind = RESTRICTED_PROJECT;
         expression.a = record;
         expect_u8(reader, 0U, "field owner must be a record type");
@@ -706,8 +724,8 @@ decode_expression(struct reader *reader, struct restricted_module *module)
     case 18U:
         expression.kind = term == 17U ?
             RESTRICTED_AND_THEN : RESTRICTED_OR_ELSE;
-        expression.a = decode_expression(reader, module);
-        expression.b = decode_expression(reader, module);
+        expression.a = decode_expression(reader, module, bindings);
+        expression.b = decode_expression(reader, module, bindings);
         break;
     case 14U:
     case 15U:
@@ -724,8 +742,8 @@ decode_expression(struct reader *reader, struct restricted_module *module)
                 RESTRICTED_EQUAL : RESTRICTED_NOT_EQUAL;
         }
         expression.kind = RESTRICTED_COMPARE;
-        expression.a = decode_expression(reader, module);
-        expression.b = decode_expression(reader, module);
+        expression.a = decode_expression(reader, module, bindings);
+        expression.b = decode_expression(reader, module, bindings);
         break;
     }
     default:
@@ -737,7 +755,7 @@ decode_expression(struct reader *reader, struct restricted_module *module)
 
 static uint32_t
 decode_tail(struct reader *reader, struct restricted_module *module,
-    unsigned depth)
+    unsigned depth, uint32_t bindings)
 {
     struct restricted_tail tail;
     uint8_t kind;
@@ -759,11 +777,11 @@ decode_tail(struct reader *reader, struct restricted_module *module,
     switch (kind) {
     case 0U:
         tail.kind = RESTRICTED_ACCEPT;
-        tail.a = decode_expression(reader, module);
+        tail.a = decode_expression(reader, module, bindings);
         break;
     case 1U:
         tail.kind = RESTRICTED_REJECT;
-        tail.a = decode_expression(reader, module);
+        tail.a = decode_expression(reader, module, bindings);
         tail.b = read_u32(reader);
         if (!reader->failed &&
             ((size_t)tail.b >= module->kernel.rejection_count ||
@@ -777,8 +795,8 @@ decode_tail(struct reader *reader, struct restricted_module *module,
     case 2U: {
         uint32_t precedence;
         tail.kind = RESTRICTED_REQUIRE;
-        tail.a = decode_expression(reader, module);
-        tail.b = decode_expression(reader, module);
+        tail.a = decode_expression(reader, module, bindings);
+        tail.b = decode_expression(reader, module, bindings);
         precedence = read_u32(reader);
         if (!reader->failed &&
             ((size_t)precedence >= module->kernel.rejection_count ||
@@ -789,14 +807,20 @@ decode_tail(struct reader *reader, struct restricted_module *module,
             reader_fail(reader, "rejection precedence index is inconsistent");
             return 0U;
         }
-        tail.c = decode_tail(reader, module, depth + 1U);
+        tail.c = decode_tail(reader, module, depth + 1U, bindings);
         break;
     }
+    case 3U:
+        tail.kind = RESTRICTED_LET;
+        tail.a = decode_expression(reader, module, bindings);
+        tail.b = bindings;
+        tail.c = decode_tail(reader, module, depth + 1U, bindings + 1U);
+        break;
     case 4U:
         tail.kind = RESTRICTED_IF;
-        tail.a = decode_expression(reader, module);
-        tail.b = decode_tail(reader, module, depth + 1U);
-        tail.c = decode_tail(reader, module, depth + 1U);
+        tail.a = decode_expression(reader, module, bindings);
+        tail.b = decode_tail(reader, module, depth + 1U, bindings);
+        tail.c = decode_tail(reader, module, depth + 1U, bindings);
         break;
     default:
         reader_fail(reader, "kernel control is outside the restricted-C slice");
@@ -854,7 +878,7 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
         module->kernel.rejection_tags[rejection_index] = ordered_tag;
     }
 
-    module->kernel.body_root = decode_tail(reader, module, 0U);
+    module->kernel.body_root = decode_tail(reader, module, 0U, 0U);
 
     /*
      * The projection checks that the stored exact bounds are well formed and
@@ -1120,6 +1144,10 @@ static void print_expression(struct text_buffer *output,
 static void resolve_representation(const struct restricted_module *module,
     uint8_t tag, uint32_t declared, uint8_t *out_tag, uint32_t *out_length);
 
+static void print_type_name(struct text_buffer *output,
+    const struct restricted_module *module, uint8_t tag, uint32_t length,
+    uint32_t declared, int *is_array, uint32_t *array_length);
+
 /*
  * Parenthesises an operand that is itself a short-circuit node, so the printed
  * C groups exactly as the decoded tree does rather than relying on the reader
@@ -1154,7 +1182,14 @@ print_expression(struct text_buffer *output,
     expression = &module->kernel.expressions[index];
     switch (expression->kind) {
     case RESTRICTED_LOCAL:
-        text_put_parameter_identifier(output, module);
+        if (expression->b == UINT32_MAX) {
+            text_put_parameter_identifier(output, module);
+        } else {
+            /* Binding names are erased by the encoding, so each is spelled by
+             * the order it was introduced. */
+            text_put(output, "seki_b");
+            text_put_unsigned(output, (uint64_t)expression->b);
+        }
         break;
     case RESTRICTED_PROJECT:
         print_expression(output, module, expression->a);
@@ -1296,6 +1331,31 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         print_tail(output, module, tail->c, depth + 1U);
         text_put_indent(output, depth);
         text_put(output, "}\n");
+        break;
+    }
+    case RESTRICTED_LET: {
+        const struct restricted_expression *value;
+        int is_array = 0;
+        uint32_t array_length = 0U;
+        if ((size_t)tail->a >= module->kernel.expression_count) {
+            output->failed = 1;
+            return;
+        }
+        value = &module->kernel.expressions[tail->a];
+        text_put_indent(output, depth);
+        text_put(output, "const ");
+        print_type_name(output, module, value->type_tag, value->type_length,
+            value->type_declaration, &is_array, &array_length);
+        text_put(output, " seki_b");
+        text_put_unsigned(output, (uint64_t)tail->b);
+        if (is_array) {
+            output->failed = 1;   /* an octet array cannot be copy-bound */
+            return;
+        }
+        text_put(output, " = ");
+        print_expression(output, module, tail->a);
+        text_put(output, ";\n");
+        print_tail(output, module, tail->c, depth);
         break;
     }
     case RESTRICTED_IF:
