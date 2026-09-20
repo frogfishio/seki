@@ -1,0 +1,56 @@
+module example::access_permit @ 1
+profile: c11_bounded @ 1
+claims: semantic_evaluation, restricted_c_source
+requires: type_well_formed, totality, determinism, resource_bounds,
+  rejection_precedence.
+
+export nominal AccountId := Digest[sha256, 32].
+export nominal DeviceId  := Digest[sha256, 32].
+export type Epoch := U32.
+
+export record Request {
+  account: AccountId,
+  boundAccount: AccountId,
+  device: DeviceId,
+  epoch: Epoch,
+  currentEpoch: Epoch,
+  age: U8,
+  tier: U16,
+  nonce: Bytes[8]
+}.
+
+export record Permit {
+  account: AccountId,
+  grantedEpoch: Epoch,
+  grantedTier: U16
+}.
+
+export variant Denial [
+  UnknownAccount @ 1.
+  StaleEpoch     @ 2.
+  Underage       @ 3.
+  TierTooLow     @ 7.
+].
+
+export kernel authorise request: Request
+-> Decision[Permit, Denial]
+arithmetic: checked
+bounded steps: 512 liveBits: 16384 controlDepth: 64 workspaceBits: 0
+rejects: Denial::UnknownAccount, Denial::StaleEpoch, Denial::Underage,
+  Denial::TierTooLow
+publication: none [
+  account := request account.
+  epoch := request epoch.
+  require account == (request boundAccount) else: Denial::UnknownAccount.
+  require epoch == (request currentEpoch) else: Denial::StaleEpoch.
+  require (request age) >= 18 else: Denial::Underage.
+  (request tier) < 3 || (request tier) > 900
+    ifTrue: [ reject Denial::TierTooLow ]
+    ifFalse: [
+      accept Permit {
+        account: account,
+        grantedEpoch: epoch,
+        grantedTier: (request tier)
+      }
+    ]
+].

@@ -652,9 +652,12 @@ try {
   assert.deepEqual(permitDecoded.kernels[0][1].exact, [17, 121, 7, 0]);
   const permitText = fs.readFileSync(permitC, "utf8");
   assert.match(permitText, /uint8_t reason;\n    seki_a0_permit_permit accepted;/u);
-  // Source order was grantedTier first; canonical order is by field name.
-  assert.match(permitText,
-    /\.seki_f_grantedEpoch = .*, \.seki_f_grantedTier = /u);
+  // Source order was grantedTier first; canonical order is by field name, and
+  // the literal is written into its destination field by field.
+  assert.ok(
+    permitText.indexOf("result.accepted.seki_f_grantedEpoch =") <
+    permitText.indexOf("result.accepted.seki_f_grantedTier ="),
+    "record fields were not written in canonical order");
   execFileSync("cc", [...strictFlags, "-c", permitC, "-o",
     path.join(temporary, "permit.o")], { stdio: "inherit" });
 
@@ -667,6 +670,29 @@ try {
   const partial = run(["check", permitPartial]);
   assert.equal(partial.status, 65);
   assert.match(partial.stderr, /^A0-CHECK-0021:/u);
+
+  // One kernel exercising every form the alpha implements, kept in the repo as
+  // the example a reader starts from.
+  const exampleSource = "spec/language/examples/access_permit.seki";
+  const exampleCore = path.join(temporary, "access_permit.scb0");
+  const exampleC = path.join(temporary, "access_permit.c");
+  const example = run([
+    "build", "--core", exampleCore, "--c", exampleC, exampleSource,
+  ]);
+  assert.equal(example.status, 0, example.stderr);
+  // An alias is a transparent synonym: typed-core formation rejects a
+  // `Declared` reference to one, so aliases must be expanded at use sites.
+  // This check is what catches an emitter that stops expanding them.
+  const exampleDecoded = decodeModule(fs.readFileSync(exampleCore));
+  checkTypedCore(exampleDecoded);
+  const exampleText = fs.readFileSync(exampleC, "utf8");
+  // C cannot copy an array, so an octet binding names the octets and an octet
+  // record field is copied rather than assigned.
+  assert.match(exampleText, /const uint8_t \*const seki_b0 = /u);
+  assert.match(exampleText, /_octets_copy\(result\.accepted\.seki_f_account, /u);
+  assert.match(exampleText, /_octets_equal\(seki_b0, /u);
+  execFileSync("cc", [...strictFlags, "-c", exampleC, "-o",
+    path.join(temporary, "access_permit.o")], { stdio: "inherit" });
 
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
@@ -744,7 +770,8 @@ try {
     "header_vectors=general nested_control=yes exhaustive=65536 " +
     "widths=u8,u16,u32,u64 declarations=n octets=constant-time " +
     "boolean=short-circuit nominals=non-substitutable require=precedence " +
-    "bindings=scoped accepted=value records=constructed",
+    "bindings=scoped accepted=value records=constructed " +
+    "aliases=expanded example=access_permit",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

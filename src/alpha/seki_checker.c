@@ -202,7 +202,8 @@ resolve_declarations(struct checker *checker)
         if (!checker->failed) {
             /* Reject a declaration whose width cannot be derived, which is how
              * a recursive declaration surfaces at this stage. */
-            const uint32_t type = seki_type_intern(
+            const uint32_t type = seki_declaration_is_alias(checker->module,
+                (uint32_t)index) ? 0U : seki_type_intern(
                 &checker->elaboration->types, SEKI_T_DECLARED,
                 (uint32_t)index, 0U);
             if (type == SEKI_TYPE_INVALID) {

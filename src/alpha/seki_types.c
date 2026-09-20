@@ -46,6 +46,14 @@ seki_tag_bits(uint32_t tag)
     return bits;
 }
 
+int
+seki_declaration_is_alias(const struct seki_module_prefix *module,
+    uint32_t declaration)
+{
+    return declaration < module->declaration_count &&
+        module->declarations[declaration].kind == SEKI_DECL_ALIAS;
+}
+
 void
 seki_type_table_init(struct seki_type_table *table)
 {
@@ -114,7 +122,39 @@ resolve_named(const struct seki_module_prefix *module,
     if (declaration == SEKI_TYPE_INVALID) {
         return SEKI_TYPE_INVALID;
     }
+    /*
+     * An alias is a transparent synonym, so it is expanded here and never
+     * referenced as a declared type: typed-core formation rejects a `Declared`
+     * reference to one. A nominal is opaque and is referenced by declaration,
+     * which is what makes two nominals over the same representation distinct.
+     */
+    if (module->declarations[declaration].kind == SEKI_DECL_ALIAS) {
+        return SEKI_TYPE_INVALID;
+    }
     return seki_type_intern(table, SEKI_T_DECLARED, declaration, 0U);
+}
+
+/* Expands alias declarations before interning; nominals are left opaque. */
+static uint32_t
+resolve_named_expanding(const struct seki_module_prefix *module,
+    struct seki_type_table *table, const struct seki_name *name)
+{
+    struct seki_name current = *name;
+    uint32_t depth;
+    for (depth = 0U; depth < SEKI_TYPE_MAX_DEPTH; depth += 1U) {
+        const uint32_t declaration = find_declaration(module, &current);
+        if (declaration == SEKI_TYPE_INVALID ||
+            module->declarations[declaration].kind != SEKI_DECL_ALIAS) {
+            return resolve_named(module, table, &current);
+        }
+        if (module->declarations[declaration].value.target.kind !=
+            SEKI_TYPE_NAMED) {
+            return seki_type_resolve(module, table,
+                &module->declarations[declaration].value.target);
+        }
+        current = module->declarations[declaration].value.target.name;
+    }
+    return SEKI_TYPE_INVALID;
 }
 
 static uint32_t seki_type_resolve_argument(
@@ -127,7 +167,7 @@ seki_type_resolve(const struct seki_module_prefix *module,
 {
     switch (reference->kind) {
     case SEKI_TYPE_NAMED:
-        return resolve_named(module, table, &reference->name);
+        return resolve_named_expanding(module, table, &reference->name);
     case SEKI_TYPE_BYTES:
         if (reference->length == 0U) {
             return SEKI_TYPE_INVALID;
@@ -165,7 +205,7 @@ seki_type_resolve_argument(const struct seki_module_prefix *module,
     if (argument->kind != SEKI_TYPE_ARG_TYPE_NAME) {
         return SEKI_TYPE_INVALID;
     }
-    return resolve_named(module, table, &argument->name);
+    return resolve_named_expanding(module, table, &argument->name);
 }
 
 uint32_t

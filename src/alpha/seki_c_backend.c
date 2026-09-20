@@ -1354,33 +1354,15 @@ print_expression(struct text_buffer *output,
             " && " : " || ");
         print_logical_operand(output, module, expression->b);
         break;
-    case RESTRICTED_RECORD: {
-        uint32_t entry;
-        int is_array = 0;
-        uint32_t array_length = 0U;
-        const struct decoded_declaration *declaration;
-        if ((size_t)expression->a >= module->declaration_count) {
-            output->failed = 1;
-            return;
-        }
-        declaration = &module->declarations[expression->a];
-        text_put(output, "(");
-        print_type_name(output, module, 21U, 0U, expression->a, &is_array,
-            &array_length);
-        text_put(output, "){");
-        for (entry = 0U; entry < expression->field_count; entry += 1U) {
-            text_put(output, entry == 0U ? " ." : ", .");
-            if (!uses_e0_compatibility_abi(module)) {
-                text_put(output, "seki_f_");
-            }
-            text_put_name(output, &declaration->fields[entry], 0);
-            text_put(output, " = ");
-            print_expression(output, module,
-                module->kernel.record_fields[expression->b + entry]);
-        }
-        text_put(output, " }");
+    case RESTRICTED_RECORD:
+        /*
+         * A record literal is written into its destination field by field, so
+         * it never appears in a C expression position. `print_record_into`
+         * does that; reaching here means one appeared somewhere the projection
+         * does not place it.
+         */
+        output->failed = 1;
         break;
-    }
     case RESTRICTED_UNIT_LIT:
     case RESTRICTED_VARIANT:
     default:
@@ -1388,6 +1370,66 @@ print_expression(struct text_buffer *output,
          * them as the tag/reason pair written by print_tail. */
         output->failed = 1;
         break;
+    }
+}
+
+/*
+ * Writes a record literal into `destination` field by field. An octet field is
+ * copied rather than assigned, because C has no array assignment; every other
+ * field is a plain assignment.
+ */
+static void
+print_record_into(struct text_buffer *output,
+    const struct restricted_module *module, const char *destination,
+    uint32_t index, unsigned depth)
+{
+    const struct restricted_expression *expression;
+    const struct decoded_declaration *declaration;
+    uint32_t entry;
+    if ((size_t)index >= module->kernel.expression_count) {
+        output->failed = 1;
+        return;
+    }
+    expression = &module->kernel.expressions[index];
+    if (expression->kind != RESTRICTED_RECORD ||
+        (size_t)expression->a >= module->declaration_count) {
+        output->failed = 1;
+        return;
+    }
+    declaration = &module->declarations[expression->a];
+    for (entry = 0U; entry < expression->field_count; entry += 1U) {
+        const uint32_t value = module->kernel.record_fields[expression->b +
+            entry];
+        uint8_t representation = 0U;
+        uint32_t length = 0U;
+        resolve_representation(module, declaration->field_types[entry],
+            declaration->field_declarations[entry], &representation, &length);
+        text_put_indent(output, depth);
+        if (representation == 11U || representation == 13U) {
+            text_put_prefix(output, module);
+            text_put(output, "_octets_copy(");
+            text_put(output, destination);
+            text_put(output, ".");
+            if (!uses_e0_compatibility_abi(module)) {
+                text_put(output, "seki_f_");
+            }
+            text_put_name(output, &declaration->fields[entry], 0);
+            text_put(output, ", ");
+            print_expression(output, module, value);
+            text_put(output, ", UINT32_C(");
+            text_put_unsigned(output, length);
+            text_put(output, "));\n");
+            continue;
+        }
+        text_put(output, destination);
+        text_put(output, ".");
+        if (!uses_e0_compatibility_abi(module)) {
+            text_put(output, "seki_f_");
+        }
+        text_put_name(output, &declaration->fields[entry], 0);
+        text_put(output, " = ");
+        print_expression(output, module, value);
+        text_put(output, ";\n");
     }
 }
 
@@ -1408,10 +1450,17 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         text_put_indent(output, depth);
         text_put(output, "result.reason = UINT8_C(0);\n");
         if (module->kernel.accepted_tag != 0U) {
-            text_put_indent(output, depth);
-            text_put(output, "result.accepted = ");
-            print_expression(output, module, tail->a);
-            text_put(output, ";\n");
+            if ((size_t)tail->a < module->kernel.expression_count &&
+                module->kernel.expressions[tail->a].kind ==
+                    RESTRICTED_RECORD) {
+                print_record_into(output, module, "result.accepted", tail->a,
+                    depth);
+            } else {
+                text_put_indent(output, depth);
+                text_put(output, "result.accepted = ");
+                print_expression(output, module, tail->a);
+                text_put(output, ";\n");
+            }
         }
         break;
     case RESTRICTED_REJECT: {
@@ -1461,21 +1510,32 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         const struct restricted_expression *value;
         int is_array = 0;
         uint32_t array_length = 0U;
+        uint8_t representation = 0U;
+        uint32_t ignored = 0U;
         if ((size_t)tail->a >= module->kernel.expression_count) {
             output->failed = 1;
             return;
         }
         value = &module->kernel.expressions[tail->a];
+        resolve_representation(module, value->type_tag,
+            value->type_declaration, &representation, &ignored);
         text_put_indent(output, depth);
+        if (representation == 11U || representation == 13U) {
+            /* C cannot copy an array, so an octet binding names the octets
+             * rather than duplicating them. It is immutable either way. */
+            text_put(output, "const uint8_t *const seki_b");
+            text_put_unsigned(output, (uint64_t)tail->b);
+            text_put(output, " = ");
+            print_expression(output, module, tail->a);
+            text_put(output, ";\n");
+            print_tail(output, module, tail->c, depth);
+            break;
+        }
         text_put(output, "const ");
         print_type_name(output, module, value->type_tag, value->type_length,
             value->type_declaration, &is_array, &array_length);
         text_put(output, " seki_b");
         text_put_unsigned(output, (uint64_t)tail->b);
-        if (is_array) {
-            output->failed = 1;   /* an octet array cannot be copy-bound */
-            return;
-        }
         text_put(output, " = ");
         print_expression(output, module, tail->a);
         text_put(output, ";\n");
@@ -1558,6 +1618,50 @@ print_type_name(struct text_buffer *output,
         return;
     }
     text_put(output, restricted_integer_type(tag));
+}
+
+/* True when a record literal writes into an octet field, which needs a copy. */
+static int
+module_copies_octets(const struct restricted_module *module)
+{
+    size_t index;
+    for (index = 0U; index < module->kernel.expression_count; index += 1U) {
+        const struct restricted_expression *expression =
+            &module->kernel.expressions[index];
+        const struct decoded_declaration *declaration;
+        uint32_t entry;
+        if (expression->kind != RESTRICTED_RECORD ||
+            (size_t)expression->a >= module->declaration_count) {
+            continue;
+        }
+        declaration = &module->declarations[expression->a];
+        for (entry = 0U; entry < expression->field_count; entry += 1U) {
+            uint8_t tag = 0U;
+            uint32_t length = 0U;
+            resolve_representation(module, declaration->field_types[entry],
+                declaration->field_declarations[entry], &tag, &length);
+            if (tag == 11U || tag == 13U) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static void
+print_octet_copy_helper(struct text_buffer *output,
+    const struct restricted_module *module)
+{
+    text_put(output, "\nstatic void\n");
+    text_put_prefix(output, module);
+    text_put(output, "_octets_copy(uint8_t *to, const uint8_t *from,\n"
+        "    uint32_t length)\n"
+        "{\n"
+        "    uint32_t index;\n"
+        "    for (index = UINT32_C(0); index < length; ++index) {\n"
+        "        to[index] = from[index];\n"
+        "    }\n"
+        "}\n");
 }
 
 /* True when the kernel compares two octet arrays, which needs the helper. */
@@ -1707,6 +1811,9 @@ print_module(const struct restricted_module *module, char *c_source,
     text_put(&output, "_decision;\n");
     if (module_compares_octets(module)) {
         print_octet_helper(&output, module);
+    }
+    if (module_copies_octets(module)) {
+        print_octet_copy_helper(&output, module);
     }
     text_put(&output, "\n");
     text_put_prefix(&output, module);

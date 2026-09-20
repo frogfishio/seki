@@ -55,6 +55,11 @@ void seki_type_table_init(struct seki_type_table *table);
 uint32_t seki_type_intern(struct seki_type_table *table, uint32_t kind,
     uint32_t a, uint32_t b);
 
+/* Aliases are expanded by `seki_type_resolve`; this reports whether a
+ * declaration is one, so callers do not intern a reference to it. */
+int seki_declaration_is_alias(const struct seki_module_prefix *module,
+    uint32_t declaration);
+
 /*
  * Resolves one surface type reference against the module's declarations.
  * Returns SEKI_TYPE_INVALID for unknown names and forms outside the alpha

@@ -356,6 +356,24 @@
   is canonical. A permit-issuing kernel derives `(17,121,7,0)`, which the
   independent checker reproduces, and the generated C carries exactly the
   inputs the kernel granted across every tested case.
+- A defect found by compiling a kernel that used every implemented form: the
+  emitter referenced type aliases as declared types. An alias is a transparent
+  synonym and typed-core formation rejects a `Declared` reference to one, so
+  `build` was producing modules the admission checker refuses while reporting
+  success. Aliases are now expanded at use sites and nominals are left opaque,
+  which is also the correct typing rule: an alias is interchangeable with its
+  representation and a nominal is not.
+- Two further defects from compiling the generated C rather than trusting it.
+  C has no array assignment, so an octet binding now names the octets with a
+  pointer instead of copying them, and an octet record field is written with a
+  copy helper rather than inside a compound literal. Both previously produced C
+  that did not compile.
+- `spec/language/examples/access_permit.seki` is now the worked example: two
+  nominals over the same digest representation, an alias, an eight-field
+  record, four ordered rejections, bindings, three `require` premises, a
+  short-circuit condition, and a permit carrying the identity it granted. It
+  derives `(38,2640,11,0)`, the independent checker accepts it, its C compiles
+  strictly, and its decisions match the stated policy on every tested case.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
