@@ -3,6 +3,14 @@
 #include <stdint.h>
 #include <string.h>
 
+/*
+ * Revision of the generated decision ABI. A consumer comparing decisions byte
+ * for byte reads this first: it rotates whenever the struct layout or the
+ * meaning of a field changes. It is not a stability promise on its own, which
+ * arrives only when the subset, encoding and ABI are frozen together.
+ */
+#define SEKI_DECISION_ABI_REVISION 1U
+
 #define DECODED_NAME_CAPACITY 64U
 #define DECODED_FIELD_CAPACITY 32U
 #define DECODED_CASE_CAPACITY 32U
@@ -86,6 +94,9 @@ enum restricted_tail_kind {
 
 struct restricted_tail {
     enum restricted_tail_kind kind;
+    /* REQUIRE: the zero-based precedence position of the premise, reported
+     * one-based so that zero means "no premise applies". */
+    uint32_t premise;
     /*
      * ACCEPT   a = accepted value expression
      * REJECT   a = reason expression, b = precedence index
@@ -874,6 +885,7 @@ decode_tail(struct reader *reader, struct restricted_module *module,
     case 2U: {
         uint32_t precedence;
         tail.kind = RESTRICTED_REQUIRE;
+        tail.premise = 0U;
         tail.a = decode_expression(reader, module, bindings);
         tail.b = decode_expression(reader, module, bindings);
         precedence = read_u32(reader);
@@ -886,6 +898,7 @@ decode_tail(struct reader *reader, struct restricted_module *module,
             reader_fail(reader, "rejection precedence index is inconsistent");
             return 0U;
         }
+        tail.premise = precedence;
         tail.c = decode_tail(reader, module, depth + 1U, bindings);
         break;
     }
@@ -1136,13 +1149,6 @@ text_put_unsigned(struct text_buffer *buffer, uint64_t value)
     }
 }
 
-static int
-decoded_name_is(const struct decoded_name *name, const char *text)
-{
-    const size_t length = strlen(text);
-    return name->length == length && memcmp(name->bytes, text, length) == 0;
-}
-
 static void
 text_put_name(struct text_buffer *buffer, const struct decoded_name *name,
     int lower_case)
@@ -1161,38 +1167,19 @@ text_put_name(struct text_buffer *buffer, const struct decoded_name *name,
     }
 }
 
-static int
-uses_e0_compatibility_abi(const struct restricted_module *module)
-{
-    return decoded_name_is(&module->module_name, "minimum_age") &&
-        decoded_name_is(&parameter_record(module)->name, "Applicant") &&
-        decoded_name_is(&module->field_name, "age") &&
-        decoded_name_is(&rejection_variant(module)->name, "Rejection") &&
-        decoded_name_is(&module->case_name, "Underage") &&
-        decoded_name_is(&module->kernel.name, "decide") &&
-        decoded_name_is(&module->kernel.parameter_name, "applicant") &&
-        module->kernel.rejection_tag == 1U;
-}
-
 static void
 text_put_prefix(struct text_buffer *buffer,
     const struct restricted_module *module)
 {
-    if (uses_e0_compatibility_abi(module)) {
-        text_put(buffer, "seki_e0");
-    } else {
-        text_put(buffer, "seki_a0_");
-        text_put_name(buffer, &module->module_name, 1);
-    }
+    text_put(buffer, "seki_a0_");
+    text_put_name(buffer, &module->module_name, 1);
 }
 
 static void
 text_put_parameter_identifier(struct text_buffer *buffer,
     const struct restricted_module *module)
 {
-    if (!uses_e0_compatibility_abi(module)) {
-        text_put(buffer, "seki_p_");
-    }
+    text_put(buffer, "seki_p_");
     text_put_name(buffer, &module->kernel.parameter_name, 0);
 }
 
@@ -1285,9 +1272,7 @@ print_expression(struct text_buffer *output,
     case RESTRICTED_PROJECT:
         print_expression(output, module, expression->a);
         text_put(output, ".");
-        if (!uses_e0_compatibility_abi(module)) {
-            text_put(output, "seki_f_");
-        }
+        text_put(output, "seki_f_");
         if ((size_t)expression->b >= parameter_record(module)->field_count) {
             output->failed = 1;
             return;
@@ -1410,9 +1395,7 @@ print_record_into(struct text_buffer *output,
             text_put(output, "_octets_copy(");
             text_put(output, destination);
             text_put(output, ".");
-            if (!uses_e0_compatibility_abi(module)) {
-                text_put(output, "seki_f_");
-            }
+            text_put(output, "seki_f_");
             text_put_name(output, &declaration->fields[entry], 0);
             text_put(output, ", ");
             print_expression(output, module, value);
@@ -1423,9 +1406,7 @@ print_record_into(struct text_buffer *output,
         }
         text_put(output, destination);
         text_put(output, ".");
-        if (!uses_e0_compatibility_abi(module)) {
-            text_put(output, "seki_f_");
-        }
+        text_put(output, "seki_f_");
         text_put_name(output, &declaration->fields[entry], 0);
         text_put(output, " = ");
         print_expression(output, module, value);
@@ -1446,9 +1427,7 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
     switch (tail->kind) {
     case RESTRICTED_ACCEPT:
         text_put_indent(output, depth);
-        text_put(output, "result.tag = UINT8_C(0);\n");
-        text_put_indent(output, depth);
-        text_put(output, "result.reason = UINT8_C(0);\n");
+        text_put(output, "result.disposition = UINT32_C(1);\n");
         if (module->kernel.accepted_tag != 0U) {
             if ((size_t)tail->a < module->kernel.expression_count &&
                 module->kernel.expressions[tail->a].kind ==
@@ -1471,9 +1450,9 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         }
         reason = &module->kernel.expressions[tail->a];
         text_put_indent(output, depth);
-        text_put(output, "result.tag = UINT8_C(1);\n");
+        text_put(output, "result.disposition = UINT32_C(2);\n");
         text_put_indent(output, depth);
-        text_put(output, "result.reason = UINT8_C(");
+        text_put(output, "result.rejection_tag = UINT32_C(");
         text_put_unsigned(output, (uint64_t)reason->a);
         text_put(output, ");\n");
         break;
@@ -1494,10 +1473,15 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         print_expression(output, module, tail->a);
         text_put(output, ")) {\n");
         text_put_indent(output, depth + 1U);
-        text_put(output, "result.tag = UINT8_C(1);\n");
+        text_put(output, "result.disposition = UINT32_C(2);\n");
         text_put_indent(output, depth + 1U);
-        text_put(output, "result.reason = UINT8_C(");
+        text_put(output, "result.rejection_tag = UINT32_C(");
         text_put_unsigned(output, (uint64_t)reason->a);
+        text_put(output, ");\n");
+        /* The premise that failed, as its one-based precedence position. */
+        text_put_indent(output, depth + 1U);
+        text_put(output, "result.premise_tag = UINT32_C(");
+        text_put_unsigned(output, (uint64_t)tail->premise + 1U);
         text_put(output, ");\n");
         text_put_indent(output, depth);
         text_put(output, "} else {\n");
@@ -1618,6 +1602,26 @@ print_type_name(struct text_buffer *output,
         return;
     }
     text_put(output, restricted_integer_type(tag));
+}
+
+/*
+ * Zeroes the decision before any field is written. C leaves padding bytes
+ * unspecified, so without this a consumer comparing two decisions with a byte
+ * comparison could see a difference that carries no meaning.
+ */
+static void
+print_zero_helper(struct text_buffer *output,
+    const struct restricted_module *module)
+{
+    text_put(output, "\nstatic void\n");
+    text_put_prefix(output, module);
+    text_put(output, "_zero(uint8_t *bytes, uint32_t length)\n"
+        "{\n"
+        "    uint32_t index;\n"
+        "    for (index = UINT32_C(0); index < length; ++index) {\n"
+        "        bytes[index] = UINT8_C(0);\n"
+        "    }\n"
+        "}\n");
 }
 
 /* True when a record literal writes into an octet field, which needs a copy. */
@@ -1772,9 +1776,7 @@ print_module(const struct restricted_module *module, char *c_source,
                 declaration->field_declarations[field_index], &is_array,
                 &array_length);
             text_put(&output, " ");
-            if (!uses_e0_compatibility_abi(module)) {
-                text_put(&output, "seki_f_");
-            }
+            text_put(&output, "seki_f_");
             text_put_name(&output, &declaration->fields[field_index], 0);
             if (is_array) {
                 text_put(&output, "[");
@@ -1792,8 +1794,10 @@ print_module(const struct restricted_module *module, char *c_source,
     text_put(&output,
         "\n"
         "typedef struct {\n"
-        "    uint8_t tag;\n"
-        "    uint8_t reason;\n");
+        "    uint32_t abi_revision;\n"
+        "    uint32_t disposition;   /* 1 accepted, 2 rejected */\n"
+        "    uint32_t rejection_tag; /* 0 when accepted */\n"
+        "    uint32_t premise_tag;   /* 0 when inapplicable */\n");
     if (module->kernel.accepted_tag != 0U) {
         /* `Unit` has no representation, so a Unit-accepting decision keeps
          * exactly the established two-octet shape. */
@@ -1809,6 +1813,7 @@ print_module(const struct restricted_module *module, char *c_source,
     text_put(&output, "} ");
     text_put_prefix(&output, module);
     text_put(&output, "_decision;\n");
+    print_zero_helper(&output, module);
     if (module_compares_octets(module)) {
         print_octet_helper(&output, module);
     }
@@ -1841,7 +1846,12 @@ print_module(const struct restricted_module *module, char *c_source,
     text_put_parameter_identifier(&output, module);
     text_put(&output, ")\n{\n    ");
     text_put_prefix(&output, module);
-    text_put(&output, "_decision result;\n");
+    text_put(&output, "_decision result;\n    ");
+    text_put_prefix(&output, module);
+    text_put(&output, "_zero((uint8_t *)&result, (uint32_t)sizeof result);\n"
+        "    result.abi_revision = UINT32_C(");
+    text_put_unsigned(&output, SEKI_DECISION_ABI_REVISION);
+    text_put(&output, ");\n");
     print_tail(&output, module, module->kernel.body_root, 1U);
     text_put(&output,
         "    return result;\n"

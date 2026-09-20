@@ -9,8 +9,12 @@ import { checkTypedCore } from "./encoding/check_typed_core.mjs";
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "seki-a0-cli-"));
 const compiler = path.join(temporary, "sekic");
 const canonicalSource = "experiments/e0-vs1/minimum_age.seki";
+// The typed core is still the E0 experiment's exact bytes: the semantic root
+// did not move. The generated C is the alpha's own regression, because the
+// decision ABI deliberately diverged from the closed experiment's two-octet
+// result. E0's own artifacts stay frozen as experimental evidence.
 const recordedCore = "experiments/e0-vs1/minimum_age.scb0.hex";
-const recordedC = "experiments/e0-vs1/minimum_age.generated.c";
+const recordedC = "tests/alpha/regression/minimum_age.generated.c";
 const sources = [
   "src/alpha/sekic.c",
   "src/alpha/seki_lexer.c",
@@ -102,6 +106,9 @@ try {
   assert.deepEqual(fs.readFileSync(corePath),
     Buffer.from(fs.readFileSync(recordedCore, "ascii").trim(), "hex"));
   assert.deepEqual(fs.readFileSync(cPath), fs.readFileSync(recordedC));
+  // Every decision stamps the ABI revision a consumer reads first.
+  assert.match(fs.readFileSync(cPath, "utf8"),
+    /result\.abi_revision = UINT32_C\(1\);/u);
 
   const renamed = run([
     "build", "--core", renamedCore, "--c", renamedC, renamedSource,
@@ -114,7 +121,7 @@ try {
   assert.match(renamedCText, /uint8_t seki_f_level;/u);
   assert.match(renamedCText,
     /seki_p_signal\.seki_f_level < UINT8_C\(42\)/u);
-  assert.match(renamedCText, /result\.reason = UINT8_C\(7\)/u);
+  assert.match(renamedCText, /result\.rejection_tag = UINT32_C\(7\)/u);
   checkTypedCore(decodeModule(fs.readFileSync(renamedCore)));
   execFileSync("cc", [...strictFlags, "-c", renamedC, "-o",
     path.join(temporary, "gate_policy.o")], { stdio: "inherit" });
@@ -252,14 +259,15 @@ try {
     '    for (unsigned tier = 0U; tier < 256U; ++tier) {',
     '        seki_a0_nested_claim c;',
     '        seki_a0_nested_decision got;',
-    '        uint8_t wt, wr;',
+    '        uint32_t wt, wr;',
     '        c.seki_f_age = (uint8_t)age; c.seki_f_tier = (uint8_t)tier;',
     '        got = seki_a0_nested_screen(c);',
-    '        if (tier == 0U)     { wt = 1U; wr = 9U; }',
-    '        else if (age < 18U) { wt = 1U; wr = 1U; }',
-    '        else if (tier > 3U) { wt = 1U; wr = 4U; }',
-    '        else                { wt = 0U; wr = 0U; }',
-    '        if (got.tag != wt || got.reason != wr) ++bad;',
+    '        if (tier == 0U)     { wt = 2U; wr = 9U; }',
+    '        else if (age < 18U) { wt = 2U; wr = 1U; }',
+    '        else if (tier > 3U) { wt = 2U; wr = 4U; }',
+    '        else                { wt = 1U; wr = 0U; }',
+    '        if (got.disposition != wt || got.rejection_tag != wr) ++bad;',
+    '        if (got.abi_revision != UINT32_C(1)) ++bad;',
     '    }',
     '    printf("%u\\n", bad);',
     '    return bad != 0U;',
@@ -651,7 +659,8 @@ try {
   checkTypedCore(permitDecoded);
   assert.deepEqual(permitDecoded.kernels[0][1].exact, [17, 121, 7, 0]);
   const permitText = fs.readFileSync(permitC, "utf8");
-  assert.match(permitText, /uint8_t reason;\n    seki_a0_permit_permit accepted;/u);
+  assert.match(permitText,
+    /uint32_t premise_tag;.*\n    seki_a0_permit_permit accepted;/u);
   // Source order was grantedTier first; canonical order is by field name, and
   // the literal is written into its destination field by field.
   assert.ok(
@@ -727,6 +736,46 @@ try {
   assert.equal(zeroed.status, 65);
   assert.match(zeroed.stderr, /^A0-PARSE-0039:/u);
 
+  // The decision ABI a shadow oracle compares against. Two rejections reached
+  // by different inputs but identical in meaning must compare equal byte for
+  // byte, which is why the whole decision is zeroed before any field is set:
+  // C leaves padding unspecified.
+  const abiHarness = path.join(temporary, "abi_main.c");
+  fs.copyFileSync(requireC, path.join(temporary, "abi.c"));
+  fs.writeFileSync(abiHarness, [
+    '#include <stdint.h>',
+    '#include <stdio.h>',
+    '#include <string.h>',
+    '#include "abi.c"',
+    'int main(void) {',
+    '    unsigned bad = 0U;',
+    '    seki_a0_publish_candidate a, b;',
+    '    seki_a0_publish_decision da, db;',
+    '    a.seki_f_epoch = 1U; a.seki_f_pack = 7U; a.seki_f_tier = 9U;',
+    '    b.seki_f_epoch = 2U; b.seki_f_pack = 3U; b.seki_f_tier = 1U;',
+    '    da = seki_a0_publish_publish(a);',
+    '    db = seki_a0_publish_publish(b);',
+    '    if (memcmp(&da, &db, sizeof da) != 0) ++bad;',
+    '    if (da.disposition != 2U) ++bad;',
+    '    if (da.rejection_tag != 1U || da.premise_tag != 1U) ++bad;',
+    '    a.seki_f_epoch = 42U; a.seki_f_pack = 3U;',
+    '    da = seki_a0_publish_publish(a);',
+    '    if (da.rejection_tag != 2U || da.premise_tag != 2U) ++bad;',
+    '    a.seki_f_pack = 7U; a.seki_f_tier = 9U;',
+    '    da = seki_a0_publish_publish(a);',
+    '    if (da.disposition != 1U) ++bad;',
+    '    if (da.rejection_tag != 0U || da.premise_tag != 0U) ++bad;',
+    '    if (da.abi_revision != 1U) ++bad;',
+    '    printf("%u\\n", bad);',
+    '    return bad != 0U;',
+    '}',
+    '',
+  ].join("\n"));
+  const abiExe = path.join(temporary, "abi_main");
+  execFileSync("cc", [...strictFlags, "-fsanitize=address,undefined",
+    `-I${temporary}`, abiHarness, "-o", abiExe], { stdio: "inherit" });
+  assert.equal(execFileSync(abiExe, { encoding: "utf8" }), "0\n");
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -757,7 +806,7 @@ try {
   assert.equal(variant.status, 0, variant.stderr);
   assert.notDeepEqual(fs.readFileSync(variantCore), fs.readFileSync(corePath));
   assert.match(fs.readFileSync(variantC, "utf8"),
-    /applicant\.age < UINT8_C\(19\)/u);
+    /seki_p_applicant\.seki_f_age < UINT8_C\(19\)/u);
 
   const inspected = run(["inspect", corePath]);
   assert.equal(inspected.status, 0, inspected.stderr);
@@ -805,7 +854,7 @@ try {
     "boolean=short-circuit nominals=non-substitutable require=precedence " +
     "bindings=scoped accepted=value records=constructed " +
     "aliases=expanded example=access_permit " +
-    "precedence=structural tag0=reserved",
+    "precedence=structural tag0=reserved abi=revision-1",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

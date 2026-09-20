@@ -374,6 +374,23 @@
   short-circuit condition, and a permit carrying the identity it granted. It
   derives `(38,2640,11,0)`, the independent checker accepts it, its C compiles
   strictly, and its decisions match the stated policy on every tested case.
+- The generated decision carries a stable ABI, at the request of the Grit
+  consumer, who needs a shadow oracle to compare more than accept against
+  reject. It is `abi_revision`, `disposition` (1 accepted, 2 rejected),
+  `rejection_tag` and `premise_tag`, all `uint32_t`, followed by the accepted
+  value. Disposition zero is never written, so an all-zero decision is
+  recognisably uninitialised. The whole decision is zeroed before any field is
+  set, because C leaves padding unspecified and the consumer compares byte for
+  byte; two rejections identical in meaning now compare equal.
+- `premise_tag` reports which premise failed as its one-based precedence
+  position, which is exactly what structural `check_order` already guarantees
+  to be deterministic.
+- The E0 naming compatibility case is gone. It existed only to hold one byte
+  regression that this ABI supersedes, and it made one program's C differ from
+  every other's. The alpha now records its own regression artifact under
+  `tests/alpha/regression/`; the E0 experiment's artifacts stay frozen as its
+  evidence. The typed core is unchanged and still byte-identical to E0's 417
+  bytes: the semantic root did not move, only the C projection.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
