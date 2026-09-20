@@ -358,6 +358,57 @@ try {
   execFileSync("cc", [...strictFlags, "-c", multiC, "-o",
     path.join(temporary, "multi.o")], { stdio: "inherit" });
 
+  // `Digest` and `Bytes` fields project to octet arrays, and identity
+  // comparison runs in time independent of the first differing octet: these
+  // are authenticated evidence identities, so an early-exit comparison would
+  // leak how much of a candidate identity an attacker had guessed.
+  const digestSource = path.join(temporary, "digest.seki");
+  const digestCore = path.join(temporary, "digest.scb0");
+  const digestC = path.join(temporary, "digest.c");
+  fs.writeFileSync(digestSource, [
+    "module grit::identity @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export record Handoff {",
+    "  declared: Digest[sha256, 32],",
+    "  observed: Digest[sha256, 32]",
+    "}.",
+    "export variant Refusal [ IdentityMismatch @ 1. ].",
+    "",
+    "export kernel publish handoff: Handoff",
+    "-> Decision[Unit, Refusal] arithmetic: checked",
+    "bounded steps: 128 liveBits: 4096 controlDepth: 64 workspaceBits: 0",
+    "rejects: Refusal::IdentityMismatch",
+    "publication: none [ (handoff declared) != (handoff observed)",
+    "  ifTrue: [ reject Refusal::IdentityMismatch ] ifFalse: [ accept unit ] ].",
+    "",
+  ].join("\n"));
+  const digest = run([
+    "build", "--core", digestCore, "--c", digestC, digestSource,
+  ]);
+  assert.equal(digest.status, 0, digest.stderr);
+  const digestDecoded = decodeModule(fs.readFileSync(digestCore));
+  checkTypedCore(digestDecoded);
+  assert.deepEqual(digestDecoded.kernels[0][1].exact, [9, 1536, 5, 0]);
+  const digestText = fs.readFileSync(digestC, "utf8");
+  assert.match(digestText, /uint8_t seki_f_declared\[32\];/u);
+  assert.match(digestText, /difference \|= \(uint8_t\)\(left\[index\]/u);
+  assert.match(digestText, /!seki_a0_identity_octets_equal\(/u);
+  execFileSync("cc", [...strictFlags, "-c", digestC, "-o",
+    path.join(temporary, "digest.o")], { stdio: "inherit" });
+
+  // Ordered comparison on an octet array has no C operator form; the checker
+  // must reject it before the projection is asked to print one.
+  const digestOrdered = path.join(temporary, "digest-ordered.seki");
+  fs.writeFileSync(digestOrdered,
+    fs.readFileSync(digestSource, "utf8").replace("!=", "<"));
+  const ordered = run(["check", digestOrdered]);
+  assert.equal(ordered.status, 65);
+  assert.match(ordered.stderr,
+    /^A0-CHECK-0004:.*ordered comparison requires numeric operands\n$/u);
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -432,7 +483,7 @@ try {
     "slice=u8-decision fields=2 rejections=2 renamed=yes overwrite=reject " +
     "operators=4 source_order=canonical table_order=name-derived " +
     "header_vectors=general nested_control=yes exhaustive=65536 " +
-    "widths=u8,u16,u32,u64 declarations=n",
+    "widths=u8,u16,u32,u64 declarations=n octets=constant-time",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

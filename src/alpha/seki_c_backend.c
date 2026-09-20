@@ -7,6 +7,7 @@
 #define DECODED_FIELD_CAPACITY 32U
 #define DECODED_CASE_CAPACITY 32U
 #define DECODED_DECL_CAPACITY 32U
+#define DECODED_OCTETS_CAPACITY 1024U
 #define RESTRICTED_MAX_EXPRESSIONS 256U
 #define RESTRICTED_MAX_TAILS 128U
 
@@ -49,6 +50,10 @@ struct restricted_expression {
     /* INT_LIT: the literal's value and its SCB-0 integer type tag. */
     uint64_t value;
     uint8_t integer_type;
+    /* The expression's claimed SCB-0 type tag and, for octet arrays, its
+     * length. The printer uses these to choose a C form. */
+    uint8_t type_tag;
+    uint32_t type_length;
     /*
      * LOCAL    a = environment slot
      * PROJECT  a = record expression, b = field index
@@ -113,8 +118,13 @@ struct decoded_declaration {
     enum decoded_declaration_kind kind;
     struct decoded_name name;
     struct decoded_name fields[DECODED_FIELD_CAPACITY];
-    /* SCB-0 `Type` tag per field: 2..5 for U8, U16, U32, U64. */
+    /*
+     * SCB-0 `Type` tag per field: 2..5 for U8, U16, U32, U64; 11 for
+     * `Bytes[N]`; 13 for `Digest[sha256, N]`. `field_lengths` carries N for
+     * the octet-array forms and is zero for the integers.
+     */
     uint8_t field_types[DECODED_FIELD_CAPACITY];
+    uint32_t field_lengths[DECODED_FIELD_CAPACITY];
     size_t field_count;
     struct decoded_name cases[DECODED_CASE_CAPACITY];
     uint32_t case_tags[DECODED_CASE_CAPACITY];
@@ -293,6 +303,10 @@ expect_bounds(struct reader *reader, uint32_t steps, uint32_t live_bits,
     expect_u32(reader, workspace_bits, "unexpected exact workspace bound");
 }
 
+static void read_claimed_type(struct reader *reader,
+    struct restricted_module *module, uint8_t *type_tag,
+    uint32_t *type_length);
+
 static void
 decode_header(struct reader *reader, struct restricted_module *module)
 {
@@ -367,13 +381,19 @@ decode_header(struct reader *reader, struct restricted_module *module)
                 declaration_index < field_count && !reader->failed;
                 declaration_index += 1U) {
                 read_name(reader, &declaration->fields[declaration_index]);
-                declaration->field_types[declaration_index] = read_u8(reader);
-                if (!reader->failed &&
-                    (declaration->field_types[declaration_index] < 2U ||
-                     declaration->field_types[declaration_index] > 5U)) {
-                    reader_fail(reader,
-                        "input field must be U8, U16, U32, or U64");
-                    return;
+                read_claimed_type(reader, module,
+                    &declaration->field_types[declaration_index],
+                    &declaration->field_lengths[declaration_index]);
+                if (!reader->failed) {
+                    const uint8_t kind =
+                        declaration->field_types[declaration_index];
+                    if (!((kind >= 2U && kind <= 5U) || kind == 11U ||
+                        kind == 13U)) {
+                        reader_fail(reader,
+                            "record field must be an unsigned integer, "
+                            "Bytes, or Digest");
+                        return;
+                    }
                 }
                 if (!reader->failed && declaration_index != 0U &&
                     !decoded_name_precedes(
@@ -499,9 +519,12 @@ add_expression(struct reader *reader, struct restricted_module *module,
  * positions established by the header.
  */
 static void
-expect_claimed_type(struct reader *reader, struct restricted_module *module)
+read_claimed_type(struct reader *reader, struct restricted_module *module,
+    uint8_t *type_tag, uint32_t *type_length)
 {
     const uint8_t tag = read_u8(reader);
+    *type_tag = tag;
+    *type_length = 0U;
     if (reader->failed) {
         return;
     }
@@ -512,6 +535,20 @@ expect_claimed_type(struct reader *reader, struct restricted_module *module)
     case 3U:
     case 4U:
     case 5U:
+        return;
+    case 11U:
+        *type_length = read_u32(reader);
+        if (!reader->failed && (*type_length == 0U ||
+            *type_length > DECODED_OCTETS_CAPACITY)) {
+            reader_fail(reader, "byte array length exceeds backend capacity");
+        }
+        return;
+    case 13U:
+        expect_u8(reader, 0U, "digest algorithm must be sha256");
+        *type_length = read_u32(reader);
+        if (!reader->failed && *type_length != 32U) {
+            reader_fail(reader, "sha256 digest must be 32 octets");
+        }
         return;
     case 19U:
         expect_u8(reader, 0U, "decision result must accept Unit");
@@ -542,7 +579,8 @@ decode_expression(struct reader *reader, struct restricted_module *module)
     if (reader->failed) {
         return 0U;
     }
-    expect_claimed_type(reader, module);
+    read_claimed_type(reader, module, &expression.type_tag,
+        &expression.type_length);
     term = read_u8(reader);
     if (reader->failed) {
         return 0U;
@@ -1032,11 +1070,40 @@ print_expression(struct text_buffer *output,
     case RESTRICTED_BOOL_LIT:
         text_put(output, expression->a != 0U ? "1" : "0");
         break;
-    case RESTRICTED_COMPARE:
+    case RESTRICTED_COMPARE: {
+        const struct restricted_expression *left;
+        if ((size_t)expression->a >= module->kernel.expression_count) {
+            output->failed = 1;
+            return;
+        }
+        left = &module->kernel.expressions[expression->a];
+        if (left->type_tag == 11U || left->type_tag == 13U) {
+            /* Octet arrays are not comparable with a C operator. Only
+             * equality reaches here: ordered comparison on them is rejected
+             * by the checker. */
+            if (expression->compare != RESTRICTED_EQUAL &&
+                expression->compare != RESTRICTED_NOT_EQUAL) {
+                output->failed = 1;
+                return;
+            }
+            if (expression->compare == RESTRICTED_NOT_EQUAL) {
+                text_put(output, "!");
+            }
+            text_put_prefix(output, module);
+            text_put(output, "_octets_equal(");
+            print_expression(output, module, expression->a);
+            text_put(output, ", ");
+            print_expression(output, module, expression->b);
+            text_put(output, ", UINT32_C(");
+            text_put_unsigned(output, left->type_length);
+            text_put(output, "))");
+            break;
+        }
         print_expression(output, module, expression->a);
         text_put(output, restricted_compare_text(expression->compare));
         print_expression(output, module, expression->b);
         break;
+    }
     case RESTRICTED_UNIT_LIT:
     case RESTRICTED_VARIANT:
     default:
@@ -1097,6 +1164,52 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
     }
 }
 
+/* True when the kernel compares two octet arrays, which needs the helper. */
+static int
+module_compares_octets(const struct restricted_module *module)
+{
+    size_t index;
+    for (index = 0U; index < module->kernel.expression_count; index += 1U) {
+        const struct restricted_expression *expression =
+            &module->kernel.expressions[index];
+        if (expression->kind != RESTRICTED_COMPARE) {
+            continue;
+        }
+        if ((size_t)expression->a >= module->kernel.expression_count) {
+            continue;
+        }
+        if (module->kernel.expressions[expression->a].type_tag == 11U ||
+            module->kernel.expressions[expression->a].type_tag == 13U) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void
+print_octet_helper(struct text_buffer *output,
+    const struct restricted_module *module)
+{
+    /*
+     * Identity comparison runs in time independent of where the first
+     * differing octet lies. These values are authenticated evidence and
+     * artifact identities, so an early-exit comparison would leak how much of
+     * a candidate identity an attacker had guessed.
+     */
+    text_put(output, "\nstatic int\n");
+    text_put_prefix(output, module);
+    text_put(output, "_octets_equal(const uint8_t *left, "
+        "const uint8_t *right,\n    uint32_t length)\n"
+        "{\n"
+        "    uint8_t difference = UINT8_C(0);\n"
+        "    uint32_t index;\n"
+        "    for (index = UINT32_C(0); index < length; ++index) {\n"
+        "        difference |= (uint8_t)(left[index] ^ right[index]);\n"
+        "    }\n"
+        "    return difference == UINT8_C(0);\n"
+        "}\n");
+}
+
 static int
 print_module(const struct restricted_module *module, char *c_source,
     size_t c_capacity, size_t *c_length)
@@ -1121,14 +1234,22 @@ print_module(const struct restricted_module *module, char *c_source,
         text_put(&output, "\ntypedef struct {\n");
         for (field_index = 0U; field_index < declaration->field_count;
             field_index += 1U) {
+            const uint8_t kind = declaration->field_types[field_index];
+            const int is_octets = kind == 11U || kind == 13U;
             text_put(&output, "    ");
-            text_put(&output, restricted_integer_type(
-                declaration->field_types[field_index]));
+            text_put(&output, is_octets ? "uint8_t" :
+                restricted_integer_type(kind));
             text_put(&output, " ");
             if (!uses_e0_compatibility_abi(module)) {
                 text_put(&output, "seki_f_");
             }
             text_put_name(&output, &declaration->fields[field_index], 0);
+            if (is_octets) {
+                text_put(&output, "[");
+                text_put_unsigned(&output,
+                    declaration->field_lengths[field_index]);
+                text_put(&output, "]");
+            }
             text_put(&output, ";\n");
         }
         text_put(&output, "} ");
@@ -1144,7 +1265,11 @@ print_module(const struct restricted_module *module, char *c_source,
         "    uint8_t reason;\n"
         "} ");
     text_put_prefix(&output, module);
-    text_put(&output, "_decision;\n\n");
+    text_put(&output, "_decision;\n");
+    if (module_compares_octets(module)) {
+        print_octet_helper(&output, module);
+    }
+    text_put(&output, "\n");
     text_put_prefix(&output, module);
     text_put(&output, "_decision ");
     text_put_prefix(&output, module);

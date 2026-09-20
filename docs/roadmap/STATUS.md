@@ -291,6 +291,16 @@
   becomes a struct in canonical order, and the kernel signature selects the
   declarations it uses by reading their positions rather than assuming a
   layout. Exports and the derivation order follow the declaration count.
+- `Bytes[N]` and `Digest[sha256, 32]` record fields project to octet arrays,
+  and identity equality projects to a comparison whose running time does not
+  depend on where the first differing octet lies. These values are
+  authenticated evidence and artifact identities, so an early-exit comparison
+  would leak how much of a candidate identity an attacker had guessed. Ordered
+  comparison on an octet array has no C operator form and is rejected by the
+  checker as `A0-CHECK-0004` before the projection is asked to print one. A
+  two-digest kernel derives `(9,1536,5,0)`, which the independent checker
+  reproduces, and its generated comparison is verified against every
+  single-bit difference across all 32 octets.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
@@ -341,10 +351,10 @@ make check-e0-lean   # experimental; currently uses local Lean 4.33.1
 
 Local and pinned Linux/amd64 seed, status, bootstrap-closure, JSON,
 encoding-vector, semantic-coverage, strict-C11, sanitizer, and whitespace checks
-passed on 2026-09-20. The alpha compiler additionally passed 2,600 source and
-3,100 typed-core mutation cases across the minimum-age, nested three-premise,
-wide-integer, and four-declaration kernels under AddressSanitizer and
-UndefinedBehaviorSanitizer with no finding, after the two stack-exhaustion
+passed on 2026-09-20. The alpha compiler additionally passed 3,200 source and
+3,700 typed-core mutation cases across the minimum-age, nested three-premise,
+wide-integer, four-declaration, and two-digest kernels under AddressSanitizer
+and UndefinedBehaviorSanitizer with no finding, after the two stack-exhaustion
 defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.

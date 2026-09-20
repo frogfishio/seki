@@ -146,9 +146,8 @@ a module stating a different obligation set still projects to C.
 `build` additionally requires the restricted-C projection, whose slice is
 currently narrower. A module can therefore pass `check` and fail `build` with a
 stable `A0-BACKEND-*` diagnostic and no output file. At revision
-`0.0.0-alpha.6` the known cases are payload-bearing variant cases, alias and
-nominal declarations, and `Bytes`/`Digest` record fields. `inspect` reports the
-two
+`0.0.0-alpha.6` the known cases are payload-bearing variant cases and alias or
+nominal declarations. `inspect` reports the two
 boundaries as `frontend=alpha-decision` and `backend=alpha-decision`, and
 reports `first_literal=<value>:<type>` when the kernel has an integer literal.
 
@@ -156,6 +155,12 @@ A module may declare any number of records and variants. Each record becomes a
 C struct in canonical order, a variant contributes no type of its own because
 its cases are the `reason` octet of the decision result, and the kernel
 signature selects the declarations it uses by position.
+
+`Bytes[N]` and `Digest[sha256, 32]` fields project to octet arrays. Their
+equality projects to a comparison whose running time does not depend on where
+the first differing octet lies, because these values are authenticated evidence
+and artifact identities. Ordered comparison on an octet array is rejected by
+the checker rather than given a C form.
 
 Record fields carry their own unsigned width through both directions: `U8`,
 `U16`, `U32`, and `U64` project to the matching exact-width C type, and integer

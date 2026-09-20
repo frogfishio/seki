@@ -88,6 +88,10 @@ expect(alpha.unsigned_field_widths_ready === true,
   "record fields narrowed back to a single unsigned width");
 expect(alpha.multiple_declarations_ready === true,
   "C projection returned to a fixed one-record one-variant module");
+expect(alpha.octet_identity_fields_ready === true,
+  "Bytes and Digest field progress record lost");
+expect(alpha.constant_time_identity_comparison === true,
+  "identity comparison lost its data-independent running time");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",
