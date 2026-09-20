@@ -513,6 +513,55 @@ try {
   assert.match(substituted.stderr,
     /^A0-CHECK-0004:.*comparison operands are incompatible\n$/u);
 
+  // `require C else: V::Case.` states one premise and the rejection that
+  // reports its failure, which is the natural form for a decision with several
+  // premises in declared precedence order.
+  const requireSource = path.join(temporary, "require.seki");
+  const requireCore = path.join(temporary, "require.scb0");
+  const requireC = path.join(temporary, "require.c");
+  fs.writeFileSync(requireSource, [
+    "module grit::publish @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export record Candidate { epoch: U32, pack: U32, tier: U8 }.",
+    "export variant Refusal [ Stale @ 1. WrongPack @ 2. LowTier @ 3. ].",
+    "",
+    "export kernel publish candidate: Candidate",
+    "-> Decision[Unit, Refusal] arithmetic: checked",
+    "bounded steps: 256 liveBits: 2048 controlDepth: 64 workspaceBits: 0",
+    "rejects: Refusal::Stale, Refusal::WrongPack, Refusal::LowTier",
+    "publication: none [",
+    "  require (candidate epoch) == 42 else: Refusal::Stale.",
+    "  require (candidate pack) == 7 else: Refusal::WrongPack.",
+    "  require (candidate tier) >= 3 else: Refusal::LowTier.",
+    "  accept unit",
+    "].",
+    "",
+  ].join("\n"));
+  const required = run([
+    "build", "--core", requireCore, "--c", requireC, requireSource,
+  ]);
+  assert.equal(required.status, 0, required.stderr);
+  const requireDecoded = decodeModule(fs.readFileSync(requireCore));
+  checkTypedCore(requireDecoded);
+  // KernelRequire, not a chain of KernelIf.
+  assert.equal(requireDecoded.kernels[0][1].body[0], 2);
+  assert.deepEqual(requireDecoded.kernels[0][1].exact, [18, 176, 7, 0]);
+  execFileSync("cc", [...strictFlags, "-c", requireC, "-o",
+    path.join(temporary, "require.o")], { stdio: "inherit" });
+
+  // `else` is a keyword part, not a field selector. The grammar distinguishes
+  // them by the following colon, so a premise reading a field named `else`
+  // would be the only way this could go wrong.
+  const requireBad = path.join(temporary, "require-bad.seki");
+  fs.writeFileSync(requireBad, fs.readFileSync(requireSource, "utf8")
+    .replace("else: Refusal::Stale", "else: Refusal::Missing"));
+  const requireBadRun = run(["check", requireBad]);
+  assert.equal(requireBadRun.status, 65);
+  assert.match(requireBadRun.stderr, /^A0-CHECK-0007:/u);
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -588,7 +637,7 @@ try {
     "operators=4 source_order=canonical table_order=name-derived " +
     "header_vectors=general nested_control=yes exhaustive=65536 " +
     "widths=u8,u16,u32,u64 declarations=n octets=constant-time " +
-    "boolean=short-circuit nominals=non-substitutable",
+    "boolean=short-circuit nominals=non-substitutable require=precedence",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

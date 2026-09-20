@@ -450,6 +450,43 @@ kernel_precedence_index(const struct seki_kernel_decl *kernel,
     return 0;
 }
 
+/*
+ * Resolves a rejection reference against the kernel's Decision result and its
+ * ordered inventory, recording the variant declaration, stable tag, and
+ * precedence index. Shared by `reject` and `require`.
+ */
+static int
+resolve_rejection(struct checker *checker, uint32_t expression_index,
+    const struct seki_variant_ref *reference)
+{
+    const uint32_t rejection = checker->kernel_elaboration->rejection_type;
+    uint32_t variant_declaration = SEKI_TYPE_INVALID;
+    uint32_t tag = 0U;
+    uint32_t precedence = 0U;
+    if (rejection < checker->elaboration->types.count &&
+        checker->elaboration->types.entries[rejection].kind ==
+            SEKI_T_DECLARED) {
+        variant_declaration = checker->elaboration->types.entries[rejection].a;
+    }
+    if (variant_declaration == SEKI_TYPE_INVALID ||
+        declaration_index(checker->module, &reference->owner) !=
+            variant_declaration ||
+        !variant_case_tag(checker->module, variant_declaration,
+            &reference->item, &tag)) {
+        check_fail(checker, "A0-CHECK-0007",
+            "rejection does not belong to Decision result");
+        return 0;
+    }
+    if (!kernel_precedence_index(checker->kernel, reference, &precedence)) {
+        check_fail(checker, "A0-CHECK-0008",
+            "rejection is absent from ordered inventory");
+        return 0;
+    }
+    record_info(checker, expression_index, SEKI_TYPE_INVALID,
+        variant_declaration, tag, precedence);
+    return 1;
+}
+
 static void
 check_kernel_tail(struct checker *checker, uint32_t expression_index,
     const struct environment *environment)
@@ -478,34 +515,28 @@ check_kernel_tail(struct checker *checker, uint32_t expression_index,
                 "accepted value does not match Decision result");
         }
     } else if (expression->kind == SEKI_EXPR_REJECT) {
-        const struct seki_variant_ref *reference =
-            &expression->value.rejection;
-        const uint32_t rejection = checker->kernel_elaboration->rejection_type;
-        uint32_t variant_declaration = SEKI_TYPE_INVALID;
-        uint32_t tag = 0U;
-        uint32_t precedence = 0U;
-        if (rejection < checker->elaboration->types.count &&
-            checker->elaboration->types.entries[rejection].kind ==
-                SEKI_T_DECLARED) {
-            variant_declaration =
-                checker->elaboration->types.entries[rejection].a;
-        }
-        if (variant_declaration == SEKI_TYPE_INVALID ||
-            declaration_index(checker->module, &reference->owner) !=
-                variant_declaration ||
-            !variant_case_tag(checker->module, variant_declaration,
-                &reference->item, &tag)) {
-            check_fail(checker, "A0-CHECK-0007",
-                "rejection does not belong to Decision result");
+        (void)resolve_rejection(checker, expression_index,
+            &expression->value.rejection);
+    } else if (expression->kind == SEKI_EXPR_REQUIRE) {
+        const uint32_t boolean = seki_type_intern(&checker->elaboration->types,
+            SEKI_T_BOOL, 0U, 0U);
+        const struct inferred condition = infer_expression(checker,
+            expression->value.require.condition, environment);
+        if (checker->failed) {
             return;
         }
-        if (!kernel_precedence_index(checker->kernel, reference, &precedence)) {
-            check_fail(checker, "A0-CHECK-0008",
-                "rejection is absent from ordered inventory");
+        if (condition.is_natural || boolean == SEKI_TYPE_INVALID ||
+            condition.type != boolean) {
+            check_fail(checker, "A0-CHECK-0009",
+                "kernel condition must have type Bool");
             return;
         }
-        record_info(checker, expression_index, SEKI_TYPE_INVALID,
-            variant_declaration, tag, precedence);
+        if (!resolve_rejection(checker, expression_index,
+            &expression->value.require.rejection)) {
+            return;
+        }
+        check_kernel_tail(checker, expression->value.require.continuation,
+            environment);
     } else if (expression->kind == SEKI_EXPR_IF) {
         const struct inferred condition = infer_expression(checker,
             expression->value.conditional.condition, environment);
@@ -727,6 +758,58 @@ cost_of_kernel_tail(struct checker *checker, uint32_t expression_index,
         if (peak > cost.live) {
             cost.live = peak;
         }
+        return cost;
+    }
+    if (expression->kind == SEKI_EXPR_REQUIRE) {
+        /*
+         * The rejection reason is one variant construction: a single step
+         * whose result is retained while the enclosing Decision is built. The
+         * failing and continuing paths are alternatives, so steps take their
+         * maximum.
+         */
+        const struct cost condition = cost_of_expression(checker,
+            expression->value.require.condition, environment, base);
+        const struct cost continuation = cost_of_kernel_tail(checker,
+            expression->value.require.continuation, environment, base,
+            result_type);
+        const uint32_t reason_width = width_of(checker,
+            checker->kernel_elaboration->rejection_type);
+        uint32_t reason_live = 0U;
+        uint32_t reason_peak = 0U;
+        uint32_t steps = 0U;
+        if (!seki_checked_add(base, reason_width, &reason_live) ||
+            !seki_checked_add(reason_live, width_of(checker, result_type),
+                &reason_peak)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return cost;
+        }
+        /* The reason costs one step; the continuation may cost more. */
+        if (!seki_checked_add(condition.steps,
+            continuation.steps > 1U ? continuation.steps : 1U, &steps) ||
+            !seki_checked_add(steps, 1U, &cost.steps)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return cost;
+        }
+        cost.live = condition.live;
+        if (reason_live > cost.live) {
+            cost.live = reason_live;
+        }
+        if (reason_peak > cost.live) {
+            cost.live = reason_peak;
+        }
+        if (continuation.live > cost.live) {
+            cost.live = continuation.live;
+        }
+        cost.depth = condition.depth > continuation.depth ?
+            condition.depth : continuation.depth;
+        if (cost.depth < 1U) {
+            cost.depth = 1U;
+        }
+        cost.depth += 1U;
+        cost.workspace = condition.workspace > continuation.workspace ?
+            condition.workspace : continuation.workspace;
         return cost;
     }
     if (expression->kind == SEKI_EXPR_IF) {

@@ -72,15 +72,17 @@ struct restricted_expression {
 enum restricted_tail_kind {
     RESTRICTED_ACCEPT,
     RESTRICTED_REJECT,
+    RESTRICTED_REQUIRE,
     RESTRICTED_IF
 };
 
 struct restricted_tail {
     enum restricted_tail_kind kind;
     /*
-     * ACCEPT  a = accepted value expression
-     * REJECT  a = reason expression, b = precedence index
-     * IF      a = condition, b = when-true tail, c = when-false tail
+     * ACCEPT   a = accepted value expression
+     * REJECT   a = reason expression, b = precedence index
+     * REQUIRE  a = condition, b = reason expression, c = continuation tail
+     * IF       a = condition, b = when-true tail, c = when-false tail
      */
     uint32_t a;
     uint32_t b;
@@ -772,6 +774,24 @@ decode_tail(struct reader *reader, struct restricted_module *module,
             return 0U;
         }
         break;
+    case 2U: {
+        uint32_t precedence;
+        tail.kind = RESTRICTED_REQUIRE;
+        tail.a = decode_expression(reader, module);
+        tail.b = decode_expression(reader, module);
+        precedence = read_u32(reader);
+        if (!reader->failed &&
+            ((size_t)precedence >= module->kernel.rejection_count ||
+             (size_t)tail.b >= module->kernel.expression_count ||
+             module->kernel.expressions[tail.b].kind != RESTRICTED_VARIANT ||
+             module->kernel.rejection_tags[precedence] !=
+                module->kernel.expressions[tail.b].a)) {
+            reader_fail(reader, "rejection precedence index is inconsistent");
+            return 0U;
+        }
+        tail.c = decode_tail(reader, module, depth + 1U);
+        break;
+    }
     case 4U:
         tail.kind = RESTRICTED_IF;
         tail.a = decode_expression(reader, module);
@@ -1248,6 +1268,34 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         text_put(output, "result.reason = UINT8_C(");
         text_put_unsigned(output, (uint64_t)reason->a);
         text_put(output, ");\n");
+        break;
+    }
+    case RESTRICTED_REQUIRE: {
+        /*
+         * A premise holds or its rejection is the decision. The continuation
+         * nests rather than returning early, so the function keeps one exit.
+         */
+        const struct restricted_expression *reason;
+        if ((size_t)tail->b >= module->kernel.expression_count) {
+            output->failed = 1;
+            return;
+        }
+        reason = &module->kernel.expressions[tail->b];
+        text_put_indent(output, depth);
+        text_put(output, "if (!(");
+        print_expression(output, module, tail->a);
+        text_put(output, ")) {\n");
+        text_put_indent(output, depth + 1U);
+        text_put(output, "result.tag = UINT8_C(1);\n");
+        text_put_indent(output, depth + 1U);
+        text_put(output, "result.reason = UINT8_C(");
+        text_put_unsigned(output, (uint64_t)reason->a);
+        text_put(output, ");\n");
+        text_put_indent(output, depth);
+        text_put(output, "} else {\n");
+        print_tail(output, module, tail->c, depth + 1U);
+        text_put_indent(output, depth);
+        text_put(output, "}\n");
         break;
     }
     case RESTRICTED_IF:

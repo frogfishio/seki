@@ -547,6 +547,25 @@ parse_primary_expression(struct parser *parser,
     return result;
 }
 
+/*
+ * The grammar spells a unary field selector `ValueIdent !Colon`: an identifier
+ * followed by a colon opens a keyword part such as `ifTrue:` or `else:`, not a
+ * projection. Deciding this by lookahead rather than by a list of excluded
+ * keywords means a new keyword cannot be silently eaten as a field name.
+ * The lexer is a value, so peeking copies it instead of mutating the parser.
+ */
+static int
+next_token_is_colon(const struct parser *parser)
+{
+    struct seki_lexer lookahead = parser->lexer;
+    struct seki_token token;
+    struct seki_lex_error error;
+    if (!seki_lexer_next(&lookahead, &token, &error)) {
+        return 0;
+    }
+    return token.kind == SEKI_TOKEN_COLON;
+}
+
 static uint32_t
 parse_projection_expression(struct parser *parser,
     struct seki_kernel_decl *kernel)
@@ -555,8 +574,7 @@ parse_projection_expression(struct parser *parser,
     while (!parser->failed && parser->current.kind == SEKI_TOKEN_IDENT &&
         parser->current.length != 0U && parser->current.start[0] >= 'a' &&
         parser->current.start[0] <= 'z' &&
-        !token_is(&parser->current, "ifTrue") &&
-        !token_is(&parser->current, "ifFalse")) {
+        !next_token_is_colon(parser)) {
         struct seki_expression expression;
         memset(&expression, 0, sizeof expression);
         expression.kind = SEKI_EXPR_FIELD;
@@ -687,7 +705,24 @@ parse_kernel_tail(struct parser *parser, struct seki_kernel_decl *kernel)
     if (!enter_nesting(parser)) {
         return UINT32_MAX;
     }
-    if (token_is(&parser->current, "accept")) {
+    if (token_is(&parser->current, "require")) {
+        /*
+         * `require C else: V::Case.` states one premise and the rejection that
+         * reports its failure, then continues. It is the tail form for a
+         * decision with several premises in declared precedence order.
+         */
+        advance(parser);
+        expression.kind = SEKI_EXPR_REQUIRE;
+        expression.value.require.condition =
+            parse_value_expression(parser, kernel);
+        expect_word(parser, "else");
+        expect_kind(parser, SEKI_TOKEN_COLON, "expected require else colon");
+        expression.value.require.rejection = parse_variant_ref(parser);
+        expect_kind(parser, SEKI_TOKEN_DOT, "expected require terminator");
+        expression.value.require.continuation =
+            parse_kernel_tail(parser, kernel);
+        result = add_expression(parser, kernel, &expression);
+    } else if (token_is(&parser->current, "accept")) {
         advance(parser);
         expression.kind = SEKI_EXPR_ACCEPT;
         expression.value.accept.value = parse_value_expression(parser, kernel);

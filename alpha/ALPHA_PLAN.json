@@ -51,6 +51,8 @@
   "short_circuit_boolean_ready": true,
   "alias_nominal_declarations_ready": true,
   "dependency_ordered_c_emission": true,
+  "kernel_require_ready": true,
+  "selector_lookahead_from_grammar": true,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

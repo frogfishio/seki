@@ -163,6 +163,10 @@ C struct in canonical order, a variant contributes no type of its own because
 its cases are the `reason` octet of the decision result, and the kernel
 signature selects the declarations it uses by position.
 
+`require C else: V::Case.` states one premise and the rejection that reports
+its failure, then continues. Several of them in sequence express a decision
+whose premises are checked in declared precedence order.
+
 Short-circuit `&&` and `||` are connected end to end, with `&&` binding tighter
 and both associating to the left. Their operands must both be `Bool`; anything
 else is rejected as `A0-CHECK-0018`.

@@ -98,6 +98,10 @@ expect(alpha.alias_nominal_declarations_ready === true,
   "alias and nominal declarations no longer reach C");
 expect(alpha.dependency_ordered_c_emission === true,
   "C declarations no longer follow the type dependency order");
+expect(alpha.kernel_require_ready === true,
+  "kernel require progress record lost");
+expect(alpha.selector_lookahead_from_grammar === true,
+  "field selectors returned to an excluded-keyword list");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",
