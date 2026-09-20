@@ -714,9 +714,9 @@ try {
     "  accept unit ].",
     "",
   ].join("\n"));
-  const ordered = run(["check", outOfOrder]);
-  assert.equal(ordered.status, 65);
-  assert.match(ordered.stderr, /^A0-CHECK-0023:/u);
+  const precedenceRun = run(["check", outOfOrder]);
+  assert.equal(precedenceRun.status, 65);
+  assert.match(precedenceRun.stderr, /^A0-CHECK-0023:/u);
 
   // Stable tag 0 is reserved so a rejection tag of 0 always means "no
   // rejection" and never names a case.
