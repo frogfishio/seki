@@ -55,10 +55,12 @@ authority. See
 [`ADR 0021`](docs/decisions/0021-build-usable-alpha-before-f0-review.md) and
 [`ADR 0022`](docs/decisions/0022-internal-certification-before-field-validation.md).
 
-Repository bootstrap B0 is complete. Its portfolio passes locally and in the
-immutable Linux/amd64 environment recorded by
-[`toolchains/CLEAN_ROOM.json`](toolchains/CLEAN_ROOM.json). This verifies the
-bootstrap repository; it does not install or qualify the formal foundations.
+Repository bootstrap B0 is complete. Its portfolio passes locally, and passed
+once in the immutable Linux/amd64 environment recorded by
+[`toolchains/CLEAN_ROOM.json`](toolchains/CLEAN_ROOM.json) before the hosted
+workflow was removed. There is no continuous integration: `make check` is run
+by hand. This verifies the bootstrap repository; it does not install or qualify
+the formal foundations.
 
 Current bootstrap records:
 

@@ -161,12 +161,16 @@
   its root `VERSION` file still reports `3.17`.
 - B0-11 adopts the original Seki Generated Output Exception 1.0 as a GPLv3
   section 7 additional permission, without copying or modifying GCC's exception.
-- B0-13 pins bootstrap CI to an immutable Linux/amd64 Node 22 Bookworm image
-  manifest and an exact `actions/checkout` commit. The lock explicitly carries
+- B0-13 pinned bootstrap CI to an immutable Linux/amd64 Node 22 Bookworm image
+  manifest and an exact `actions/checkout` commit. The lock explicitly carried
   no formal-foundation or qualification authority.
-- The complete bootstrap portfolio passes inside that pinned Linux/amd64 image.
-  The local observation records a mounted working tree; the pinned CI workflow
-  is responsible for reproducing it from a clean checkout after commit.
+- The complete bootstrap portfolio passed inside that pinned Linux/amd64 image
+  on 2026-09-19, against a mounted working tree.
+- The hosted workflow has since been removed. That observation stands as a
+  record of what happened on that date; nothing re-checks it, and no
+  clean-checkout reproduction is performed after a commit. The portfolio is run
+  locally. `toolchains/CLEAN_ROOM.json` still records the image and checkout
+  identities that were used, but those fields no longer pin anything.
 - B0 is complete. Foundation sources and use policies are bound; their installed
   builds and qualification remain later formal-delivery work rather than
   repository-bootstrap conditions.
@@ -532,11 +536,10 @@ make check-e0-manifest
 
 Local and pinned Linux/amd64 seed, status, bootstrap-closure, JSON,
 encoding-vector, semantic-coverage, strict-C11, sanitizer, and whitespace checks
-passed on 2026-09-20, including the E0 Lean proof under the pinned toolchain.
+passed locally on 2026-09-21, including the E0 Lean proof under the pinned
+toolchain. There is no hosted CI: `make check` is run by hand.
 The alpha compiler additionally passed 4,400 source and 4,900 typed-core
 mutation cases across the minimum-age, nested three-premise, wide-integer,
 four-declaration, two-digest, short-circuit Boolean, nominal-identity,
 require-premise, binding, permit-issuing, payload-rejection, and match kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
-after the two stack-exhaustion defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
-no formal qualification authority; clean-checkout reproduction is delegated to
-the exact pinned CI workflow.
+after the two stack-exhaustion defects that earlier sweeps found were fixed.

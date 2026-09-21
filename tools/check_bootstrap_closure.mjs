@@ -2,7 +2,6 @@ import fs from "node:fs";
 
 const project = JSON.parse(fs.readFileSync("PROJECT_STATUS.json", "utf8"));
 const clean = JSON.parse(fs.readFileSync("toolchains/CLEAN_ROOM.json", "utf8"));
-const workflow = fs.readFileSync(".github/workflows/ci.yml", "utf8");
 const exception = fs.readFileSync("SEKI_OUTPUT_EXCEPTION", "utf8");
 const foundations = fs.readFileSync("toolchains/FOUNDATIONS.toml", "utf8");
 
@@ -35,9 +34,9 @@ expect(clean.last_local_execution?.result === "pass" &&
   "successful pinned-environment execution is not recorded");
 expect(clean.last_local_execution?.source_state === "mounted-working-tree",
   "local execution source-state disclosure drift");
-expect(workflow.includes(clean.image), "CI image disagrees with clean-room lock");
-expect(workflow.includes(`actions/checkout@${clean.checkout_action_commit}`),
-  "checkout action is not pinned to the recorded commit");
+// The pinned-environment identities remain recorded, but no hosted workflow
+// re-checks them: the portfolio is run locally. `last_local_execution` below
+// is therefore the only execution evidence this repository carries.
 expect(exception.startsWith("Seki Generated Output Exception, version 1.0\n"),
   "output exception title/version drift");
 expect(exception.includes("additional permission under section 7"),
