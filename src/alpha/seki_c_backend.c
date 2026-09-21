@@ -9,12 +9,13 @@
  * meaning of a field changes. It is not a stability promise on its own, which
  * arrives only when the subset, encoding and ABI are frozen together.
  */
-#define SEKI_DECISION_ABI_REVISION 1U
+#define SEKI_DECISION_ABI_REVISION 2U
 
 #define DECODED_NAME_CAPACITY 64U
 #define DECODED_FIELD_CAPACITY 32U
 #define DECODED_CASE_CAPACITY 32U
 #define DECODED_DECL_CAPACITY 32U
+#define DECODED_PAYLOAD_CAPACITY 8U
 #define DECODED_OCTETS_CAPACITY 1024U
 #define RESTRICTED_MAX_EXPRESSIONS 256U
 #define RESTRICTED_MAX_TAILS 128U
@@ -75,7 +76,8 @@ struct restricted_expression {
      * PROJECT  a = record expression, b = field index
      * INT_LIT  a = value
      * BOOL_LIT a = 0 or 1
-     * VARIANT  a = stable tag
+     * VARIANT  a = stable tag, b = first payload slot,
+     *          field_count = how many payload values
      * RECORD   a = declaration position, b = first field slot,
      *          field_count = how many
      * COMPARE  a = left, b = right
@@ -174,6 +176,14 @@ struct decoded_declaration {
     size_t field_count;
     struct decoded_name cases[DECODED_CASE_CAPACITY];
     uint32_t case_tags[DECODED_CASE_CAPACITY];
+    /* Declared payload of each case, in canonical field order. */
+    struct decoded_name payload_names[DECODED_CASE_CAPACITY]
+        [DECODED_PAYLOAD_CAPACITY];
+    uint8_t payload_types[DECODED_CASE_CAPACITY][DECODED_PAYLOAD_CAPACITY];
+    uint32_t payload_lengths[DECODED_CASE_CAPACITY][DECODED_PAYLOAD_CAPACITY];
+    uint32_t payload_declarations[DECODED_CASE_CAPACITY]
+        [DECODED_PAYLOAD_CAPACITY];
+    size_t payload_counts[DECODED_CASE_CAPACITY];
     size_t case_count;
 };
 
@@ -481,7 +491,38 @@ decode_header(struct reader *reader, struct restricted_module *module)
                 }
                 declaration->case_tags[declaration_index] = rejection_tag;
                 read_name(reader, &declaration->cases[declaration_index]);
-                expect_u8(reader, 0U, "rejection case must have no payload");
+                {
+                    const uint8_t present = read_u8(reader);
+                    uint32_t fields = 0U;
+                    uint32_t field;
+                    if (reader->failed || present > 1U) {
+                        reader_fail(reader, "malformed variant case payload");
+                        return;
+                    }
+                    if (present == 1U) {
+                        fields = read_u32(reader);
+                        if (!reader->failed && (fields == 0U ||
+                            fields > DECODED_PAYLOAD_CAPACITY)) {
+                            reader_fail(reader,
+                                "variant payload exceeds backend capacity");
+                            return;
+                        }
+                    }
+                    declaration->payload_counts[declaration_index] =
+                        (size_t)fields;
+                    for (field = 0U; field < fields && !reader->failed;
+                        field += 1U) {
+                        read_name(reader, &declaration->payload_names
+                            [declaration_index][field]);
+                        read_claimed_type(reader, module,
+                            &declaration->payload_types[declaration_index]
+                                [field],
+                            &declaration->payload_lengths[declaration_index]
+                                [field],
+                            &declaration->payload_declarations
+                                [declaration_index][field]);
+                    }
+                }
                 if (!reader->failed && declaration_index != 0U &&
                     declaration->case_tags[declaration_index - 1U] >=
                         rejection_tag) {
@@ -803,7 +844,30 @@ decode_expression(struct reader *reader, struct restricted_module *module,
             reader_fail(reader, "rejection constructs an unknown case");
             return 0U;
         }
-        expect_u32(reader, 0U, "rejection case takes no arguments");
+        {
+            const uint32_t count = read_u32(reader);
+            uint32_t entry;
+            if (reader->failed) {
+                return 0U;
+            }
+            expression.b = (uint32_t)module->kernel.record_field_count;
+            expression.field_count = count;
+            if (module->kernel.record_field_count + count >
+                RESTRICTED_MAX_RECORD_FIELDS) {
+                reader_fail(reader, "rejection payloads exceed capacity");
+                return 0U;
+            }
+            module->kernel.record_field_count += count;
+            for (entry = 0U; entry < count && !reader->failed; entry += 1U) {
+                struct decoded_name ignored_key;
+                /* Payload keys are names in canonical order; the declaration
+                 * supplies the field identities, so the key is checked for
+                 * shape and the position carries the meaning. */
+                read_name(reader, &ignored_key);
+                module->kernel.record_fields[expression.b + entry] =
+                    decode_expression(reader, module, bindings);
+            }
+        }
         if (!reader->failed && module->case_name.length == 0U) {
             module->case_name = rejection_variant(module)->cases[selected];
             module->kernel.rejection_tag = (uint8_t)expression.a;
@@ -1414,6 +1478,70 @@ print_record_into(struct text_buffer *output,
     }
 }
 
+/*
+ * Writes a rejection's payload fields into the decision's union member for
+ * that case. Only one member is ever live and the decision is zeroed first, so
+ * the inactive members stay comparable.
+ */
+static void
+print_rejection_payload(struct text_buffer *output,
+    const struct restricted_module *module, uint32_t reason_index,
+    unsigned depth)
+{
+    const struct restricted_expression *reason;
+    const struct decoded_declaration *variant;
+    size_t item;
+    uint32_t field;
+    if ((size_t)reason_index >= module->kernel.expression_count) {
+        output->failed = 1;
+        return;
+    }
+    reason = &module->kernel.expressions[reason_index];
+    if (reason->field_count == 0U) {
+        return;
+    }
+    variant = &module->declarations[module->variant_position];
+    for (item = 0U; item < variant->case_count; item += 1U) {
+        if (variant->case_tags[item] == reason->a) {
+            break;
+        }
+    }
+    if (item == variant->case_count ||
+        variant->payload_counts[item] != (size_t)reason->field_count) {
+        output->failed = 1;
+        return;
+    }
+    for (field = 0U; field < reason->field_count; field += 1U) {
+        uint8_t representation = 0U;
+        uint32_t length = 0U;
+        const uint32_t value = module->kernel.record_fields[reason->b + field];
+        resolve_representation(module, variant->payload_types[item][field],
+            variant->payload_declarations[item][field], &representation,
+            &length);
+        text_put_indent(output, depth);
+        if (representation == 11U || representation == 13U) {
+            text_put_prefix(output, module);
+            text_put(output, "_octets_copy(result.rejection.");
+            text_put_name(output, &variant->cases[item], 1);
+            text_put(output, ".seki_f_");
+            text_put_name(output, &variant->payload_names[item][field], 0);
+            text_put(output, ", ");
+            print_expression(output, module, value);
+            text_put(output, ", UINT32_C(");
+            text_put_unsigned(output, length);
+            text_put(output, "));\n");
+            continue;
+        }
+        text_put(output, "result.rejection.");
+        text_put_name(output, &variant->cases[item], 1);
+        text_put(output, ".seki_f_");
+        text_put_name(output, &variant->payload_names[item][field], 0);
+        text_put(output, " = ");
+        print_expression(output, module, value);
+        text_put(output, ";\n");
+    }
+}
+
 static void
 print_tail(struct text_buffer *output, const struct restricted_module *module,
     uint32_t index, unsigned depth)
@@ -1455,6 +1583,7 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         text_put(output, "result.rejection_tag = UINT32_C(");
         text_put_unsigned(output, (uint64_t)reason->a);
         text_put(output, ");\n");
+        print_rejection_payload(output, module, tail->a, depth);
         break;
     }
     case RESTRICTED_REQUIRE: {
@@ -1483,6 +1612,7 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         text_put(output, "result.premise_tag = UINT32_C(");
         text_put_unsigned(output, (uint64_t)tail->premise + 1U);
         text_put(output, ");\n");
+        print_rejection_payload(output, module, tail->b, depth + 1U);
         text_put_indent(output, depth);
         text_put(output, "} else {\n");
         print_tail(output, module, tail->c, depth + 1U);
@@ -1791,6 +1921,46 @@ print_module(const struct restricted_module *module, char *c_source,
         text_put_name(&output, &declaration->name, 1);
         text_put(&output, ";\n");
     }
+    {
+        /* Each payload-bearing case becomes a struct, and the decision holds
+         * a union of them. Only one is ever live, and the whole decision is
+         * zeroed first, so the inactive members compare deterministically. */
+        const struct decoded_declaration *variant =
+            &module->declarations[module->variant_position];
+        size_t item;
+        for (item = 0U; item < variant->case_count; item += 1U) {
+            size_t field;
+            if (variant->payload_counts[item] == 0U) {
+                continue;
+            }
+            text_put(&output, "\ntypedef struct {\n");
+            for (field = 0U; field < variant->payload_counts[item];
+                field += 1U) {
+                int is_array = 0;
+                uint32_t array_length = 0U;
+                text_put(&output, "    ");
+                print_type_name(&output, module,
+                    variant->payload_types[item][field],
+                    variant->payload_lengths[item][field],
+                    variant->payload_declarations[item][field], &is_array,
+                    &array_length);
+                text_put(&output, " seki_f_");
+                text_put_name(&output, &variant->payload_names[item][field],
+                    0);
+                if (is_array) {
+                    text_put(&output, "[");
+                    text_put_unsigned(&output, array_length);
+                    text_put(&output, "]");
+                }
+                text_put(&output, ";\n");
+            }
+            text_put(&output, "} ");
+            text_put_prefix(&output, module);
+            text_put(&output, "_payload_");
+            text_put_name(&output, &variant->cases[item], 1);
+            text_put(&output, ";\n");
+        }
+    }
     text_put(&output,
         "\n"
         "typedef struct {\n"
@@ -1809,6 +1979,31 @@ print_module(const struct restricted_module *module, char *c_source,
             module->kernel.accepted_declaration, &accepted_is_array,
             &accepted_array_length);
         text_put(&output, " accepted;\n");
+    }
+    {
+        const struct decoded_declaration *variant =
+            &module->declarations[module->variant_position];
+        size_t item;
+        int any = 0;
+        for (item = 0U; item < variant->case_count; item += 1U) {
+            if (variant->payload_counts[item] == 0U) {
+                continue;
+            }
+            if (!any) {
+                text_put(&output, "    union {\n");
+                any = 1;
+            }
+            text_put(&output, "        ");
+            text_put_prefix(&output, module);
+            text_put(&output, "_payload_");
+            text_put_name(&output, &variant->cases[item], 1);
+            text_put(&output, " ");
+            text_put_name(&output, &variant->cases[item], 1);
+            text_put(&output, ";\n");
+        }
+        if (any) {
+            text_put(&output, "    } rejection;\n");
+        }
     }
     text_put(&output, "} ");
     text_put_prefix(&output, module);

@@ -110,6 +110,10 @@ expect(alpha.accepted_value_ready === true,
   "decision results no longer carry an accepted value");
 expect(alpha.record_construction_ready === true,
   "record construction progress record lost");
+expect(alpha.decision_abi_revision === 2,
+  "decision ABI revision drift");
+expect(alpha.payload_rejections_ready === true,
+  "payload-bearing rejection progress record lost");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",

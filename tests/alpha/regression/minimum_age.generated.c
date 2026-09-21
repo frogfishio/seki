@@ -27,7 +27,7 @@ seki_a0_minimum_age_decide(seki_a0_minimum_age_applicant seki_p_applicant)
 {
     seki_a0_minimum_age_decision result;
     seki_a0_minimum_age_zero((uint8_t *)&result, (uint32_t)sizeof result);
-    result.abi_revision = UINT32_C(1);
+    result.abi_revision = UINT32_C(2);
     if (seki_p_applicant.seki_f_age < UINT8_C(18)) {
         result.disposition = UINT32_C(2);
         result.rejection_tag = UINT32_C(1);

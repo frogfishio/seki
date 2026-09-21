@@ -197,11 +197,22 @@ struct seki_expression {
         struct {
             uint32_t value;
         } accept;
-        struct seki_variant_ref rejection;
+        /*
+         * A rejection names its case and, when that case declares a payload,
+         * the field values filling it. The values live in the same per-kernel
+         * arena as record literal fields.
+         */
+        struct {
+            struct seki_variant_ref reference;
+            uint32_t first;
+            uint32_t count;
+        } rejection;
         struct {
             uint32_t condition;
             uint32_t continuation;
-            struct seki_variant_ref rejection;
+            struct seki_variant_ref reference;
+            uint32_t first;
+            uint32_t count;
         } require;
         struct {
             struct seki_name name;

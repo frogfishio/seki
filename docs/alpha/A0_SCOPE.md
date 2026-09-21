@@ -146,8 +146,8 @@ a module stating a different obligation set still projects to C.
 `build` additionally requires the restricted-C projection, whose slice is
 currently narrower. A module can therefore pass `check` and fail `build` with a
 stable `A0-BACKEND-*` diagnostic and no output file. At revision
-`0.0.0-alpha.6` the known case is payload-bearing variant cases. `inspect`
-reports the two
+`0.0.0-alpha.6` there are no known cases: every form the frontend admits also
+projects. `inspect` reports the two
 boundaries as `frontend=alpha-decision` and `backend=alpha-decision`, and
 reports `first_literal=<value>:<type>` when the kernel has an integer literal.
 
@@ -173,6 +173,12 @@ cannot assign a bare array.
 body. Bindings cannot shadow a visible local, and a binding has no type
 annotation, so a bare integer literal has nothing to take its width from and is
 rejected.
+
+A rejection case may declare a payload, and constructing one mirrors its
+declaration: `Denial::TierTooLow(limit: 100, actual: (entry tier))`. Every
+declared field must be supplied exactly once with a matching type. The surface
+draft leaves payload construction syntax open; this is the spelling the alpha
+uses, chosen so that construction and declaration agree.
 
 `require C else: V::Case.` states one premise and the rejection that reports
 its failure, then continues. Several of them in sequence express a decision

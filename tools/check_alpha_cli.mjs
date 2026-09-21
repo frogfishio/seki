@@ -108,7 +108,7 @@ try {
   assert.deepEqual(fs.readFileSync(cPath), fs.readFileSync(recordedC));
   // Every decision stamps the ABI revision a consumer reads first.
   assert.match(fs.readFileSync(cPath, "utf8"),
-    /result\.abi_revision = UINT32_C\(1\);/u);
+    /result\.abi_revision = UINT32_C\(2\);/u);
 
   const renamed = run([
     "build", "--core", renamedCore, "--c", renamedC, renamedSource,
@@ -267,7 +267,7 @@ try {
     '        else if (tier > 3U) { wt = 2U; wr = 4U; }',
     '        else                { wt = 1U; wr = 0U; }',
     '        if (got.disposition != wt || got.rejection_tag != wr) ++bad;',
-    '        if (got.abi_revision != UINT32_C(1)) ++bad;',
+    '        if (got.abi_revision != UINT32_C(2)) ++bad;',
     '    }',
     '    printf("%u\\n", bad);',
     '    return bad != 0U;',
@@ -765,7 +765,7 @@ try {
     '    da = seki_a0_publish_publish(a);',
     '    if (da.disposition != 1U) ++bad;',
     '    if (da.rejection_tag != 0U || da.premise_tag != 0U) ++bad;',
-    '    if (da.abi_revision != 1U) ++bad;',
+    '    if (da.abi_revision != 2U) ++bad;',
     '    printf("%u\\n", bad);',
     '    return bad != 0U;',
     '}',
@@ -775,6 +775,96 @@ try {
   execFileSync("cc", [...strictFlags, "-fsanitize=address,undefined",
     `-I${temporary}`, abiHarness, "-o", abiExe], { stdio: "inherit" });
   assert.equal(execFileSync(abiExe, { encoding: "utf8" }), "0\n");
+
+  // A rejection can report which value failed and against what. Each
+  // payload-bearing case becomes a struct and the decision holds a union of
+  // them; only one is live and the decision is zeroed first, so the inactive
+  // members stay byte-comparable.
+  const payloadSource = path.join(temporary, "payload.seki");
+  const payloadCore = path.join(temporary, "payload.scb0");
+  const payloadC = path.join(temporary, "payload.c");
+  fs.writeFileSync(payloadSource, [
+    "module gate::payload @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export record Entry { tier: U16, region: U8 }.",
+    "export variant Denial [",
+    "  TierTooLow(limit: U16, actual: U16) @ 1.",
+    "  WrongRegion(seen: U8) @ 2.",
+    "].",
+    "",
+    "export kernel screen entry: Entry",
+    "-> Decision[Unit, Denial] arithmetic: checked",
+    "bounded steps: 256 liveBits: 4096 controlDepth: 64 workspaceBits: 0",
+    "rejects: Denial::TierTooLow, Denial::WrongRegion",
+    "publication: none [",
+    "  require (entry tier) >= 100",
+    "    else: Denial::TierTooLow(limit: 100, actual: (entry tier)).",
+    "  require (entry region) == 7",
+    "    else: Denial::WrongRegion(seen: (entry region)).",
+    "  accept unit ].",
+    "",
+  ].join("\n"));
+  const payload = run([
+    "build", "--core", payloadCore, "--c", payloadC, payloadSource,
+  ]);
+  assert.equal(payload.status, 0, payload.stderr);
+  const payloadDecoded = decodeModule(fs.readFileSync(payloadCore));
+  checkTypedCore(payloadDecoded);
+  // Payload keys are names and must be strictly increasing, so the declared
+  // order `limit, actual` is emitted canonically as `actual, limit`.
+  const reasonTerm = payloadDecoded.kernels[0][1].body[2].term;
+  assert.equal(reasonTerm[0], 8);
+  assert.deepEqual(reasonTerm[2].map(([key]) => key), ["actual", "limit"]);
+  assert.deepEqual(payloadDecoded.kernels[0][1].exact, [14, 93, 6, 0]);
+
+  const payloadHarness = path.join(temporary, "payload_main.c");
+  fs.copyFileSync(payloadC, path.join(temporary, "pay.c"));
+  fs.writeFileSync(payloadHarness, [
+    '#include <stdint.h>',
+    '#include <stdio.h>',
+    '#include "pay.c"',
+    'int main(void) {',
+    '    unsigned bad = 0U;',
+    '    for (uint32_t t = 0U; t < 300U; t += 7U)',
+    '    for (unsigned r = 0U; r < 256U; r += 3U) {',
+    '        seki_a0_payload_entry e; seki_a0_payload_decision d;',
+    '        e.seki_f_tier = (uint16_t)t; e.seki_f_region = (uint8_t)r;',
+    '        d = seki_a0_payload_screen(e);',
+    '        if (d.abi_revision != 2U) { ++bad; continue; }',
+    '        if (t < 100U) {',
+    '            if (d.disposition != 2U || d.rejection_tag != 1U) ++bad;',
+    '            else if (d.premise_tag != 1U) ++bad;',
+    '            else if (d.rejection.tiertoolow.seki_f_actual != (uint16_t)t) ++bad;',
+    '            else if (d.rejection.tiertoolow.seki_f_limit != 100U) ++bad;',
+    '        } else if (r != 7U) {',
+    '            if (d.disposition != 2U || d.rejection_tag != 2U) ++bad;',
+    '            else if (d.premise_tag != 2U) ++bad;',
+    '            else if (d.rejection.wrongregion.seki_f_seen != (uint8_t)r) ++bad;',
+    '        } else {',
+    '            if (d.disposition != 1U || d.rejection_tag != 0U) ++bad;',
+    '        }',
+    '    }',
+    '    printf("%u\\n", bad);',
+    '    return bad != 0U;',
+    '}',
+    '',
+  ].join("\n"));
+  const payloadExe = path.join(temporary, "payload_main");
+  execFileSync("cc", [...strictFlags, "-fsanitize=address,undefined",
+    `-I${temporary}`, payloadHarness, "-o", payloadExe], { stdio: "inherit" });
+  assert.equal(execFileSync(payloadExe, { encoding: "utf8" }), "0\n");
+
+  // Every declared payload field must be supplied exactly once.
+  const payloadPartial = path.join(temporary, "payload-partial.seki");
+  fs.writeFileSync(payloadPartial, fs.readFileSync(payloadSource, "utf8")
+    .replace("TierTooLow(limit: 100, actual: (entry tier))",
+      "TierTooLow(limit: 100)"));
+  const partialPayload = run(["check", payloadPartial]);
+  assert.equal(partialPayload.status, 65);
+  assert.match(partialPayload.stderr, /^A0-CHECK-0024:/u);
 
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
@@ -854,7 +944,8 @@ try {
     "boolean=short-circuit nominals=non-substitutable require=precedence " +
     "bindings=scoped accepted=value records=constructed " +
     "aliases=expanded example=access_permit " +
-    "precedence=structural tag0=reserved abi=revision-1",
+    "precedence=structural tag0=reserved abi=revision-2 " +
+    "payloads=typed",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

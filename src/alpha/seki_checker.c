@@ -66,6 +66,17 @@ struct checker {
     int failed;
 };
 
+static int
+name_precedes_checker(const struct seki_name *left,
+    const struct seki_name *right)
+{
+    const size_t shared = left->length < right->length ?
+        left->length : right->length;
+    const int comparison = shared == 0U ? 0 :
+        memcmp(left->bytes, right->bytes, shared);
+    return comparison < 0 || (comparison == 0 && left->length < right->length);
+}
+
 static void
 check_fail(struct checker *checker, const char *code, const char *message)
 {
@@ -529,6 +540,77 @@ kernel_precedence_index(const struct seki_kernel_decl *kernel,
  * ordered inventory, recording the variant declaration, stable tag, and
  * precedence index. Shared by `reject` and `require`.
  */
+/*
+ * Checks a constructed rejection's payload against the declared payload of its
+ * case: every declared field supplied exactly once, with a matching type, and
+ * nothing supplied for a payload-free case.
+ */
+static int
+check_rejection_payload(struct checker *checker, uint32_t variant_declaration,
+    const struct seki_name *item, uint32_t first, uint32_t count,
+    const struct environment *environment)
+{
+    const struct seki_type_decl *declaration =
+        &checker->module->declarations[variant_declaration];
+    const struct seki_variant_case *selected = NULL;
+    size_t index;
+    for (index = 0U; index < declaration->value.variant.case_count;
+        index += 1U) {
+        if (seki_name_equal(&declaration->value.variant.cases[index].name,
+            item)) {
+            selected = &declaration->value.variant.cases[index];
+            break;
+        }
+    }
+    if (selected == NULL) {
+        check_fail(checker, "A0-CHECK-0007",
+            "rejection does not belong to Decision result");
+        return 0;
+    }
+    if (selected->payload_count != (size_t)count) {
+        check_fail(checker, "A0-CHECK-0024",
+            "rejection payload does not fill every declared field exactly "
+            "once");
+        return 0;
+    }
+    for (index = 0U; index < selected->payload_count; index += 1U) {
+        const uint32_t declared_type = resolve(checker,
+            &selected->payload[index].type);
+        uint32_t supplied = UINT32_MAX;
+        size_t entry;
+        struct inferred value;
+        if (checker->failed) {
+            return 0;
+        }
+        for (entry = 0U; entry < (size_t)count; entry += 1U) {
+            const struct seki_record_init *initialiser =
+                &checker->kernel->record_fields[first + entry];
+            if (seki_name_equal(&initialiser->name,
+                &selected->payload[index].name)) {
+                supplied = initialiser->value;
+                break;
+            }
+        }
+        if (supplied == UINT32_MAX) {
+            check_fail(checker, "A0-CHECK-0024",
+                "rejection payload does not fill every declared field "
+                "exactly once");
+            return 0;
+        }
+        value = infer_expression(checker, supplied, environment);
+        if (checker->failed) {
+            return 0;
+        }
+        (void)adopt_natural(checker, supplied, &value, declared_type);
+        if (value.type != declared_type) {
+            check_fail(checker, "A0-CHECK-0025",
+                "rejection payload field does not match its declared type");
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static int
 resolve_rejection(struct checker *checker, uint32_t expression_index,
     const struct seki_variant_ref *reference)
@@ -589,8 +671,14 @@ check_kernel_tail(struct checker *checker, uint32_t expression_index,
                 "accepted value does not match Decision result");
         }
     } else if (expression->kind == SEKI_EXPR_REJECT) {
-        (void)resolve_rejection(checker, expression_index,
-            &expression->value.rejection);
+        if (resolve_rejection(checker, expression_index,
+            &expression->value.rejection.reference)) {
+            (void)check_rejection_payload(checker,
+                checker->kernel_elaboration->expressions[expression_index].a,
+                &expression->value.rejection.reference.item,
+                expression->value.rejection.first,
+                expression->value.rejection.count, environment);
+        }
     } else if (expression->kind == SEKI_EXPR_REQUIRE) {
         const uint32_t boolean = seki_type_intern(&checker->elaboration->types,
             SEKI_T_BOOL, 0U, 0U);
@@ -606,7 +694,14 @@ check_kernel_tail(struct checker *checker, uint32_t expression_index,
             return;
         }
         if (!resolve_rejection(checker, expression_index,
-            &expression->value.require.rejection)) {
+            &expression->value.require.reference)) {
+            return;
+        }
+        if (!check_rejection_payload(checker,
+            checker->kernel_elaboration->expressions[expression_index].a,
+            &expression->value.require.reference.item,
+            expression->value.require.first,
+            expression->value.require.count, environment)) {
             return;
         }
         check_kernel_tail(checker, expression->value.require.continuation,
@@ -859,6 +954,66 @@ cost_of_expression(struct checker *checker, uint32_t expression_index,
     return cost;
 }
 
+/*
+ * Collects a rejection's payload values in canonical field order, which is the
+ * order the emitter writes them, so the derivation matches the encoding.
+ * Returns the number collected.
+ */
+static size_t
+payload_children(struct checker *checker, uint32_t variant_declaration,
+    uint32_t tag, uint32_t first, uint32_t count, uint32_t *children)
+{
+    const struct seki_type_decl *declaration;
+    const struct seki_variant_case *selected = NULL;
+    struct seki_name ordered[SEKI_VARIANT_MAX_PAYLOAD_FIELDS];
+    size_t index;
+    if (count == 0U || variant_declaration >= checker->module->declaration_count
+        || count > SEKI_VARIANT_MAX_PAYLOAD_FIELDS) {
+        return 0U;
+    }
+    declaration = &checker->module->declarations[variant_declaration];
+    for (index = 0U; index < declaration->value.variant.case_count;
+        index += 1U) {
+        if (declaration->value.variant.cases[index].tag == tag) {
+            selected = &declaration->value.variant.cases[index];
+            break;
+        }
+    }
+    if (selected == NULL || selected->payload_count != (size_t)count) {
+        return 0U;
+    }
+    for (index = 0U; index < (size_t)count; index += 1U) {
+        ordered[index] = selected->payload[index].name;
+    }
+    /* Insertion sort by name, matching the emitter's canonical key order. */
+    for (index = 1U; index < (size_t)count; index += 1U) {
+        struct seki_name candidate = ordered[index];
+        size_t position = index;
+        while (position > 0U &&
+            name_precedes_checker(&candidate, &ordered[position - 1U])) {
+            ordered[position] = ordered[position - 1U];
+            position -= 1U;
+        }
+        ordered[position] = candidate;
+    }
+    for (index = 0U; index < (size_t)count; index += 1U) {
+        size_t entry;
+        children[index] = UINT32_MAX;
+        for (entry = 0U; entry < (size_t)count; entry += 1U) {
+            const struct seki_record_init *initialiser =
+                &checker->kernel->record_fields[first + entry];
+            if (seki_name_equal(&initialiser->name, &ordered[index])) {
+                children[index] = initialiser->value;
+                break;
+            }
+        }
+        if (children[index] == UINT32_MAX) {
+            return 0U;
+        }
+    }
+    return (size_t)count;
+}
+
 static struct cost
 cost_of_kernel_tail(struct checker *checker, uint32_t expression_index,
     const struct environment *environment, uint32_t base, uint32_t result_type)
@@ -887,15 +1042,18 @@ cost_of_kernel_tail(struct checker *checker, uint32_t expression_index,
             child_width = width_of(checker, checker->kernel_elaboration
                 ->expressions[child_index].type);
         } else {
-            /* The rejection reason is one variant construction with no
-             * arguments: a single step whose result is the rejection type. */
+            /* The reason is a variant construction over its payload values. */
+            const struct seki_expr_info *info =
+                &checker->kernel_elaboration->expressions[expression_index];
+            uint32_t children[SEKI_VARIANT_MAX_PAYLOAD_FIELDS];
+            const size_t payload = payload_children(checker, info->a, info->b,
+                expression->value.rejection.first,
+                expression->value.rejection.count, children);
             child_width = width_of(checker,
                 checker->kernel_elaboration->rejection_type);
-            if (!seki_checked_add(base, child_width, &child.live)) {
-                check_fail(checker, "A0-CHECK-0013",
-                    "semantic value width is unbounded or overflows U32");
-                return cost;
-            }
+            child = cost_strict(checker, children, payload,
+                checker->kernel_elaboration->rejection_type, environment,
+                base);
         }
         cost.steps = child.steps + 1U;
         cost.live = child.live;
@@ -966,29 +1124,35 @@ cost_of_kernel_tail(struct checker *checker, uint32_t expression_index,
         const struct cost continuation = cost_of_kernel_tail(checker,
             expression->value.require.continuation, environment, base,
             result_type);
-        const uint32_t reason_width = width_of(checker,
-            checker->kernel_elaboration->rejection_type);
-        uint32_t reason_live = 0U;
+        const struct seki_expr_info *info =
+            &checker->kernel_elaboration->expressions[expression_index];
+        uint32_t children[SEKI_VARIANT_MAX_PAYLOAD_FIELDS];
+        const size_t payload = payload_children(checker, info->a, info->b,
+            expression->value.require.first,
+            expression->value.require.count, children);
+        const struct cost reason = cost_strict(checker, children, payload,
+            checker->kernel_elaboration->rejection_type, environment, base);
         uint32_t reason_peak = 0U;
         uint32_t steps = 0U;
-        if (!seki_checked_add(base, reason_width, &reason_live) ||
-            !seki_checked_add(reason_live, width_of(checker, result_type),
+        if (!seki_checked_add(base, width_of(checker,
+            checker->kernel_elaboration->rejection_type), &reason_peak) ||
+            !seki_checked_add(reason_peak, width_of(checker, result_type),
                 &reason_peak)) {
             check_fail(checker, "A0-CHECK-0013",
                 "semantic value width is unbounded or overflows U32");
             return cost;
         }
-        /* The reason costs one step; the continuation may cost more. */
         if (!seki_checked_add(condition.steps,
-            continuation.steps > 1U ? continuation.steps : 1U, &steps) ||
+            continuation.steps > reason.steps ?
+                continuation.steps : reason.steps, &steps) ||
             !seki_checked_add(steps, 1U, &cost.steps)) {
             check_fail(checker, "A0-CHECK-0013",
                 "semantic value width is unbounded or overflows U32");
             return cost;
         }
         cost.live = condition.live;
-        if (reason_live > cost.live) {
-            cost.live = reason_live;
+        if (reason.live > cost.live) {
+            cost.live = reason.live;
         }
         if (reason_peak > cost.live) {
             cost.live = reason_peak;
@@ -998,6 +1162,9 @@ cost_of_kernel_tail(struct checker *checker, uint32_t expression_index,
         }
         cost.depth = condition.depth > continuation.depth ?
             condition.depth : continuation.depth;
+        if (reason.depth > cost.depth) {
+            cost.depth = reason.depth;
+        }
         if (cost.depth < 1U) {
             cost.depth = 1U;
         }

@@ -456,6 +456,27 @@ integer_tag(const struct seki_elaboration *elaboration, uint32_t type,
     return UINT32_MAX;
 }
 
+/* Canonical payload field order is by name, like every other keyed table. */
+static void
+sort_payload_order(const struct seki_variant_case *item, uint32_t *order)
+{
+    size_t index;
+    for (index = 0U; index < item->payload_count; index += 1U) {
+        order[index] = (uint32_t)index;
+    }
+    for (index = 1U; index < item->payload_count; index += 1U) {
+        const uint32_t candidate = order[index];
+        size_t position = index;
+        while (position > 0U &&
+            name_precedes(&item->payload[candidate].name,
+                &item->payload[order[position - 1U]].name)) {
+            order[position] = order[position - 1U];
+            position -= 1U;
+        }
+        order[position] = candidate;
+    }
+}
+
 static void
 put_expression(struct emitter *emitter, uint32_t expression_index)
 {
@@ -575,16 +596,66 @@ put_expression(struct emitter *emitter, uint32_t expression_index)
     }
 }
 
-/* The rejection reason is a payload-free variant construction built inline;
- * the surface has no expression node for it. */
+/*
+ * The rejection reason is a variant construction built inline; the surface has
+ * no expression node for it. Payload fields are keyed by name and must be
+ * strictly increasing, so they are written in canonical name order.
+ */
 static void
-put_rejection_reason(struct emitter *emitter, const struct seki_expr_info *info)
+put_rejection_reason(struct emitter *emitter, const struct seki_expr_info *info,
+    uint32_t first, uint32_t count)
 {
+    const struct seki_type_decl *declaration;
+    const struct seki_variant_case *selected = NULL;
+    uint32_t order[SEKI_VARIANT_MAX_PAYLOAD_FIELDS];
+    size_t index;
+
     put_type_value(emitter, emitter->kernel_elaboration->rejection_type);
     put_u8(emitter->buffer, SEKI_TERM_VARIANT);
     put_type_ref(emitter->buffer, emitter->layout->type_position[info->a]);
     put_u32(emitter->buffer, info->b);
-    put_u32(emitter->buffer, 0U);
+    put_u32(emitter->buffer, count);
+    if (count == 0U) {
+        return;
+    }
+    if (info->a >= emitter->module->declaration_count ||
+        count > SEKI_VARIANT_MAX_PAYLOAD_FIELDS) {
+        emitter->buffer->failed = 1;
+        return;
+    }
+    declaration = &emitter->module->declarations[info->a];
+    for (index = 0U; index < declaration->value.variant.case_count;
+        index += 1U) {
+        if (declaration->value.variant.cases[index].tag == info->b) {
+            selected = &declaration->value.variant.cases[index];
+            break;
+        }
+    }
+    if (selected == NULL || selected->payload_count != (size_t)count) {
+        emitter->buffer->failed = 1;
+        return;
+    }
+    sort_payload_order(selected, order);
+    for (index = 0U; index < (size_t)count; index += 1U) {
+        const struct seki_name *name =
+            &selected->payload[order[index]].name;
+        size_t entry;
+        uint32_t value = UINT32_MAX;
+        for (entry = 0U; entry < (size_t)count; entry += 1U) {
+            const struct seki_record_init *initialiser =
+                &emitter->kernel->record_fields[first + entry];
+            if (seki_name_equal(&initialiser->name, name)) {
+                value = initialiser->value;
+                break;
+            }
+        }
+        if (value == UINT32_MAX) {
+            emitter->buffer->failed = 1;
+            return;
+        }
+        put_name(emitter->buffer, name);
+        put_expression(emitter, value);
+    }
 }
 
 static void
@@ -606,7 +677,9 @@ put_kernel_expression(struct emitter *emitter, uint32_t expression_index)
         break;
     case SEKI_EXPR_REJECT:
         put_u8(emitter->buffer, SEKI_KERNEL_REJECT);
-        put_rejection_reason(emitter, info);
+        put_rejection_reason(emitter, info,
+            expression->value.rejection.first,
+            expression->value.rejection.count);
         put_u32(emitter->buffer, info->c);
         break;
     case SEKI_EXPR_LET:
@@ -617,7 +690,8 @@ put_kernel_expression(struct emitter *emitter, uint32_t expression_index)
     case SEKI_EXPR_REQUIRE:
         put_u8(emitter->buffer, SEKI_KERNEL_REQUIRE);
         put_expression(emitter, expression->value.require.condition);
-        put_rejection_reason(emitter, info);
+        put_rejection_reason(emitter, info, expression->value.require.first,
+            expression->value.require.count);
         put_u32(emitter->buffer, info->c);
         put_kernel_expression(emitter,
             expression->value.require.continuation);
@@ -638,11 +712,15 @@ put_kernel_expression(struct emitter *emitter, uint32_t expression_index)
 /* Declarations and kernels                                                */
 /* ---------------------------------------------------------------------- */
 
+static void sort_payload_order(const struct seki_variant_case *item,
+    uint32_t *order);
+
 static void
 put_declaration(struct emitter *emitter, size_t declaration_index)
 {
     const struct seki_type_decl *declaration =
         &emitter->module->declarations[declaration_index];
+    uint32_t payload_order[SEKI_VARIANT_MAX_PAYLOAD_FIELDS];
     size_t index;
     put_name(emitter->buffer, &declaration->name);
     switch (declaration->kind) {
@@ -685,9 +763,14 @@ put_declaration(struct emitter *emitter, size_t declaration_index)
             }
             put_u8(emitter->buffer, 1U);
             put_u32(emitter->buffer, (uint32_t)item->payload_count);
+            /* Payload fields are keyed by name like every other table, so
+             * they are declared in canonical order rather than source order. */
+            sort_payload_order(item, payload_order);
             for (payload = 0U; payload < item->payload_count; payload += 1U) {
-                put_name(emitter->buffer, &item->payload[payload].name);
-                put_surface_type(emitter, &item->payload[payload].type);
+                const struct seki_field_decl *field =
+                    &item->payload[payload_order[payload]];
+                put_name(emitter->buffer, &field->name);
+                put_surface_type(emitter, &field->type);
             }
         }
         break;

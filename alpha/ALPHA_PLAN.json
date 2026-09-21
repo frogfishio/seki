@@ -57,6 +57,8 @@
   "lexical_scope_chain_ready": true,
   "accepted_value_ready": true,
   "record_construction_ready": true,
+  "decision_abi_revision": 2,
+  "payload_rejections_ready": true,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

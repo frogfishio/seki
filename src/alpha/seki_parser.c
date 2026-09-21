@@ -490,6 +490,61 @@ parse_variant_ref(struct parser *parser)
     return reference;
 }
 
+static uint32_t parse_value_expression(struct parser *parser,
+    struct seki_kernel_decl *kernel);
+
+/*
+ * Parses the optional payload of a constructed rejection. Declarations spell a
+ * payload in parentheses, so construction does too. Records use braces in both
+ * positions for the same reason.
+ */
+static void
+parse_rejection_payload(struct parser *parser, struct seki_kernel_decl *kernel,
+    uint32_t *first, uint32_t *count)
+{
+    *first = (uint32_t)kernel->record_field_count;
+    *count = 0U;
+    if (parser->failed || parser->current.kind != SEKI_TOKEN_LPAREN) {
+        return;
+    }
+    advance(parser);
+    while (!parser->failed && parser->current.kind != SEKI_TOKEN_RPAREN) {
+        struct seki_record_init initialiser;
+        size_t earlier;
+        if (kernel->record_field_count == SEKI_KERNEL_MAX_RECORD_FIELDS) {
+            parser_fail(parser, "A0-PARSE-0036",
+                "record literal fields exceed fixed capacity");
+            return;
+        }
+        memset(&initialiser, 0, sizeof initialiser);
+        initialiser.name = take_value_name(parser);
+        for (earlier = *first; earlier < kernel->record_field_count;
+            earlier += 1U) {
+            if (seki_name_equal(&kernel->record_fields[earlier].name,
+                &initialiser.name)) {
+                parser_fail(parser, "A0-PARSE-0037",
+                    "duplicate record literal field");
+                return;
+            }
+        }
+        expect_kind(parser, SEKI_TOKEN_COLON,
+            "expected payload field colon");
+        initialiser.value = parse_value_expression(parser, kernel);
+        if (parser->failed) {
+            return;
+        }
+        kernel->record_fields[kernel->record_field_count++] = initialiser;
+        if (parser->current.kind == SEKI_TOKEN_COMMA) {
+            advance(parser);
+        } else if (parser->current.kind != SEKI_TOKEN_RPAREN) {
+            parser_fail(parser, "A0-PARSE-0038",
+                "expected comma or payload close");
+        }
+    }
+    *count = (uint32_t)kernel->record_field_count - *first;
+    expect_kind(parser, SEKI_TOKEN_RPAREN, "expected payload close");
+}
+
 static uint32_t
 add_expression(struct parser *parser, struct seki_kernel_decl *kernel,
     const struct seki_expression *expression)
@@ -525,9 +580,6 @@ next_token_is_colon(const struct parser *parser)
 {
     return next_token_is(parser, SEKI_TOKEN_COLON);
 }
-
-static uint32_t parse_value_expression(struct parser *parser,
-    struct seki_kernel_decl *kernel);
 
 static uint32_t
 parse_primary_expression(struct parser *parser,
@@ -797,7 +849,10 @@ parse_kernel_tail(struct parser *parser, struct seki_kernel_decl *kernel)
             parse_value_expression(parser, kernel);
         expect_word(parser, "else");
         expect_kind(parser, SEKI_TOKEN_COLON, "expected require else colon");
-        expression.value.require.rejection = parse_variant_ref(parser);
+        expression.value.require.reference = parse_variant_ref(parser);
+        parse_rejection_payload(parser, kernel,
+            &expression.value.require.first,
+            &expression.value.require.count);
         expect_kind(parser, SEKI_TOKEN_DOT, "expected require terminator");
         expression.value.require.continuation =
             parse_kernel_tail(parser, kernel);
@@ -810,7 +865,10 @@ parse_kernel_tail(struct parser *parser, struct seki_kernel_decl *kernel)
     } else if (token_is(&parser->current, "reject")) {
         advance(parser);
         expression.kind = SEKI_EXPR_REJECT;
-        expression.value.rejection = parse_variant_ref(parser);
+        expression.value.rejection.reference = parse_variant_ref(parser);
+        parse_rejection_payload(parser, kernel,
+            &expression.value.rejection.first,
+            &expression.value.rejection.count);
         result = add_expression(parser, kernel, &expression);
     } else {
         expression.kind = SEKI_EXPR_IF;

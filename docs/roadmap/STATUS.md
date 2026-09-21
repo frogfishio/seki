@@ -391,6 +391,21 @@
   `tests/alpha/regression/`; the E0 experiment's artifacts stay frozen as its
   evidence. The typed core is unchanged and still byte-identical to E0's 417
   bytes: the semantic root did not move, only the C projection.
+- Rejections can carry a typed payload, so a decision reports which value
+  failed and against what rather than only that a premise failed. Construction
+  mirrors declaration: declarations spell a payload in parentheses, so
+  construction does too, exactly as records use braces in both positions. The
+  surface draft lists payload construction syntax as an open question, so this
+  resolves a spelling rather than adding a form: the subset already admits
+  variant construction and single-payload cases.
+- Each payload-bearing case becomes a C struct and the decision holds a union
+  of them. Only one is ever live and the whole decision is zeroed first, so
+  inactive members stay byte-comparable, which is what the consumer asked for.
+  The ABI is revision 2.
+- Emitting a payload found that declared payload fields were written in source
+  order. They are keyed by name and must be strictly increasing, so a case
+  declared `(limit, actual)` now emits `actual, limit`. Nothing had exercised a
+  payload table before, so this had never been reachable.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
@@ -462,7 +477,7 @@ passed on 2026-09-20, including the E0 Lean proof under the pinned toolchain.
 The alpha compiler additionally passed 4,400 source and 4,900 typed-core
 mutation cases across the minimum-age, nested three-premise, wide-integer,
 four-declaration, two-digest, short-circuit Boolean, nominal-identity,
-require-premise, binding, and permit-issuing kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
+require-premise, binding, permit-issuing, and payload-rejection kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
 after the two stack-exhaustion defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.
