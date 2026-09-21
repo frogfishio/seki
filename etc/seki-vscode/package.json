@@ -1,0 +1,30 @@
+{
+  "name": "seki-vscode",
+  "displayName": "Seki",
+  "description": "Syntax highlighting for the Seki language (.seki).",
+  "version": "0.0.1",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "vscode": "^1.138.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "seki",
+        "aliases": ["Seki", "seki"],
+        "extensions": [".seki"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "seki",
+        "scopeName": "source.seki",
+        "path": "./syntaxes/seki.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+// Launches a second VS Code window with this extension loaded, opened on the
+// Seki examples in spec/language/examples so the grammar can be eyeballed.
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Extension",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/../../spec/language/examples"
+			]
+		}
+	]
+}

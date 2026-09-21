@@ -1,0 +1,28 @@
+{
+    "comments": {
+        // Seki has line comments only: `;;` to end of line (spec/language/seki-v0.peg).
+        "lineComment": ";;"
+    },
+    "brackets": [
+        ["{", "}"],
+        ["[", "]"],
+        ["(", ")"]
+    ],
+    "autoClosingPairs": [
+        { "open": "{", "close": "}" },
+        { "open": "[", "close": "]" },
+        { "open": "(", "close": ")" },
+        { "open": "\"", "close": "\"", "notIn": ["string", "comment"] }
+    ],
+    "surroundingPairs": [
+        ["{", "}"],
+        ["[", "]"],
+        ["(", ")"],
+        ["\"", "\""]
+    ],
+    "indentationRules": {
+        "increaseIndentPattern": "[\\[{(]\\s*$",
+        "decreaseIndentPattern": "^\\s*[\\]})]"
+    },
+    "wordPattern": "[A-Za-z_][A-Za-z0-9_]*"
+}

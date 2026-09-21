@@ -1,0 +1,306 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Seki",
+  "scopeName": "source.seki",
+  "patterns": [
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#digest-literal"
+    },
+    {
+      "include": "#bytes-literal"
+    },
+    {
+      "include": "#hash-algorithm"
+    },
+    {
+      "include": "#module-decl"
+    },
+    {
+      "include": "#use-decl"
+    },
+    {
+      "include": "#type-decl"
+    },
+    {
+      "include": "#function-decl"
+    },
+    {
+      "include": "#profile-clause"
+    },
+    {
+      "include": "#name-list-clause"
+    },
+    {
+      "include": "#header-clause"
+    },
+    {
+      "include": "#arithmetic-clause"
+    },
+    {
+      "include": "#publication-clause"
+    },
+    {
+      "include": "#policy-expr"
+    },
+    {
+      "include": "#contract-clause"
+    },
+    {
+      "include": "#declaration-keyword"
+    },
+    {
+      "include": "#control-keyword"
+    },
+    {
+      "include": "#constant"
+    },
+    {
+      "include": "#number"
+    },
+    {
+      "include": "#path-separator"
+    },
+    {
+      "include": "#block-param"
+    },
+    {
+      "include": "#builtin-type"
+    },
+    {
+      "include": "#type-name"
+    },
+    {
+      "include": "#selector"
+    },
+    {
+      "include": "#operator"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-semicolon.seki",
+      "match": ";;.*$"
+    },
+    "digest-literal": {
+      "match": "(sha256:)(\")([0-9A-Fa-f]*)(\")",
+      "captures": {
+        "1": {
+          "name": "support.function.digest.seki"
+        },
+        "2": {
+          "name": "punctuation.definition.string.begin.seki"
+        },
+        "3": {
+          "name": "string.quoted.double.seki"
+        },
+        "4": {
+          "name": "punctuation.definition.string.end.seki"
+        }
+      }
+    },
+    "module-decl": {
+      "match": "\\b(module)\\s+([a-z][A-Za-z0-9_]*(?:::[a-z][A-Za-z0-9_]*)*)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.module.seki"
+        },
+        "2": {
+          "name": "entity.name.namespace.seki"
+        }
+      }
+    },
+    "use-decl": {
+      "match": "\\b(use)\\s+([a-z][A-Za-z0-9_]*(?:::[a-z][A-Za-z0-9_]*)*)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.import.seki"
+        },
+        "2": {
+          "name": "entity.name.namespace.seki"
+        }
+      }
+    },
+    "type-decl": {
+      "match": "\\b(domain|type|nominal|record|variant)\\s+([A-Z][A-Za-z0-9_]*)",
+      "captures": {
+        "1": {
+          "name": "storage.type.seki"
+        },
+        "2": {
+          "name": "entity.name.type.seki"
+        }
+      }
+    },
+    "function-decl": {
+      "match": "\\b(fn|kernel)\\s+([a-z][A-Za-z0-9_]*)",
+      "captures": {
+        "1": {
+          "name": "storage.type.function.seki"
+        },
+        "2": {
+          "name": "entity.name.function.seki"
+        }
+      }
+    },
+    "header-clause": {
+      "name": "keyword.control.header.seki",
+      "match": "\\b(?:profile|claims|requires):"
+    },
+    "arithmetic-clause": {
+      "match": "\\b(arithmetic:)\\s*(checked|wrapping|saturating)\\b",
+      "captures": {
+        "1": {
+          "name": "keyword.other.contract.seki"
+        },
+        "2": {
+          "name": "support.constant.policy.seki"
+        }
+      }
+    },
+    "publication-clause": {
+      "match": "\\b(publication:)\\s*(none|eligible)\\b",
+      "captures": {
+        "1": {
+          "name": "keyword.other.contract.seki"
+        },
+        "2": {
+          "name": "support.constant.policy.seki"
+        }
+      }
+    },
+    "policy-expr": {
+      "name": "support.constant.policy.seki",
+      "match": "\\b(?:checked|wrapping|saturating)(?=:)"
+    },
+    "contract-clause": {
+      "name": "keyword.other.contract.seki",
+      "match": "\\bbounded\\b|\\b(?:steps|liveBits|controlDepth|workspaceBits|rejects|publication|arithmetic):"
+    },
+    "declaration-keyword": {
+      "name": "keyword.other.declaration.seki",
+      "match": "\\b(?:export|as)\\b"
+    },
+    "control-keyword": {
+      "name": "keyword.control.seki",
+      "match": "\\b(?:match|require|accept|reject)\\b|\\belse:"
+    },
+    "constant": {
+      "name": "constant.language.seki",
+      "match": "\\b(?:true|false|unit)\\b"
+    },
+    "number": {
+      "name": "constant.numeric.integer.seki",
+      "match": "\\b(?:0|[1-9][0-9]*)\\b"
+    },
+    "block-param": {
+      "match": "(?<!:)(:)([a-z][A-Za-z0-9_]*)\\b",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.parameter.seki"
+        },
+        "2": {
+          "name": "variable.parameter.seki"
+        }
+      }
+    },
+    "path-separator": {
+      "name": "punctuation.separator.namespace.seki",
+      "match": "::"
+    },
+    "builtin-type": {
+      "name": "support.type.primitive.seki",
+      "match": "\\b(?:Unit|Bool|U8|U16|U32|U64|I8|I16|I32|I64|ArithmeticError|Bytes|Identity|Digest|Index|Option|Result|Tuple|Array|Decision)\\b"
+    },
+    "type-name": {
+      "name": "entity.name.type.seki",
+      "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+    },
+    "selector": {
+      "name": "entity.name.function.selector.seki",
+      "match": "\\b[a-z][A-Za-z0-9_]*:(?![=:])"
+    },
+    "operator": {
+      "name": "keyword.operator.seki",
+      "match": "->|:=|\\|\\||&&|==|!=|<=|>=|[<>+\\-*/%@|]"
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.statement.seki",
+          "match": "\\."
+        },
+        {
+          "name": "punctuation.separator.comma.seki",
+          "match": ","
+        },
+        {
+          "name": "punctuation.separator.colon.seki",
+          "match": ":"
+        }
+      ]
+    },
+    "bytes-literal": {
+      "begin": "\\b(bytes)(\\[)",
+      "beginCaptures": {
+        "1": {
+          "name": "support.function.bytes.seki"
+        },
+        "2": {
+          "name": "punctuation.section.brackets.begin.seki"
+        }
+      },
+      "end": "\\]",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.brackets.end.seki"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.seki",
+          "match": "\\b[0-9A-Fa-f]{2}\\b"
+        }
+      ]
+    },
+    "profile-clause": {
+      "match": "\\b(profile:)\\s*([a-z][A-Za-z0-9_]*)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.header.seki"
+        },
+        "2": {
+          "name": "support.constant.property.seki"
+        }
+      }
+    },
+    "name-list-clause": {
+      "begin": "\\b(claims:|requires:)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.header.seki"
+        }
+      },
+      "end": "(?=^\\s*requires:)|(?=\\.)|^\\s*$",
+      "patterns": [
+        {
+          "name": "support.constant.property.seki",
+          "match": "\\b[a-z][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "punctuation.separator.comma.seki",
+          "match": ","
+        }
+      ]
+    },
+    "hash-algorithm": {
+      "name": "support.constant.hash.seki",
+      "match": "\\bsha256\\b"
+    }
+  }
+}
