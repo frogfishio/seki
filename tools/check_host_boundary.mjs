@@ -43,7 +43,7 @@ try {
   assert.match(fs.readFileSync("src/alpha/seki_c_backend.c", "utf8"),
     new RegExp(`#define SEKI_DECISION_ABI_REVISION ${abiRevision}U`, "u"),
     "the contract and the compiler disagree about the ABI revision");
-  assert.equal(contractRevision, "1");
+  assert.equal(contractRevision, "2");
 
   const core = path.join(temporary, "example.scb0");
   const generated = path.join(temporary, "example.c");
@@ -66,7 +66,7 @@ try {
 
   // Section 4: the decision is zeroed before any field is written.
   assert.match(c, /_zero\(\(uint8_t \*\)&result, \(uint32_t\)sizeof result\);/u,
-    "the decision is no longer zeroed, so padding is not deterministic");
+    "the decision is no longer zeroed before its fields are written");
 
   // Section 3: parameter passing and the stated identifier spellings.
   assert.match(c,
@@ -97,6 +97,72 @@ try {
   assert.match(c, /result\.rejection_tag = UINT32_C\(7\);/u,
     "rejection tags are no longer the authored stable tags");
 
+  // Sections 4 and 6: what `disposition` 0 means, and when `premise_tag` is set.
+  // Both are contract terms rather than implementation details, so they are
+  // checked by running a kernel, not by reading the prose.
+  const variantSource = path.join(temporary, "variant.seki");
+  fs.writeFileSync(variantSource, [
+    "module contract::variant @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "export variant Operation [ Divide @ 1. FloorMod @ 3. ].",
+    "export record Node { op: Operation, width: U8 }.",
+    "export variant Denial [ Narrow @ 1. Unsupported @ 2. ].",
+    "export kernel admit node: Node",
+    "-> Decision[Unit, Denial] arithmetic: checked",
+    "bounded steps: 512 liveBits: 4096 controlDepth: 64 workspaceBits: 0",
+    "rejects: Denial::Narrow, Denial::Unsupported",
+    "publication: none [",
+    "  require (node width) >= 32 else: Denial::Narrow.",
+    "  match (node op) [",
+    "    Divide: [ accept unit ].",
+    "    FloorMod: [ reject Denial::Unsupported ].",
+    "  ]",
+    "].",
+    "",
+  ].join("\n"));
+  const variantC = path.join(temporary, "variant.c");
+  const variantBuilt = spawnSync(compiler, ["build", "--core",
+    path.join(temporary, "variant.scb0"), "--c", variantC, variantSource],
+    { encoding: "utf8" });
+  assert.equal(variantBuilt.status, 0, variantBuilt.stderr);
+  const probe = path.join(temporary, "probe.c");
+  fs.writeFileSync(probe, [
+    "#include <stdint.h>",
+    "#include <stdio.h>",
+    '#include "variant.c"',
+    "static uint32_t run(uint32_t tag, uint8_t width, uint32_t *tagOut,",
+    "    uint32_t *premiseOut) {",
+    "    seki_a0_variant_node n = {0};",
+    "    seki_a0_variant_decision d;",
+    "    n.seki_f_op.tag = tag; n.seki_f_width = width;",
+    "    d = seki_a0_variant_admit(n);",
+    "    *tagOut = d.rejection_tag; *premiseOut = d.premise_tag;",
+    "    return d.disposition;",
+    "}",
+    "int main(void) {",
+    "    uint32_t tag, premise, bad = 0U;",
+    /* a declared case the kernel accepts */
+    "    if (run(1U, 64U, &tag, &premise) != 1U) ++bad;",
+    /* a tag that is not a declared case: not admitted, disposition 0 */
+    "    if (run(2U, 64U, &tag, &premise) != 0U) ++bad;",
+    "    if (run(9U, 64U, &tag, &premise) != 0U) ++bad;",
+    /* a rejection from `require`: premise_tag names the premise */
+    "    if (run(1U, 8U, &tag, &premise) != 2U || tag != 1U || premise != 1U) ++bad;",
+    /* a rejection from `reject`: premise_tag is 0 */
+    "    if (run(3U, 64U, &tag, &premise) != 2U || tag != 2U || premise != 0U) ++bad;",
+    '    printf("%u\\n", bad);',
+    "    return bad != 0U;",
+    "}",
+    "",
+  ].join("\n"));
+  const probeExe = path.join(temporary, "probe");
+  execFileSync("cc", ["-std=c11", "-pedantic", "-Werror", `-I${temporary}`,
+    probe, "-o", probeExe], { stdio: "inherit" });
+  assert.equal(execFileSync(probeExe, { encoding: "utf8" }), "0\n",
+    "disposition 0 or premise_tag no longer behave as the contract states");
+
   // Section 6: a failed build writes neither output.
   const rejectedSource = path.join(temporary, "rejected.seki");
   const rejectedCore = path.join(temporary, "rejected.scb0");
@@ -113,6 +179,7 @@ try {
   console.log(
     `host_boundary=verified contract=${contractRevision} ` +
     `abi=${abiRevision} authenticates=never canonical_fields=yes ` +
+    "unadmitted=disposition-0 premise_tag=require-only " +
     "failed_build_writes=nothing");
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

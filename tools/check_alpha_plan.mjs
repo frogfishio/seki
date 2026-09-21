@@ -120,7 +120,7 @@ expect(alpha.variant_values_ready === true,
   "variant values no longer project to C");
 expect(alpha.match_payload_binder_ready === false,
   "payload binders claimed before implementation");
-expect(alpha.host_boundary_contract_revision === 1,
+expect(alpha.host_boundary_contract_revision === 2,
   "host-boundary contract revision drift");
 expect(alpha.public_header_ready === true,
   "public header progress record lost");

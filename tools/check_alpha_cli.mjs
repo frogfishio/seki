@@ -736,10 +736,12 @@ try {
   assert.equal(zeroed.status, 65);
   assert.match(zeroed.stderr, /^A0-PARSE-0039:/u);
 
-  // The decision ABI a shadow oracle compares against. Two rejections reached
-  // by different inputs but identical in meaning must compare equal byte for
-  // byte, which is why the whole decision is zeroed before any field is set:
-  // C leaves padding unspecified.
+  // The decision ABI a shadow oracle compares against. The portable contract
+  // is on the defined fields, and that is what most of this checks. The
+  // whole-decision memcmp below is an observation about this toolchain, not a
+  // guarantee: C11 6.2.6.1 leaves padding and inactive union bytes unspecified
+  // once a member is stored, and the host-boundary contract says so. It is
+  // kept because it shows the zeroing does happen here.
   const abiHarness = path.join(temporary, "abi_main.c");
   fs.copyFileSync(requireC, path.join(temporary, "abi.c"));
   fs.writeFileSync(abiHarness, [

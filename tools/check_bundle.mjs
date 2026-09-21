@@ -37,7 +37,7 @@ try {
   const manifest = JSON.parse(
     fs.readFileSync(path.join(bundle, "MANIFEST.json"), "utf8"));
   assert.equal(manifest.decision_abi_revision, 2);
-  assert.equal(manifest.host_boundary_contract_revision, 1);
+  assert.equal(manifest.host_boundary_contract_revision, 2);
   // The bundle states its own ceiling rather than leaving a reader to assume.
   assert.match(manifest.claim_ceiling, /not proved/u);
   assert.match(manifest.claim_ceiling, /no\n?\s*implementation, proof, product or production authority/u);

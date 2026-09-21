@@ -384,8 +384,10 @@
   `rejection_tag` and `premise_tag`, all `uint32_t`, followed by the accepted
   value. Disposition zero is never written, so an all-zero decision is
   recognisably uninitialised. The whole decision is zeroed before any field is
-  set, because C leaves padding unspecified and the consumer compares byte for
-  byte; two rejections identical in meaning now compare equal.
+  set. That makes padding and inactive union bytes zero on the toolchains
+  tested, but C does not guarantee they stay zero once a member is stored
+  (C11 §6.2.6.1), so a portable comparison uses the defined fields; see the
+  corrected host-boundary contract below.
 - `premise_tag` reports which premise failed as its one-based precedence
   position, which is exactly what structural `check_order` already guarantees
   to be deterministic.
@@ -403,8 +405,9 @@
   resolves a spelling rather than adding a form: the subset already admits
   variant construction and single-payload cases.
 - Each payload-bearing case becomes a C struct and the decision holds a union
-  of them. Only one is ever live and the whole decision is zeroed first, so
-  inactive members stay byte-comparable, which is what the consumer asked for.
+  of them. Only one is ever live and the whole decision is zeroed first. The
+  consumer asked for inactive members to be byte-comparable; C does not
+  guarantee that, and the host-boundary contract now says so.
   The ABI is revision 2.
 - Emitting a payload found that declared payload fields were written in source
   order. They are keyed by name and must be strictly increasing, so a case
@@ -506,6 +509,31 @@
   than weaken the sentence, `inspect` now reports `exact_bounds` and
   `declared_ceiling`, so the figure `A0-CHECK-0017` complains about can be read
   without rebuilding anything.
+
+- The host-boundary contract is corrected to revision 2. Re-reading it before
+  sending VISION.md to consumers found five statements stronger than what is
+  true, all now corrected and each recorded in the contract's revision history:
+  nominal distinctness is a guarantee about what a kernel does, not a C
+  type-system property; a non-admitted value returns `disposition` `0`, which
+  revision 1 said could not happen; decisions do not portably compare equal
+  under `memcmp`, because C11 §6.2.6.1 leaves padding and inactive union bytes
+  unspecified once a member is stored; the kernel is total over admitted values,
+  not every value of its parameter type; and `premise_tag` is set only for
+  rejections produced by `require`.
+- The `memcmp` claim is worth recording for its shape. It rested on a simple
+  model of C — zero the decision first and its bytes are deterministic — and a
+  test on one compiler confirmed it. The standard does not. The Grit consumer
+  asked for byte comparison, so this is a finding for them, not only a wording
+  fix: portable byte comparison would need a layout with no implicit padding
+  and no union, which would be a new ABI revision.
+- No layout and no field meaning changed, so the decision ABI stays at revision
+  2. The contract's rotation rule is decoupled accordingly: a correction to what
+  the contract says rotates the contract; a change to the layout or a field's
+  meaning also rotates the ABI. Coupling them would have told every consumer
+  their decision had changed when it had not.
+- `check-host-boundary` now runs a kernel to pin both new contract terms: an
+  undeclared variant tag returns `disposition` `0`, and a rejection from
+  `reject` has `premise_tag` `0` while one from `require` names its premise.
 
 ## Active work
 

@@ -668,8 +668,10 @@ with real cost, and should be chosen deliberately rather than assumed.
   core, restricted C and a public header, deterministically.
 - **A stable decision ABI.** Accept or reject; rejection tags authored in the
   source and never derived from declaration order; the failing premise; typed
-  rejection detail; a byte-comparable layout zeroed before use, so two
-  decisions identical in meaning compare equal byte for byte.
+  rejection detail; a decision zeroed in full before any field is written.
+  Consumers compare its defined fields: C does not guarantee that padding or
+  inactive union bytes stay zero once a member is stored, so comparing whole
+  decisions byte for byte is not portable.
 - **Structural rejection precedence.** When several premises would fail, the one
   reported follows the declared order, and a kernel that contradicts its own
   declared order does not compile.

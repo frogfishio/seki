@@ -161,10 +161,11 @@ reports `first_literal=<value>:<type>` when the kernel has an integer literal.
 
 Alias and nominal declarations project to C typedefs, emitted in the module's
 type dependency order so a typedef precedes its use. Nominals are not
-substitutable even when they share a representation, and that distinction
-survives into the generated C by construction: the projection resolves through
-them when choosing a C form, so an octet identity behind a nominal is still
-compared by content rather than by address.
+substitutable even when they share a representation. That is enforced when the
+kernel is checked; it is a guarantee about what the kernel does, not a property
+of the C type system, which lets a host mix the two typedefs. Separately, the
+projection resolves through nominals when choosing a C form, so an octet
+identity behind a nominal is compared by content rather than by address.
 
 A module may declare any number of records and variants. Each record becomes a
 C struct in canonical order, a variant contributes no type of its own because

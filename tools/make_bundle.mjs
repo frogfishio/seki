@@ -164,7 +164,7 @@ const manifest = {
   module: tags.module,
   kernel: tags.kernel,
   decision_abi_revision: 2,
-  host_boundary_contract_revision: 1,
+  host_boundary_contract_revision: 2,
   claim_ceiling: "provisional bootstrap alpha; the generated C is not proved " +
     "to preserve the kernel's semantics, and this bundle carries no " +
     "implementation, proof, product or production authority",

@@ -62,7 +62,7 @@
   "exhaustive_match_ready": true,
   "variant_values_ready": true,
   "match_payload_binder_ready": false,
-  "host_boundary_contract_revision": 1,
+  "host_boundary_contract_revision": 2,
   "public_header_ready": true,
   "consumer_bundle_ready": true,
   "quickstart_ready": true,
