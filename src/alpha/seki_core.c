@@ -42,6 +42,7 @@
 #define SEKI_KERNEL_REQUIRE 2U
 #define SEKI_KERNEL_LET 3U
 #define SEKI_KERNEL_IF 4U
+#define SEKI_KERNEL_MATCH 5U
 
 struct core_buffer {
     unsigned char *bytes;
@@ -696,6 +697,50 @@ put_kernel_expression(struct emitter *emitter, uint32_t expression_index)
         put_kernel_expression(emitter,
             expression->value.require.continuation);
         break;
+    case SEKI_EXPR_MATCH: {
+        const struct seki_type_decl *declaration;
+        size_t index;
+        if (info->a >= emitter->module->declaration_count) {
+            emitter->buffer->failed = 1;
+            return;
+        }
+        declaration = &emitter->module->declarations[info->a];
+        put_u8(emitter->buffer, SEKI_KERNEL_MATCH);
+        put_expression(emitter, expression->value.match.scrutinee);
+        put_u32(emitter->buffer,
+            (uint32_t)declaration->value.variant.case_count);
+        /* Arms are keyed by ConstructorRef and must be strictly increasing,
+         * so they are written in canonical stable-tag order. */
+        for (index = 0U; index < declaration->value.variant.case_count;
+            index += 1U) {
+            const struct seki_variant_case *item =
+                &declaration->value.variant.cases
+                    [emitter->layout->case_order[info->a][index]];
+            size_t entry;
+            uint32_t body = UINT32_MAX;
+            for (entry = 0U; entry < (size_t)expression->value.match.count;
+                entry += 1U) {
+                const struct seki_match_arm *arm =
+                    &emitter->kernel->match_arms
+                        [expression->value.match.first + entry];
+                if (seki_name_equal(&arm->item, &item->name)) {
+                    body = arm->body;
+                    break;
+                }
+            }
+            if (body == UINT32_MAX) {
+                emitter->buffer->failed = 1;
+                return;
+            }
+            /* ConstructorRef: SumTypeRef(declared_variant, TypeRef) + tag. */
+            put_u8(emitter->buffer, 0U);
+            put_type_ref(emitter->buffer,
+                emitter->layout->type_position[info->a]);
+            put_u32(emitter->buffer, item->tag);
+            put_kernel_expression(emitter, body);
+        }
+        break;
+    }
     case SEKI_EXPR_IF:
         put_u8(emitter->buffer, SEKI_KERNEL_IF);
         put_expression(emitter, expression->value.conditional.condition);

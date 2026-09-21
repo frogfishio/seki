@@ -866,6 +866,87 @@ try {
   assert.equal(partialPayload.status, 65);
   assert.match(partialPayload.stderr, /^A0-CHECK-0024:/u);
 
+  // Exhaustive `match` over a declared variant. A variant value is its stable
+  // tag plus, where any case carries one, a union of payloads; the arms are
+  // exhaustive so the switch needs no default.
+  const matchSource = path.join(temporary, "match.seki");
+  const matchCore = path.join(temporary, "match.scb0");
+  const matchC = path.join(temporary, "match.c");
+  fs.writeFileSync(matchSource, [
+    "module gate::project @ 1",
+    "profile: c11_bounded @ 1",
+    "claims: semantic_evaluation",
+    "requires: totality.",
+    "",
+    "export variant Operation [ Divide @ 1. FloorDiv @ 2. FloorMod @ 3. ].",
+    "export record Node { op: Operation, width: U8 }.",
+    "export variant Denial [ NarrowWidth @ 1. Unsupported @ 2. ].",
+    "",
+    "export kernel admit node: Node",
+    "-> Decision[Unit, Denial] arithmetic: checked",
+    "bounded steps: 512 liveBits: 4096 controlDepth: 64 workspaceBits: 0",
+    "rejects: Denial::NarrowWidth, Denial::Unsupported",
+    "publication: none [",
+    "  require (node width) >= 32 else: Denial::NarrowWidth.",
+    "  match (node op) [",
+    "    Divide: [ accept unit ].",
+    "    FloorDiv: [ accept unit ].",
+    "    FloorMod: [ reject Denial::Unsupported ].",
+    "  ]",
+    "].",
+    "",
+  ].join("\n"));
+  const matched = run(["build", "--core", matchCore, "--c", matchC, matchSource]);
+  assert.equal(matched.status, 0, matched.stderr);
+  const matchDecoded = decodeModule(fs.readFileSync(matchCore));
+  checkTypedCore(matchDecoded);
+  assert.equal(matchDecoded.kernels[0][1].body[4][0], 5);
+  assert.deepEqual(matchDecoded.kernels[0][1].exact, [11, 28, 5, 0]);
+  const matchText = fs.readFileSync(matchC, "utf8");
+  assert.match(matchText, /typedef struct \{\n    uint32_t tag;\n\} seki_a0_project_operation;/u);
+  assert.match(matchText, /switch \(seki_p_node\.seki_f_op\.tag\) \{/u);
+  execFileSync("cc", [...strictFlags, "-c", matchC, "-o",
+    path.join(temporary, "match.o")], { stdio: "inherit" });
+
+  const matchHarness = path.join(temporary, "match_main.c");
+  fs.copyFileSync(matchC, path.join(temporary, "mt.c"));
+  fs.writeFileSync(matchHarness, [
+    '#include <stdint.h>', '#include <stdio.h>', '#include "mt.c"',
+    'int main(void) {',
+    '    unsigned bad = 0U;',
+    '    for (uint32_t op = 1U; op <= 3U; ++op)',
+    '    for (unsigned w = 0U; w < 256U; ++w) {',
+    '        seki_a0_project_node n; seki_a0_project_decision d;',
+    '        n.seki_f_op.tag = op; n.seki_f_width = (uint8_t)w;',
+    '        d = seki_a0_project_admit(n);',
+    '        if (w < 32U) {',
+    '            if (d.disposition != 2U || d.rejection_tag != 1U) ++bad;',
+    '        } else if (op == 3U) {',
+    '            if (d.disposition != 2U || d.rejection_tag != 2U) ++bad;',
+    '        } else if (d.disposition != 1U) ++bad;',
+    '    }',
+    '    printf("%u\\n", bad);',
+    '    return bad != 0U;',
+    '}', '',
+  ].join("\n"));
+  const matchExe = path.join(temporary, "match_main");
+  execFileSync("cc", [...strictFlags, "-fsanitize=address,undefined",
+    `-I${temporary}`, matchHarness, "-o", matchExe], { stdio: "inherit" });
+  assert.equal(execFileSync(matchExe, { encoding: "utf8" }), "0\n");
+
+  // Arms must cover every case exactly once: a missing arm and a repeated one
+  // are the same failure.
+  for (const [label, edit] of [
+    ["missing", (t) => t.replace("    FloorMod: [ reject Denial::Unsupported ].\n", "")],
+    ["repeated", (t) => t.replace("FloorDiv: [ accept unit ].", "Divide: [ accept unit ].")],
+  ]) {
+    const armSource = path.join(temporary, `match-${label}.seki`);
+    fs.writeFileSync(armSource, edit(fs.readFileSync(matchSource, "utf8")));
+    const armRun = run(["check", armSource]);
+    assert.equal(armRun.status, 65, label);
+    assert.match(armRun.stderr, /^A0-CHECK-0027:/u);
+  }
+
   // A claim the registry does not define has no tag, so the module cannot be
   // encoded at all.
   const unknownClaimSource = path.join(temporary, "unknown-claim.seki");
@@ -945,7 +1026,7 @@ try {
     "bindings=scoped accepted=value records=constructed " +
     "aliases=expanded example=access_permit " +
     "precedence=structural tag0=reserved abi=revision-2 " +
-    "payloads=typed",
+    "payloads=typed match=exhaustive",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

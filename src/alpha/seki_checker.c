@@ -743,6 +743,69 @@ check_kernel_tail(struct checker *checker, uint32_t expression_index,
         }
         record_info(checker, expression_index, SEKI_TYPE_INVALID, 0U, 0U, 0U);
         check_kernel_tail(checker, expression->value.let.body, &extended);
+    } else if (expression->kind == SEKI_EXPR_MATCH) {
+        const struct inferred scrutinee = infer_expression(checker,
+            expression->value.match.scrutinee, environment);
+        const struct seki_type_decl *declaration;
+        uint32_t owner;
+        size_t index;
+        if (checker->failed) {
+            return;
+        }
+        owner = seki_type_expand(checker->module, &checker->elaboration->types,
+            scrutinee.type);
+        if (owner == SEKI_TYPE_INVALID ||
+            owner >= checker->elaboration->types.count ||
+            checker->elaboration->types.entries[owner].kind !=
+                SEKI_T_DECLARED ||
+            checker->module->declarations[
+                checker->elaboration->types.entries[owner].a].kind !=
+                SEKI_DECL_VARIANT) {
+            check_fail(checker, "A0-CHECK-0026",
+                "match scrutinee must be a declared variant");
+            return;
+        }
+        owner = checker->elaboration->types.entries[owner].a;
+        declaration = &checker->module->declarations[owner];
+        record_info(checker, expression_index, SEKI_TYPE_INVALID, owner, 0U,
+            0U);
+        if (declaration->value.variant.case_count !=
+            (size_t)expression->value.match.count) {
+            check_fail(checker, "A0-CHECK-0027",
+                "match arms must cover every case exactly once");
+            return;
+        }
+        /* Every declared case is selected by exactly one arm. Equal counts
+         * plus no repeats makes that exhaustive. */
+        for (index = 0U; index < declaration->value.variant.case_count;
+            index += 1U) {
+            size_t matched = 0U;
+            size_t entry;
+            for (entry = 0U; entry < (size_t)expression->value.match.count;
+                entry += 1U) {
+                if (seki_name_equal(&checker->kernel->match_arms
+                    [expression->value.match.first + entry].item,
+                    &declaration->value.variant.cases[index].name)) {
+                    matched += 1U;
+                }
+            }
+            if (matched != 1U) {
+                check_fail(checker, "A0-CHECK-0027",
+                    "match arms must cover every case exactly once");
+                return;
+            }
+            if (declaration->value.variant.cases[index].payload_count != 0U) {
+                check_fail(checker, "A0-CHECK-0028",
+                    "matching a payload-bearing case needs a binder, which "
+                    "this revision does not provide");
+                return;
+            }
+        }
+        for (index = 0U; index < (size_t)expression->value.match.count &&
+            !checker->failed; index += 1U) {
+            check_kernel_tail(checker, checker->kernel->match_arms
+                [expression->value.match.first + index].body, environment);
+        }
     } else if (expression->kind == SEKI_EXPR_IF) {
         const struct inferred condition = infer_expression(checker,
             expression->value.conditional.condition, environment);
@@ -1112,6 +1175,57 @@ cost_of_kernel_tail(struct checker *checker, uint32_t expression_index,
             value.workspace : body.workspace;
         return cost;
     }
+    if (expression->kind == SEKI_EXPR_MATCH) {
+        /*
+         * The scrutinee stays live while the selected arm runs, so each arm is
+         * costed at the raised base. Only one arm executes, so steps, live,
+         * depth and workspace take the maximum across them.
+         */
+        const uint32_t scrutinee_index = expression->value.match.scrutinee;
+        const struct cost scrutinee = cost_of_expression(checker,
+            scrutinee_index, environment, base);
+        const uint32_t scrutinee_width = width_of(checker,
+            checker->kernel_elaboration->expressions[scrutinee_index].type);
+        uint32_t arm_base = 0U;
+        struct cost arms = {0U, 0U, 0U, 0U};
+        size_t index;
+        if (!seki_checked_add(base, scrutinee_width, &arm_base)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return cost;
+        }
+        for (index = 0U; index < (size_t)expression->value.match.count;
+            index += 1U) {
+            const struct cost arm = cost_of_kernel_tail(checker,
+                checker->kernel->match_arms
+                    [expression->value.match.first + index].body, environment,
+                arm_base, result_type);
+            if (arm.steps > arms.steps) {
+                arms.steps = arm.steps;
+            }
+            if (arm.live > arms.live) {
+                arms.live = arm.live;
+            }
+            if (arm.depth > arms.depth) {
+                arms.depth = arm.depth;
+            }
+            if (arm.workspace > arms.workspace) {
+                arms.workspace = arm.workspace;
+            }
+        }
+        if (!seki_checked_add(scrutinee.steps, arms.steps, &cost.steps) ||
+            !seki_checked_add(cost.steps, 1U, &cost.steps)) {
+            check_fail(checker, "A0-CHECK-0013",
+                "semantic value width is unbounded or overflows U32");
+            return cost;
+        }
+        cost.live = scrutinee.live > arms.live ? scrutinee.live : arms.live;
+        cost.depth = (scrutinee.depth > arms.depth ?
+            scrutinee.depth : arms.depth) + 1U;
+        cost.workspace = scrutinee.workspace > arms.workspace ?
+            scrutinee.workspace : arms.workspace;
+        return cost;
+    }
     if (expression->kind == SEKI_EXPR_REQUIRE) {
         /*
          * The rejection reason is one variant construction: a single step
@@ -1270,6 +1384,15 @@ check_rejection_order(struct checker *checker, uint32_t expression_index,
         check_rejection_order(checker, expression->value.conditional.if_false,
             floor);
         break;
+    case SEKI_EXPR_MATCH: {
+        size_t index;
+        for (index = 0U; index < (size_t)expression->value.match.count;
+            index += 1U) {
+            check_rejection_order(checker, checker->kernel->match_arms
+                [expression->value.match.first + index].body, floor);
+        }
+        break;
+    }
     default:
         break;
     }

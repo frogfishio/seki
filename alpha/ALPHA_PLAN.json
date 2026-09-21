@@ -59,6 +59,9 @@
   "record_construction_ready": true,
   "decision_abi_revision": 2,
   "payload_rejections_ready": true,
+  "exhaustive_match_ready": true,
+  "variant_values_ready": true,
+  "match_payload_binder_ready": false,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

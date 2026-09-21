@@ -406,6 +406,21 @@
   order. They are keyed by name and must be strictly increasing, so a case
   declared `(limit, actual)` now emits `actual, limit`. Nothing had exercised a
   payload table before, so this had never been reachable.
+- Exhaustive `match` over a declared variant is connected end to end. Arms must
+  cover every case exactly once, so a missing arm and a repeated one are the
+  same failure, and the generated `switch` needs no default because no admitted
+  value can carry a tag outside the declaration. A three-case kernel derives
+  `(11,28,5,0)`, which the independent checker reproduces.
+- This needed variant values to exist in C first, and that exposed a defect: a
+  record field of variant type named a C type the projection never defined, so
+  `build` reported success while emitting source that did not compile. A
+  variant value is now its stable tag plus, where any case carries one, a union
+  of payloads. The rejection variant is still projected into the decision
+  result instead and needs no type of its own.
+- Matching a payload-bearing case is rejected as `A0-CHECK-0028` rather than
+  silently dropping the binder. The surface spells a binder as a block
+  parameter and this revision does not implement one; failing closed keeps the
+  gap visible.
 - The C projection no longer re-derives exact resource bounds with a
   shape-specific formula. It checks that stored bounds are well formed and
   within the declared ceiling, and leaves exact-bound equality to admission,
@@ -477,7 +492,7 @@ passed on 2026-09-20, including the E0 Lean proof under the pinned toolchain.
 The alpha compiler additionally passed 4,400 source and 4,900 typed-core
 mutation cases across the minimum-age, nested three-premise, wide-integer,
 four-declaration, two-digest, short-circuit Boolean, nominal-identity,
-require-premise, binding, permit-issuing, and payload-rejection kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
+require-premise, binding, permit-issuing, payload-rejection, and match kernels under AddressSanitizer and UndefinedBehaviorSanitizer with no finding,
 after the two stack-exhaustion defects that earlier sweeps found were fixed. The container run used the mounted working tree and carries
 no formal qualification authority; clean-checkout reproduction is delegated to
 the exact pinned CI workflow.

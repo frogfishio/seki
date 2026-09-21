@@ -17,6 +17,7 @@
 #define SEKI_KERNEL_MAX_REJECTIONS 32U
 #define SEKI_KERNEL_MAX_EXPRESSIONS 256U
 #define SEKI_KERNEL_MAX_RECORD_FIELDS 64U
+#define SEKI_KERNEL_MAX_MATCH_ARMS 64U
 
 /*
  * Syntactic nesting ceiling, matching `maximum_nesting` in the
@@ -144,6 +145,12 @@ struct seki_record_init {
     uint32_t value;
 };
 
+/* One arm of a match: the case it selects and the tail it runs. */
+struct seki_match_arm {
+    struct seki_name item;
+    uint32_t body;
+};
+
 enum seki_expression_kind {
     SEKI_EXPR_VALUE_NAME,
     SEKI_EXPR_BOOL,
@@ -158,6 +165,7 @@ enum seki_expression_kind {
     SEKI_EXPR_REJECT,
     SEKI_EXPR_REQUIRE,
     SEKI_EXPR_LET,
+    SEKI_EXPR_MATCH,
     SEKI_EXPR_IF
 };
 
@@ -220,6 +228,11 @@ struct seki_expression {
             uint32_t body;
         } let;
         struct {
+            uint32_t scrutinee;
+            uint32_t first;
+            uint32_t count;
+        } match;
+        struct {
             uint32_t condition;
             uint32_t if_true;
             uint32_t if_false;
@@ -241,6 +254,8 @@ struct seki_kernel_decl {
     size_t expression_count;
     struct seki_record_init record_fields[SEKI_KERNEL_MAX_RECORD_FIELDS];
     size_t record_field_count;
+    struct seki_match_arm match_arms[SEKI_KERNEL_MAX_MATCH_ARMS];
+    size_t match_arm_count;
     uint32_t body_root;
 };
 

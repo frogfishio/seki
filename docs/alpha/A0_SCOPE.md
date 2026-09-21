@@ -174,6 +174,11 @@ body. Bindings cannot shadow a visible local, and a binding has no type
 annotation, so a bare integer literal has nothing to take its width from and is
 rejected.
 
+`match scrutinee [ Case: [ tail ]. ... ]` selects on a declared variant. Arms
+must cover every case exactly once. Matching a payload-bearing case needs a
+binder, which this revision does not provide and rejects explicitly rather than
+dropping.
+
 A rejection case may declare a payload, and constructing one mirrors its
 declaration: `Denial::TierTooLow(limit: 100, actual: (entry tier))`. Every
 declared field must be supplied exactly once with a matching type. The surface

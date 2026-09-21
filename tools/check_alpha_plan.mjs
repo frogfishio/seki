@@ -114,6 +114,12 @@ expect(alpha.decision_abi_revision === 2,
   "decision ABI revision drift");
 expect(alpha.payload_rejections_ready === true,
   "payload-bearing rejection progress record lost");
+expect(alpha.exhaustive_match_ready === true,
+  "exhaustive match progress record lost");
+expect(alpha.variant_values_ready === true,
+  "variant values no longer project to C");
+expect(alpha.match_payload_binder_ready === false,
+  "payload binders claimed before implementation");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",

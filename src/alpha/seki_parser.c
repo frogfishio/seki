@@ -824,7 +824,42 @@ parse_kernel_tail(struct parser *parser, struct seki_kernel_decl *kernel)
     if (!enter_nesting(parser)) {
         return UINT32_MAX;
     }
-    if (parser->current.kind == SEKI_TOKEN_IDENT &&
+    if (token_is(&parser->current, "match")) {
+        /*
+         * `match scrutinee [ Case: [ tail ]. ... ]` selects on a declared
+         * variant. Arms must be exhaustive and cannot repeat a constructor;
+         * the checker enforces both against the declaration.
+         */
+        advance(parser);
+        expression.kind = SEKI_EXPR_MATCH;
+        expression.value.match.scrutinee =
+            parse_value_expression(parser, kernel);
+        expression.value.match.first = (uint32_t)kernel->match_arm_count;
+        expect_kind(parser, SEKI_TOKEN_LBRACKET, "expected match arms");
+        while (!parser->failed &&
+            parser->current.kind != SEKI_TOKEN_RBRACKET) {
+            struct seki_match_arm arm;
+            if (kernel->match_arm_count == SEKI_KERNEL_MAX_MATCH_ARMS) {
+                parser_fail(parser, "A0-PARSE-0040",
+                    "match arms exceed fixed capacity");
+                break;
+            }
+            memset(&arm, 0, sizeof arm);
+            arm.item = take_type_name(parser);
+            expect_kind(parser, SEKI_TOKEN_COLON, "expected match arm colon");
+            arm.body = parse_kernel_block(parser, kernel);
+            expect_kind(parser, SEKI_TOKEN_DOT,
+                "expected match arm terminator");
+            if (parser->failed) {
+                break;
+            }
+            kernel->match_arms[kernel->match_arm_count++] = arm;
+        }
+        expression.value.match.count =
+            (uint32_t)kernel->match_arm_count - expression.value.match.first;
+        expect_kind(parser, SEKI_TOKEN_RBRACKET, "expected match close");
+        result = add_expression(parser, kernel, &expression);
+    } else if (parser->current.kind == SEKI_TOKEN_IDENT &&
         parser->current.length != 0U && parser->current.start[0] >= 'a' &&
         parser->current.start[0] <= 'z' &&
         next_token_is(parser, SEKI_TOKEN_BIND)) {

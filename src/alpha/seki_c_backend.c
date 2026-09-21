@@ -91,6 +91,7 @@ enum restricted_tail_kind {
     RESTRICTED_REJECT,
     RESTRICTED_REQUIRE,
     RESTRICTED_LET,
+    RESTRICTED_MATCH,
     RESTRICTED_IF
 };
 
@@ -104,6 +105,7 @@ struct restricted_tail {
      * REJECT   a = reason expression, b = precedence index
      * REQUIRE  a = condition, b = reason expression, c = continuation tail
      * LET      a = value expression, b = binding ordinal, c = body tail
+     * MATCH    a = scrutinee, b = first arm slot, premise = arm count
      * IF       a = condition, b = when-true tail, c = when-false tail
      */
     uint32_t a;
@@ -123,6 +125,10 @@ struct restricted_kernel {
     size_t record_field_count;
     struct restricted_tail tails[RESTRICTED_MAX_TAILS];
     size_t tail_count;
+    /* Match arms, as (stable tag, body tail) pairs in canonical order. */
+    uint32_t match_tags[RESTRICTED_MAX_TAILS];
+    uint32_t match_bodies[RESTRICTED_MAX_TAILS];
+    size_t match_arm_count;
     uint32_t body_root;
     /*
      * The accepted type of the kernel's `Decision` result. `Unit` carries no
@@ -972,6 +978,37 @@ decode_tail(struct reader *reader, struct restricted_module *module,
         tail.b = bindings;
         tail.c = decode_tail(reader, module, depth + 1U, bindings + 1U);
         break;
+    case 5U: {
+        uint32_t count;
+        uint32_t entry;
+        tail.kind = RESTRICTED_MATCH;
+        tail.a = decode_expression(reader, module, bindings);
+        count = read_u32(reader);
+        if (reader->failed || count == 0U ||
+            module->kernel.match_arm_count + count > RESTRICTED_MAX_TAILS) {
+            reader_fail(reader, "match arms exceed backend capacity");
+            return 0U;
+        }
+        tail.b = (uint32_t)module->kernel.match_arm_count;
+        tail.premise = count;
+        module->kernel.match_arm_count += count;
+        for (entry = 0U; entry < count && !reader->failed; entry += 1U) {
+            /* ConstructorRef: SumTypeRef(declared_variant, TypeRef) + tag. */
+            uint32_t owner;
+            expect_u8(reader, 0U, "match arm owner must be a declared variant");
+            expect_u8(reader, 0U, "match arm owner must be local");
+            owner = read_u32(reader);
+            if (!reader->failed &&
+                (size_t)owner >= module->declaration_count) {
+                reader_fail(reader, "match arm owner is outside the module");
+                return 0U;
+            }
+            module->kernel.match_tags[tail.b + entry] = read_u32(reader);
+            module->kernel.match_bodies[tail.b + entry] =
+                decode_tail(reader, module, depth + 1U, bindings);
+        }
+        break;
+    }
     case 4U:
         tail.kind = RESTRICTED_IF;
         tail.a = decode_expression(reader, module, bindings);
@@ -1656,6 +1693,31 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
         print_tail(output, module, tail->c, depth);
         break;
     }
+    case RESTRICTED_MATCH: {
+        /*
+         * Arms are exhaustive over the declared cases, so the switch needs no
+         * default; a tag outside them cannot arise from an admitted value.
+         */
+        uint32_t entry;
+        text_put_indent(output, depth);
+        text_put(output, "switch (");
+        print_expression(output, module, tail->a);
+        text_put(output, ".tag) {\n");
+        for (entry = 0U; entry < tail->premise; entry += 1U) {
+            text_put_indent(output, depth);
+            text_put(output, "case UINT32_C(");
+            text_put_unsigned(output,
+                (uint64_t)module->kernel.match_tags[tail->b + entry]);
+            text_put(output, "):\n");
+            print_tail(output, module,
+                module->kernel.match_bodies[tail->b + entry], depth + 1U);
+            text_put_indent(output, depth + 1U);
+            text_put(output, "break;\n");
+        }
+        text_put_indent(output, depth);
+        text_put(output, "}\n");
+        break;
+    }
     case RESTRICTED_IF:
         text_put_indent(output, depth);
         text_put(output, "if (");
@@ -1875,6 +1937,76 @@ print_module(const struct restricted_module *module, char *c_source,
         }
         declaration = &module->declarations[position];
         if (declaration->kind == DECODED_DECL_VARIANT) {
+            /*
+             * A variant value is its stable tag and, when any case carries a
+             * payload, a union of those payloads. The rejection variant is
+             * projected into the decision result instead, so it needs no type
+             * of its own; every other variant does.
+             */
+            size_t item;
+            int any_payload = 0;
+            if (position == module->variant_position) {
+                continue;
+            }
+            for (item = 0U; item < declaration->case_count; item += 1U) {
+                size_t field;
+                if (declaration->payload_counts[item] == 0U) {
+                    continue;
+                }
+                any_payload = 1;
+                text_put(&output, "\ntypedef struct {\n");
+                for (field = 0U; field < declaration->payload_counts[item];
+                    field += 1U) {
+                    int payload_array = 0;
+                    uint32_t payload_length = 0U;
+                    text_put(&output, "    ");
+                    print_type_name(&output, module,
+                        declaration->payload_types[item][field],
+                        declaration->payload_lengths[item][field],
+                        declaration->payload_declarations[item][field],
+                        &payload_array, &payload_length);
+                    text_put(&output, " seki_f_");
+                    text_put_name(&output,
+                        &declaration->payload_names[item][field], 0);
+                    if (payload_array) {
+                        text_put(&output, "[");
+                        text_put_unsigned(&output, payload_length);
+                        text_put(&output, "]");
+                    }
+                    text_put(&output, ";\n");
+                }
+                text_put(&output, "} ");
+                text_put_prefix(&output, module);
+                text_put(&output, "_");
+                text_put_name(&output, &declaration->name, 1);
+                text_put(&output, "_");
+                text_put_name(&output, &declaration->cases[item], 1);
+                text_put(&output, ";\n");
+            }
+            text_put(&output, "\ntypedef struct {\n    uint32_t tag;\n");
+            if (any_payload) {
+                text_put(&output, "    union {\n");
+                for (item = 0U; item < declaration->case_count; item += 1U) {
+                    if (declaration->payload_counts[item] == 0U) {
+                        continue;
+                    }
+                    text_put(&output, "        ");
+                    text_put_prefix(&output, module);
+                    text_put(&output, "_");
+                    text_put_name(&output, &declaration->name, 1);
+                    text_put(&output, "_");
+                    text_put_name(&output, &declaration->cases[item], 1);
+                    text_put(&output, " ");
+                    text_put_name(&output, &declaration->cases[item], 1);
+                    text_put(&output, ";\n");
+                }
+                text_put(&output, "    } value;\n");
+            }
+            text_put(&output, "} ");
+            text_put_prefix(&output, module);
+            text_put(&output, "_");
+            text_put_name(&output, &declaration->name, 1);
+            text_put(&output, ";\n");
             continue;
         }
         if (declaration->kind == DECODED_DECL_ALIAS ||
