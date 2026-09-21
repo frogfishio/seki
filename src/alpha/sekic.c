@@ -45,6 +45,8 @@ print_usage(FILE *stream)
         "  sekic --version\n"
         "  sekic check INPUT.seki\n"
         "  sekic build --core OUTPUT.scb0 --c OUTPUT.c INPUT.seki\n"
+        "  sekic build --core OUTPUT.scb0 --c OUTPUT.c --header OUTPUT.h "
+        "INPUT.seki\n"
         "  sekic inspect INPUT.scb0\n");
 }
 
@@ -167,15 +169,23 @@ check_command(struct seki_workspace *workspace, const char *input_path)
 
 static int
 build_command(struct seki_workspace *workspace, const char *input_path,
-    const char *core_path, const char *c_path)
+    const char *core_path, const char *c_path, const char *header_path)
 {
     unsigned char core[SEKI_CORE_CAPACITY];
     char c_source[SEKI_C_SOURCE_CAPACITY];
+    char header[SEKI_C_SOURCE_CAPACITY];
     size_t core_length = 0U;
     size_t c_length = 0U;
+    size_t header_length = 0U;
     struct seki_backend_error backend_error;
     int status;
 
+    if (header_path != NULL && (strcmp(header_path, core_path) == 0 ||
+        strcmp(header_path, c_path) == 0 || path_exists(header_path))) {
+        (void)fprintf(stderr,
+            "A0-IO-0002: output paths must be distinct and not already exist\n");
+        return EXIT_IO;
+    }
     if (strcmp(core_path, c_path) == 0 || path_exists(core_path) ||
         path_exists(c_path)) {
         (void)fprintf(stderr,
@@ -186,8 +196,13 @@ build_command(struct seki_workspace *workspace, const char *input_path,
     if (status != EXIT_OK) {
         return status;
     }
+    if (header_path != NULL && !seki_core_to_header(core, core_length, header,
+        sizeof header, &header_length, &backend_error)) {
+        print_backend_error(input_path, &backend_error);
+        return EXIT_DATA;
+    }
     if (!seki_core_to_c(core, core_length, c_source, sizeof c_source,
-        &c_length, &backend_error)) {
+        &c_length, header_path != NULL, &backend_error)) {
         print_backend_error(input_path, &backend_error);
         return strcmp(backend_error.code, "A0-BACKEND-0002") == 0 ?
             EXIT_INTERNAL : EXIT_DATA;
@@ -201,6 +216,14 @@ build_command(struct seki_workspace *workspace, const char *input_path,
         (void)remove(core_path);
         (void)fprintf(stderr, "A0-IO-0004:%s: cannot create C output\n",
             c_path);
+        return EXIT_IO;
+    }
+    if (header_path != NULL &&
+        !write_new_file(header_path, header, header_length)) {
+        (void)remove(core_path);
+        (void)remove(c_path);
+        (void)fprintf(stderr, "A0-IO-0005:%s: cannot create header output\n",
+            header_path);
         return EXIT_IO;
     }
     return EXIT_OK;
@@ -268,7 +291,12 @@ main(int argc, char **argv)
     }
     if (argc == 7 && command_is(argv[1], "build") &&
         command_is(argv[2], "--core") && command_is(argv[4], "--c")) {
-        return build_command(workspace, argv[6], argv[3], argv[5]);
+        return build_command(workspace, argv[6], argv[3], argv[5], NULL);
+    }
+    if (argc == 9 && command_is(argv[1], "build") &&
+        command_is(argv[2], "--core") && command_is(argv[4], "--c") &&
+        command_is(argv[6], "--header")) {
+        return build_command(workspace, argv[8], argv[3], argv[5], argv[7]);
     }
     if (argc == 3 && command_is(argv[1], "inspect")) {
         return inspect_command(argv[2]);

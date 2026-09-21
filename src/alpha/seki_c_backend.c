@@ -1268,6 +1268,27 @@ text_put_name(struct text_buffer *buffer, const struct decoded_name *name,
     }
 }
 
+/* Include guard, derived from the module name so it is path independent. */
+static void
+text_put_guard(struct text_buffer *buffer,
+    const struct restricted_module *module)
+{
+    size_t index;
+    text_put(buffer, "SEKI_A0_");
+    for (index = 0U; index < module->module_name.length; index += 1U) {
+        char character = module->module_name.bytes[index];
+        if (character >= 'a' && character <= 'z') {
+            character = (char)(character - 'a' + 'A');
+        }
+        if (buffer->failed || buffer->length == buffer->capacity) {
+            buffer->failed = 1;
+            return;
+        }
+        buffer->bytes[buffer->length++] = character;
+    }
+    text_put(buffer, "_H");
+}
+
 static void
 text_put_prefix(struct text_buffer *buffer,
     const struct restricted_module *module)
@@ -1912,14 +1933,43 @@ print_octet_helper(struct text_buffer *output,
         "}\n");
 }
 
+/*
+ * `mode` selects what a pass emits. The declarations a consumer integrates
+ * against are the same bytes whether they land in a self-contained translation
+ * unit or a separate header, so both come from one emitter rather than two
+ * that could drift.
+ */
+enum print_mode {
+    PRINT_SELF_CONTAINED,   /* declarations and implementation together */
+    PRINT_HEADER,           /* declarations only, guarded */
+    PRINT_IMPLEMENTATION    /* implementation only, including the header */
+};
+
 static int
 print_module(const struct restricted_module *module, char *c_source,
-    size_t c_capacity, size_t *c_length)
+    size_t c_capacity, size_t *c_length, enum print_mode mode)
 {
     struct text_buffer output = {c_source, c_capacity, 0U, 0};
+    const int declarations = mode != PRINT_IMPLEMENTATION;
     size_t field_index;
     size_t order_index;
-    text_put(&output, "#include <stdint.h>\n");
+    if (mode == PRINT_HEADER) {
+        text_put(&output, "#ifndef ");
+        text_put_guard(&output, module);
+        text_put(&output, "\n#define ");
+        text_put_guard(&output, module);
+        text_put(&output, "\n\n");
+    }
+    if (declarations) {
+        text_put(&output, "#include <stdint.h>\n");
+    } else {
+        text_put(&output, "#include \"");
+        text_put_prefix(&output, module);
+        text_put(&output, ".h\"\n");
+    }
+    if (!declarations) {
+        goto emit_implementation;
+    }
     /*
      * Declarations are emitted in the module's own type dependency order, not
      * canonical name order, so a typedef always precedes its use. A variant
@@ -2140,6 +2190,28 @@ print_module(const struct restricted_module *module, char *c_source,
     text_put(&output, "} ");
     text_put_prefix(&output, module);
     text_put(&output, "_decision;\n");
+    if (mode == PRINT_HEADER) {
+        /* Declarations end with the kernel's prototype, emitted below. */
+        text_put(&output, "\n");
+        text_put_prefix(&output, module);
+        text_put(&output, "_decision ");
+        text_put_prefix(&output, module);
+        text_put(&output, "_");
+        text_put_name(&output, &module->kernel.name, 0);
+        text_put(&output, "(");
+        text_put_prefix(&output, module);
+        text_put(&output, "_");
+        text_put_name(&output, &parameter_record(module)->name, 1);
+        text_put(&output, " ");
+        text_put_parameter_identifier(&output, module);
+        text_put(&output, ");\n\n#endif\n");
+        if (output.failed) {
+            return 0;
+        }
+        *c_length = output.length;
+        return 1;
+    }
+emit_implementation:
     print_zero_helper(&output, module);
     if (module_compares_octets(module)) {
         print_octet_helper(&output, module);
@@ -2192,7 +2264,7 @@ print_module(const struct restricted_module *module, char *c_source,
 
 int
 seki_core_to_c(const unsigned char *core, size_t core_length,
-    char *c_source, size_t c_capacity, size_t *c_length,
+    char *c_source, size_t c_capacity, size_t *c_length, int external_header,
     struct seki_backend_error *error)
 {
     struct restricted_module module;
@@ -2205,9 +2277,31 @@ seki_core_to_c(const unsigned char *core, size_t core_length,
     if (!decode_module(core, core_length, &module, error)) {
         return 0;
     }
-    if (!print_module(&module, c_source, c_capacity, c_length)) {
+    if (!print_module(&module, c_source, c_capacity, c_length,
+        external_header ? PRINT_IMPLEMENTATION : PRINT_SELF_CONTAINED)) {
         error->code = "A0-BACKEND-0002";
         error->message = "restricted-C output exceeds capacity";
+        return 0;
+    }
+    return 1;
+}
+
+int
+seki_core_to_header(const unsigned char *core, size_t core_length,
+    char *header, size_t capacity, size_t *length,
+    struct seki_backend_error *error)
+{
+    struct restricted_module module;
+    if (core == NULL || header == NULL || length == NULL || error == NULL) {
+        return 0;
+    }
+    if (!decode_module(core, core_length, &module, error)) {
+        return 0;
+    }
+    if (!print_module(&module, header, capacity, length, PRINT_HEADER)) {
+        error->code = "A0-BACKEND-0002";
+        error->message = "public header exceeds capacity";
+        error->offset = 0U;
         return 0;
     }
     return 1;

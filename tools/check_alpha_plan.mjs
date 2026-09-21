@@ -122,6 +122,10 @@ expect(alpha.match_payload_binder_ready === false,
   "payload binders claimed before implementation");
 expect(alpha.host_boundary_contract_revision === 1,
   "host-boundary contract revision drift");
+expect(alpha.public_header_ready === true,
+  "public header progress record lost");
+expect(alpha.consumer_bundle_ready === true,
+  "consumer bundle progress record lost");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",

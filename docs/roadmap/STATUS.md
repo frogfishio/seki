@@ -465,6 +465,29 @@
   deliberately not machine-checked: no test establishes them, and the checker
   says so rather than implying coverage it does not have.
 
+- `sekic build` can now emit a public header beside the implementation:
+  `--header OUT.h` writes the declarations a consumer integrates against, and
+  the translation unit includes it by a module-derived name so nothing depends
+  on where either file is written. Both forms come from one emitter, so the
+  declarations cannot drift between them. Without `--header` the translation
+  unit stays self-contained exactly as before.
+- `make bundle KERNEL=...` assembles a consumer bundle: the exact compiler
+  sources that produced the artifacts, the kernel source, typed core, generated
+  C and public header, the tag dictionary, the frozen host-boundary contract,
+  and a manifest binding every file by SHA-256. The compiler binary is
+  deliberately absent because it is platform specific.
+- Each bundle carries `VERIFY.sh`, which checks every digest, rebuilds the
+  compiler from the carried sources, confirms that rebuild reproduces the
+  artifacts byte for byte, and compiles the generated kernel. It leaves the
+  bundle as it found it, so it can be run repeatedly.
+- `check-bundle` verifies the three properties that make it a bundle rather
+  than a directory: it verifies itself, it detects tampering with any carried
+  file, and assembling it twice under a different locale and timezone produces
+  the same manifest digest.
+- The manifest states its own ceiling: the generated C is not proved to
+  preserve the kernel's semantics, and the bundle carries no implementation,
+  proof, product or production authority.
+
 ## Active work
 
 `E0-VS1` is complete experimentally. A0-02 is active: extract its program-shaped

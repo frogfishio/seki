@@ -52,9 +52,17 @@ The intended first interface is:
 ```text
 sekic check INPUT.seki
 sekic build --core OUTPUT.scb0 --c OUTPUT.c INPUT.seki
+sekic build --core OUTPUT.scb0 --c OUTPUT.c --header OUTPUT.h INPUT.seki
 sekic inspect INPUT.scb0
 sekic --version
 ```
+
+`make bundle KERNEL=...` assembles the consumer bundle: compiler sources,
+kernel source, typed core, generated C, public header, tag dictionary, the
+frozen host-boundary contract and a manifest binding every file by SHA-256.
+Each bundle carries `VERIFY.sh`, which checks the digests, rebuilds the
+compiler from the carried sources, confirms the rebuild reproduces the
+artifacts byte for byte, and compiles the generated kernel.
 
 Successful `build` writes neither output until parsing, type checking, bound
 checking, and complete artifact construction succeed. Output bytes cannot depend
