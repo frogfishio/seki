@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := check
 
-.PHONY: alpha bundle check check-lean-proof check-host-boundary check-bundle verify-seed verify-status check-bootstrap-closure check-alpha-plan check-alpha-cli check-alpha-lexer check-alpha-parser check-alpha-checker check-host-boundary check-bundle check-f0-candidate check-foundation-lock check-lean-proof check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-e0-lean check-encoding-vectors check-diff
+.PHONY: alpha bundle check check-lean-proof check-host-boundary check-bundle check-quickstart verify-seed verify-status check-bootstrap-closure check-alpha-plan check-alpha-cli check-alpha-lexer check-alpha-parser check-alpha-checker check-host-boundary check-bundle check-quickstart check-f0-candidate check-foundation-lock check-lean-proof check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-e0-lean check-encoding-vectors check-diff
 
 A0_CFLAGS = -std=c11 -pedantic -Wall -Wextra -Werror -Wconversion -Wsign-conversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wformat=2
 A0_SOURCES = src/alpha/sekic.c src/alpha/seki_lexer.c src/alpha/seki_parser.c \
@@ -15,7 +15,7 @@ build/sekic: $(A0_SOURCES) src/alpha/seki_lexer.h src/alpha/seki_parser.h \
 	mkdir -p build
 	$(CC) $(A0_CFLAGS) -Isrc/alpha $(A0_SOURCES) -o $@
 
-check: verify-seed verify-status check-bootstrap-closure check-alpha-plan check-alpha-cli check-alpha-lexer check-alpha-parser check-alpha-checker check-host-boundary check-bundle check-f0-candidate check-foundation-lock check-lean-proof check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-encoding-vectors check-diff
+check: verify-seed verify-status check-bootstrap-closure check-alpha-plan check-alpha-cli check-alpha-lexer check-alpha-parser check-alpha-checker check-host-boundary check-bundle check-quickstart check-f0-candidate check-foundation-lock check-lean-proof check-e0-vs1 check-e0-frontend check-e0-backend check-e0-manifest check-encoding-vectors check-diff
 
 verify-seed:
 	./SEKI_V0_3_PROJECT_SEED/VERIFY.sh
@@ -50,6 +50,9 @@ check-bundle:
 bundle:
 	@mkdir -p build/bundle
 	node tools/make_bundle.mjs $(KERNEL) build/bundle
+
+check-quickstart:
+	node tools/check_quickstart.mjs
 
 check-f0-candidate:
 	node tools/check_f0_candidate.mjs

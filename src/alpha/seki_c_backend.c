@@ -143,6 +143,8 @@ struct restricted_kernel {
     uint64_t first_literal;
     uint8_t first_literal_type;
     int has_literal;
+    uint32_t exact_bounds[4];
+    uint32_t declared_bounds[4];
     uint8_t rejection_tag;
 };
 
@@ -1097,9 +1099,11 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
      */
     for (component = 0U; component < 4U; component += 1U) {
         declared[component] = read_u32(reader);
+        module->kernel.declared_bounds[component] = declared[component];
     }
     for (component = 0U; component < 4U; component += 1U) {
         exact[component] = read_u32(reader);
+        module->kernel.exact_bounds[component] = exact[component];
         if (!reader->failed && exact[component] > declared[component]) {
             reader_fail(reader, "exact bound exceeds the declared ceiling");
             return;
@@ -2326,5 +2330,14 @@ seki_inspect_core(const unsigned char *core, size_t core_length,
     inspection->first_literal = module.kernel.first_literal;
     inspection->first_literal_type = module.kernel.first_literal_type;
     inspection->has_literal = module.kernel.has_literal;
+    {
+        size_t component;
+        for (component = 0U; component < 4U; component += 1U) {
+            inspection->exact_bounds[component] =
+                module.kernel.exact_bounds[component];
+            inspection->declared_bounds[component] =
+                module.kernel.declared_bounds[component];
+        }
+    }
     return 1;
 }

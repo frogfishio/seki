@@ -62,6 +62,10 @@ workflow was removed. There is no continuous integration: `make check` is run
 by hand. This verifies the bootstrap repository; it does not install or qualify
 the formal foundations.
 
+A consumer starts with
+[`docs/alpha/QUICKSTART.md`](docs/alpha/QUICKSTART.md) and
+[`docs/alpha/HOST_BOUNDARY_CONTRACT.md`](docs/alpha/HOST_BOUNDARY_CONTRACT.md).
+
 Current bootstrap records:
 
 - [`PLAN.md`](PLAN.md) — controlled delivery plan and handoff entry point

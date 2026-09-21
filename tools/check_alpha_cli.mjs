@@ -987,6 +987,9 @@ try {
     "backend=alpha-decision\n" +
     "profile=c11_bounded@1\n" +
     "first_literal=18:u8\n" +
+    // The figures A0-CHECK-0017 complains about, readable without rebuilding.
+    "exact_bounds=8,25,5,0\n" +
+    "declared_ceiling=32,256,16,0\n" +
     "authority=none\n");
 
   const badMagicPath = path.join(temporary, "bad-magic.scb0");

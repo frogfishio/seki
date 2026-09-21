@@ -266,7 +266,18 @@ inspect_command(const char *input_path)
                 (unsigned long long)inspection.first_literal,
                 integer_names[inspection.first_literal_type - 2U]);
         }
-        (void)printf("authority=none\n");
+        (void)printf(
+            "exact_bounds=%u,%u,%u,%u\n"
+            "declared_ceiling=%u,%u,%u,%u\n"
+            "authority=none\n",
+            (unsigned)inspection.exact_bounds[0],
+            (unsigned)inspection.exact_bounds[1],
+            (unsigned)inspection.exact_bounds[2],
+            (unsigned)inspection.exact_bounds[3],
+            (unsigned)inspection.declared_bounds[0],
+            (unsigned)inspection.declared_bounds[1],
+            (unsigned)inspection.declared_bounds[2],
+            (unsigned)inspection.declared_bounds[3]);
     }
     return EXIT_OK;
 }

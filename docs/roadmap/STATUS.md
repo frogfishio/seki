@@ -492,6 +492,21 @@
   preserve the kernel's semantics, and the bundle carries no implementation,
   proof, product or production authority.
 
+- `docs/alpha/QUICKSTART.md` is written: build the compiler, write a kernel,
+  compile it, call it from C, read the diagnostics, ship a bundle, and what is
+  not established. It is one annotated worked example rather than a reference.
+- `check-quickstart` extracts the kernel and the calling code from the document
+  and runs them: the kernel checks and builds, the caller compiles against the
+  generated header, every diagnostic the table names is one the compiler can
+  actually emit, and the disclosure that the C is unproved is still present. A
+  quickstart that does not compile is worse than none, because a reader trusts
+  it before they trust the compiler.
+- Writing it found a false claim in its own draft: it told the reader to read
+  the exact derived cost from `sekic inspect`, which did not report it. Rather
+  than weaken the sentence, `inspect` now reports `exact_bounds` and
+  `declared_ceiling`, so the figure `A0-CHECK-0017` complains about can be read
+  without rebuilding anything.
+
 ## Active work
 
 `E0-VS1` is complete experimentally. A0-02 is active: extract its program-shaped
@@ -503,10 +518,10 @@ conformance.
 
 ## Next unblocked tasks
 
-1. A0-02 — extract the reusable compiler core and `sekic` CLI.
-2. A0-03 — implement and test the fixed alpha subset.
-3. A0-04 — add the runnable Grit publication kernel.
-4. A0-05/A0-06 — produce deterministic bundles and the consumer quickstart.
+1. Grit applies the alpha to a real shadow kernel and reports back.
+2. The generic typed-core to generated-C refinement proof, which is the
+   consumer's stated production blocker and remains open.
+3. Freezing the subset, encoding and C ABI together once that proof exists.
 
 ## Open decisions and blockers
 

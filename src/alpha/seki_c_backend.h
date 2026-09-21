@@ -22,6 +22,14 @@ struct seki_core_inspection {
     uint64_t first_literal;
     uint8_t first_literal_type;
     int has_literal;
+    /*
+     * The kernel's exact derived cost and its declared ceiling, in the order
+     * steps, live bits, control depth, workspace bits. A ceiling below the
+     * exact figure is what `A0-CHECK-0017` reports; this is where the figure
+     * itself can be read.
+     */
+    uint32_t exact_bounds[4];
+    uint32_t declared_bounds[4];
 };
 
 /*
