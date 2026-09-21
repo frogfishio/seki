@@ -120,6 +120,8 @@ expect(alpha.variant_values_ready === true,
   "variant values no longer project to C");
 expect(alpha.match_payload_binder_ready === false,
   "payload binders claimed before implementation");
+expect(alpha.host_boundary_contract_revision === 1,
+  "host-boundary contract revision drift");
 expect(alpha.general_declaration_parser_ready === false,
   "declaration parser claimed ready before functions and domains exist");
 expect(status.development_assurance_model === "internal-self-attestation",

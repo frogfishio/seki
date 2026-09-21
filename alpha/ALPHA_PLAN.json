@@ -62,6 +62,7 @@
   "exhaustive_match_ready": true,
   "variant_values_ready": true,
   "match_payload_binder_ready": false,
+  "host_boundary_contract_revision": 1,
   "general_declaration_parser_ready": false,
   "required_examples": [
     "minimum-age",

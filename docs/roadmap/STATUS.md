@@ -444,6 +444,27 @@
   applies to both. The remaining formal work is installing them and writing
   proofs, not obtaining permission.
 
+- The host-boundary contract is written and frozen at revision 1:
+  `docs/alpha/HOST_BOUNDARY_CONTRACT.md`. Its headline is the assertion the
+  Grit consumer asked for explicitly: a kernel consumes already-authenticated
+  identities and never authenticates anything itself. It cannot verify a
+  signature, recompute a digest, read a file, consult a clock, or observe
+  anything outside its one parameter value. Authority for authentication rests
+  entirely with the host; Seki narrows what a decision means and does not widen
+  what the host established.
+- The contract also states the Boolean rule: nominal identity types carry
+  evidence, a `Bool` input does not. A kernel whose decision turns on a `Bool`
+  parameter has delegated the decision back to its caller. That is a contract
+  on the host, not yet a compiler check, and the contract says so.
+- `check-host-boundary` verifies every mechanical claim in the contract against
+  what the compiler emits: the ABI revision, the decision's leading fields and
+  their order, the zeroing guarantee, parameter passing, canonical field order
+  in every emitted struct, authored stable tags, and that a failed build writes
+  neither output. The contract cannot drift from the compiler without `make
+  check` failing. The prose assertions about what Seki does not do are
+  deliberately not machine-checked: no test establishes them, and the checker
+  says so rather than implying coverage it does not have.
+
 ## Active work
 
 `E0-VS1` is complete experimentally. A0-02 is active: extract its program-shaped
