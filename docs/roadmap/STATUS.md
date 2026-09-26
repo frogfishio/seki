@@ -1,6 +1,6 @@
 # Seki execution status
 
-- Updated: 2026-09-20
+- Updated: 2026-09-26
 - Plan: `docs/roadmap/DELIVERY_PLAN.md` version 0.4
 - Current stage: A0 provisional alpha
 - Bootstrap status: complete
@@ -535,21 +535,37 @@
   undeclared variant tag returns `disposition` `0`, and a rejection from
   `reject` has `premise_tag` `0` while one from `require` names its premise.
 
+- **New direction: Seki lowers to KCore** (ADR 0023). Krisis, the Semantic
+  Algebra Kernel implementation, could not wait for Seki and could not have used
+  it, because SAK needs loops, a heap, allocation failure and cancellation. It
+  built KCore: a small imperative core defined in Lean, with language theorems
+  proved once, per-program proofs, a printer to restricted C11 and an
+  independent checker of the printed text. Its expensive part is the
+  per-program proof. Seki's kernels are total and bounded by construction, so a
+  single proof that lowering preserves Seki semantics can supply that proof for
+  every kernel. Seki therefore stops planning a C semantics and C backend of its
+  own, and shares KCore's C boundary. `VISION.md` §§3, 8, 9, 15–18 are updated to
+  match. ADR 0023 states in advance what would make the direction be revisited:
+  a lowering theorem that needs per-kernel help, or Krisis declining the
+  dependency.
+
 ## Active work
 
-`E0-VS1` is complete experimentally. A0-02 is active: extract its program-shaped
-C code into a reusable compiler core and general `sekic` CLI. F0 remains open;
-the Grit Stage 1 publication decision remains the selected independent case.
-External field validation begins only after internal release-candidate
-certification. All current alpha work is replaceable and cannot freeze
-conformance.
+The direction is lowering to KCore (ADR 0023). The alpha, with its own C backend,
+keeps serving Grit unchanged until the KCore path produces a kernel a consumer
+can integrate. F0 remains open. All current alpha work is replaceable and cannot
+freeze conformance.
 
 ## Next unblocked tasks
 
-1. Grit applies the alpha to a real shadow kernel and reports back.
-2. The generic typed-core to generated-C refinement proof, which is the
-   consumer's stated production blocker and remains open.
-3. Freezing the subset, encoding and C ABI together once that proof exists.
+1. Hand spike: lower the quickstart `gate` kernel to KCore, prove it with KCore's
+   proof kit, emit it through KCore's printer and checker, and call it through a
+   Seki decision header.
+2. Decode, admit and evaluate any kernel in Lean, not one example.
+3. Lowering theorem for a first fragment: field projection, comparison,
+   `require`, `reject`, `accept`.
+4. Axiom policy gate for Seki's Lean, and removal of the one `native_decide`.
+5. Grit applies the alpha to a real shadow kernel and reports back.
 
 ## Open decisions and blockers
 
@@ -562,6 +578,8 @@ conformance.
 | Locked foundation sources not clean-room built | Formal results cannot qualify. |
 | Several surface forms remain provisional | Parser work may experiment but cannot freeze conformance. |
 | E0 has no Clight refinement | Its Lean proof does not prove generated C or native behavior. |
+| No agreement yet with Krisis on depending on KCore | The spike can use KCore in place; a pinned dependency cannot be adopted. |
+| KCore carries no licence file | Seki cannot depend on or ship KCore-derived output until KCore has a licence compatible with GPL-3.0-or-later. |
 
 ## Verification commands
 

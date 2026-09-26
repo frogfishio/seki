@@ -30,6 +30,13 @@ shows that the exact kernel satisfies a requirement stated independently in
 Lean. A *compiler proof*, made once, shows that compilation preserves a
 kernel's meaning. Together they carry the requirement to the generated C.
 
+Seki does not carry the C end of that chain alone. It lowers each kernel to
+**KCore**, a small verified core built by the Krisis project, and KCore's
+printer and checker produce the C. Seki's compiler proof is therefore a proof
+between two Lean definitions, and the C boundary is shared with another project
+that needs it for its own reasons. Section 8 explains the chain; ADR 0023
+records the decision.
+
 Behind that sits a view about **trust** that shapes everything else. A proof is
 only worth what its provenance is worth. So every part of Seki's assurance is
 either **borrowed** from tools the field already trusts, used unmodified, or
@@ -107,8 +114,8 @@ publication: none [
 ].
 ```
 
-It compiles to C that needs only `<stdint.h>`: no allocation, no recursion, no
-unbounded loops, no library calls. The result is a fixed-layout decision
+It compiles to C that needs only standard headers: no allocation, no
+recursion, no unbounded loops, no library calls. The result is a fixed-layout decision
 reporting whether the kernel accepted, which rejection applies by an explicitly
 authored tag, which premise failed, and typed detail about why.
 
@@ -178,21 +185,34 @@ program is good.
 This is proved once, for every program that will ever be written:
 
 ```lean
-theorem compile_correct :
-  ∀ P x, C.exec (compile P) x = Seki.eval P x
+theorem lower_correct :
+  ∀ P x, Admitted P → KCore.run (lower P) x = .ok (Seki.eval P x)
 ```
 
 It says nothing about whether any program is good. It says only that
 compilation does not change what a program means.
+
+`lower` translates a kernel into KCore, a small imperative language whose
+meaning is also defined in Lean. KCore's own theorems, proved once by its
+authors, carry that meaning into the restricted C its printer emits (section 8).
+Proving `lower` correct is a proof between two Lean definitions. It never has to
+reason about the C standard.
+
+One consequence is worth stating. KCore's general programs can fail
+operationally, when an allocation is refused or a run is cancelled. A Seki
+kernel allocates nothing and needs no cancellation point, so the theorem above
+says `ok` for every input: a lowered Seki kernel cannot fail at all.
 
 ### Putting them together
 
 ```text
 SafePolicy (Seki.eval P)
        +
-C.exec (compile P) = Seki.eval P
+KCore.run (lower P) = Seki.eval P          ← Seki's proof, once
+       +
+the emitted C means KCore.run (lower P)    ← KCore's boundary, shared
        ↓
-SafePolicy (C.exec (compile P))
+SafePolicy (the generated C)
 ```
 
 The generated C satisfies the requirement for every input, although nobody ever
@@ -339,13 +359,16 @@ of its own.
 
 ```text
 Seki source text
-    │  parser and elaborator             untrusted; not the authority
+    │  sekic front end                   untrusted; not the authority
     ▼
 canonical typed core                     THE AUTHORITY, bound by digest
-    │  Seki.eval, defined in Lean        our definition; kept small and legible
+    │  admission, in Lean                re-checks the core; trusts nothing sekic said
     ▼
-decision function
-    │  compile, proved once in Lean      borrowed trust: Lean's kernel
+Seki.eval, defined in Lean               our definition; kept small and legible
+    │  lower, proved once in Lean        borrowed trust: Lean's kernel
+    ▼
+KCore program                            KCore's language theorems, proved once by Krisis
+    │  KCore printer and checker         printer trusted; checker independent
     ▼
 restricted C
     │  C compiler                        trusted and recorded, or CompCert
@@ -360,35 +383,49 @@ Each link rests on something different, and it is worth being exact about what.
 
 ### The compiler that runs stays untrusted
 
-Seki's working compiler can be fast, convenient and conventionally written. It
-is never trusted.
+Seki's front end can be fast, convenient and conventionally written. It is never
+trusted. Its only output is a typed core, which Lean admits or rejects by its own
+rules. Everything after admission is defined in Lean.
 
-The authority is a `compile` function **defined in Lean** and proved correct
-once. For each kernel, Lean's kernel checks that the working compiler's output
-is exactly what that verified function produces, by direct reduction. The
-working compiler only has to agree with the verified one.
-
-This matters for how failure looks. A bug in the working compiler produces an
-artifact that **fails to check** — a rejection — not a plausible kernel that
-quietly decides wrongly. The worst a compiler bug can do is cost time.
+This matters for how failure looks. A bug in the front end produces a typed core
+that **fails admission**, or one that says something other than the author
+meant, which the program proof then catches against the requirement. It does
+not produce a plausible kernel that quietly decides wrongly.
 
 It also keeps all of the proof in one foundation. The requirement, Seki's
-semantics, the program proof and the compiler proof all live in Lean. There is
-no bridge between proof assistants on the essential path.
+semantics, the program proof, the lowering proof and KCore's own theorems all
+live in Lean. There is no bridge between proof assistants on the essential
+path.
 
-### The C semantics is the link we cannot borrow
+### KCore: the C boundary, shared
 
-The compiler proof needs a formal definition of what the generated C means. If
-we write that definition ourselves, it is ours, and its trust cannot be
-borrowed. It is the one link in the chain exposed to the closed-loop problem.
+KCore is a small imperative language defined in Lean by the Krisis project,
+which needed verified C for work Seki deliberately cannot express: loops, a
+heap, allocation failure and cancellation. It has unsigned integers, structs
+and first-order functions, and it excludes by construction every C hazard it
+can: no signed arithmetic, no casts beyond width changes, no unions, no
+observable struct bytes, no address-of.
 
-Two things limit that exposure. First, it is kept very small. Seki emits a tiny
-fragment of C: struct field reads, integer comparisons, `&&` and `||`,
-conditionals, a `switch` on a tag, assignments to a result, and three fixed
-bounded loops. No floating point, no undefined arithmetic, no allocation, no
-recursion. A definition of that fragment is small enough for a stranger to
-check by reading it. Second, it is checked against execution rather than taken
-as definitional.
+Krisis has proved, once for the whole language, that its evaluator and its
+formal semantics agree, that well-typed programs never reach a typing fault,
+and that a failed run releases everything and publishes nothing. Its printer
+emits C from a closed table with one row per construct. An independent checker
+then parses the emitted text, rebuilds the program it denotes, and refuses it
+unless that is exactly the proved program.
+
+For KCore's own programs, each one needs a hand-written proof, and that is the
+expensive part of KCore. For a Seki kernel it is not needed: the lowering
+theorem supplies it once for every kernel. That is the division of labour. KCore
+does the systems work; Seki provides decisions whose KCore proofs come free.
+
+### The C semantics is still the link we cannot borrow
+
+The printer is trusted, not proved; the checker's soundness is argued, not
+proved. KCore states this as its ceiling: refinement proved, emitted C
+qualified by the checker and by tests, the printer and C compiler trusted.
+Closing that link, for example by proving the printer against CompCert's Clight
+semantics, is now work shared by two projects rather than carried by Seki
+alone.
 
 ---
 
@@ -404,8 +441,9 @@ and implementation-defined behaviour. CompCert includes **Clight**, a restricted
 C with a mechanised operational semantics written and scrutinised by other
 people.
 
-Constraining Seki's output to a Clight-compatible fragment, and proving against
-Clight's semantics rather than our own, has two benefits. It gives the generated
+Constraining the emitted C to a Clight-compatible fragment, and proving
+KCore's printer against Clight's semantics rather than our own, has two
+benefits. It gives the generated
 C an established mathematical meaning. And it removes the one link we otherwise
 could not borrow: the C semantics would then be someone else's, which is exactly
 the independence the closed-loop problem calls for.
@@ -448,7 +486,7 @@ other's blind spots.
 
 | | Inputs covered | Depth covered |
 | --- | --- | --- |
-| Lean proof | every input | down to a model of the C |
+| Lean proof | every input | down to KCore, whose emitted C is checked rather than proved |
 | CompCert | every input | from the C down to a model of the machine |
 | Differential execution | only those run | the whole stack, including the actual processor |
 
@@ -498,7 +536,7 @@ The target and toolchain are part of the evidence, not context around it.
 
 ### Seki avoids most divergence by construction
 
-The fragment of C that Seki emits stays well inside the part of the instruction
+The fragment of C that a Seki kernel becomes stays well inside the part of the instruction
 set every implementation agrees on. It has no floating point, so no precision
 divergence. Its arithmetic is checked, so there are no undefined shifts or
 overflow. It uses no bit-scan or exotic instructions. This is a consequence of
@@ -510,7 +548,7 @@ stop being true.
 
 Seki compares identities such as digests in code whose running time does not
 depend on where the first differing byte lies. That is true of the C Seki
-emits. It is **not** established by any proof in this chain. A proof that the C
+emits today, and lowering to KCore must keep it true. It is **not** established by any proof in this chain. A proof that the C
 means the same as the kernel says nothing about how long it takes, and compiler
 optimisation and processor behaviour are precisely where data-independent
 source can become data-dependent execution. If a project comes to rely on it,
@@ -648,8 +686,8 @@ Not every project needs every layer. The layers separate cleanly:
 
 | Level | What it adds |
 | --- | --- |
-| **Essential** | A Lean requirement, the exact kernel, a proof that it satisfies the requirement, and a proof that compilation preserves its meaning into a precisely defined C fragment |
-| **Established C semantics** | That C fragment is defined by CompCert's Clight rather than by Seki, removing the one link whose trust cannot otherwise be borrowed |
+| **Essential** | A Lean requirement, the exact kernel, a proof that it satisfies the requirement, and a proof that lowering preserves its meaning into KCore, whose emitted C is qualified by an independent checker |
+| **Established C semantics** | KCore's printer is proved against CompCert's Clight semantics, removing the one link whose trust cannot otherwise be borrowed |
 | **Verified native code** | CompCert, rather than a trusted and recorded conventional compiler, produces the binary |
 | **Independent double-checking** | Two separate proof foundations check the same invocation and must agree |
 
@@ -687,9 +725,13 @@ with real cost, and should be chosen deliberately rather than assumed.
 
 ### What does not exist yet
 
-- **There is no verified compiler.** The working compiler is conventional and
+- **There is no verified compiler.** The alpha's C backend is conventional and
   untrusted, and nothing yet proves that its C preserves the typed core's
-  meaning.
+  meaning. It will be retired in favour of lowering to KCore; until that path
+  produces a kernel a consumer can integrate, the alpha keeps working as it
+  does.
+- **No kernel has been lowered to KCore yet.** KCore exists, with two proved
+  programs and its printer and checker; the lowering does not.
 - **No customer kernel can be checked against a Lean requirement.** The program
   proof exists only for the one example it was built for.
 - **The one existing proof does not yet borrow only the kernel's trust.** It
@@ -712,22 +754,31 @@ correct C, which is the compiler proof's territory. But the program proof is
 what a customer buys, and it does not need the compiler proof at all: it proves
 things about the typed core, which is the authority. So the order becomes:
 
-1. **Decode and evaluate any kernel in Lean**, not one example.
-2. **Let a project state a requirement in Lean and check its kernel against
-   it.** This delivers the proposition.
-3. **Use that Lean evaluator as the oracle for differential execution** of the
-   generated C, replacing reference policies written by the compiler's authors.
-   This makes the existing evidence independent.
-4. **Remove every proof step that does not borrow only the kernel's trust.**
-5. **Define `compile` in Lean, prove it correct once, and check the working
-   compiler against it.** The working compiler becomes a fast, untrusted
-   producer.
-6. **Adopt CompCert's Clight semantics**, and optionally its native compiler,
-   where a project needs that level.
+The second change is **where the C comes from**. Seki will not maintain a C
+semantics and a C backend of its own. It lowers to KCore (section 8, ADR 0023).
+The order becomes:
 
-Steps 1 and 2 deliver the proposition. Step 3 makes today's evidence honest.
-Steps 4 to 6 are the long tail — and they are the part it is tempting to assume
-is the whole job.
+1. **Lower one kernel to KCore by hand** — the quickstart kernel — prove it with
+   KCore's tools, emit it through KCore's printer and checker, and call it
+   through a Seki decision header. This settles how Seki's types are encoded in
+   KCore and measures one real kernel.
+2. **Decode, admit and evaluate any kernel in Lean**, not one example.
+3. **Let a project state a requirement in Lean and check its kernel against
+   it.** This delivers the proposition.
+4. **Use that Lean evaluator as the oracle for differential execution**,
+   replacing reference policies written by the compiler's authors. This makes
+   the existing evidence independent.
+5. **Prove `lower` correct once, for a small fragment first**, then for the
+   whole agreed surface.
+6. **Remove every proof step that does not borrow only the kernel's trust**, and
+   gate the build on it as KCore does.
+7. **Move consumers to the KCore path** with a new decision ABI revision, and
+   retire the alpha's C backend.
+
+Steps 2 and 3 deliver the proposition. Step 4 makes today's evidence honest.
+Step 5 is what makes the direction pay: the lowering theorem must hold for every
+kernel without per-kernel proof work, or the reason for lowering is gone. ADR
+0023 states that test in advance.
 
 ---
 
@@ -752,7 +803,9 @@ whether the picture above is right for how you would actually use it.
 
 4. **Targets.** Evidence is relative to a named target and toolchain. Which
    processors, operating systems and compilers must Seki's evidence cover for
-   you?
+   you? KCore currently assumes 8-bit bytes, a 64-bit `size_t` and a 32-bit
+   `int`. A target outside that needs a KCore layout of its own, so we would
+   like to know about it early.
 
 5. **The security property.** Do you depend, or expect to depend, on
    data-independent timing for identity comparison? If so it needs its own
@@ -786,7 +839,12 @@ meaning. The authority that every proof and every artifact is anchored to.
 requirement, for every input.
 
 **Compiler proof.** A Lean proof, made once, that compilation preserves every
-kernel's meaning.
+kernel's meaning. For Seki this is the proof that lowering to KCore preserves
+it.
+
+**KCore.** A small imperative language defined in Lean by the Krisis project,
+with a printer to restricted C and an independent checker of what it prints.
+Seki lowers every kernel to it.
 
 **Requirement.** A property stated in Lean, independently of any program, that a
 kernel is required to satisfy.
