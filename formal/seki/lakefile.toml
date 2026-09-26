@@ -1,0 +1,11 @@
+name = "seki"
+version = "0.0.0"
+defaultTargets = ["Seki", "oracle"]
+
+[[lean_lib]]
+name = "Seki"
+globs = ["Seki.+"]
+
+[[lean_exe]]
+name = "oracle"
+root = "Oracle"

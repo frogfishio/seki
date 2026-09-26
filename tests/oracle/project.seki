@@ -1,0 +1,21 @@
+module gate::project @ 1
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: totality.
+
+export variant Operation [ Divide @ 1. FloorDiv @ 2. FloorMod @ 3. ].
+export record Node { op: Operation, width: U8 }.
+export variant Denial [ NarrowWidth @ 1. Unsupported @ 2. ].
+
+export kernel admit node: Node
+-> Decision[Unit, Denial] arithmetic: checked
+bounded steps: 512 liveBits: 4096 controlDepth: 64 workspaceBits: 0
+rejects: Denial::NarrowWidth, Denial::Unsupported
+publication: none [
+  require (node width) >= 32 else: Denial::NarrowWidth.
+  match (node op) [
+    Divide: [ accept unit ].
+    FloorDiv: [ accept unit ].
+    FloorMod: [ reject Denial::Unsupported ].
+  ]
+].

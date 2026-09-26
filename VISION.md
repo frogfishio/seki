@@ -722,6 +722,17 @@ with real cost, and should be chosen deliberately rather than assumed.
 - **One machine-checked Lean proof**, checked against a pinned toolchain by the
   project's verification suite, that a single example program satisfies its
   requirement.
+- **A Lean evaluator of the typed core, used as an oracle.** Lean decodes the
+  exact typed-core bytes the compiler emits and evaluates the kernel. Every
+  generated kernel in the verification suite is run against it on generated
+  inputs, and every decision field must agree. Its first run found a real
+  miscompilation: comparing or copying a `Bytes[N]` or `Digest` value whose
+  type was written directly, not through a declared type, reached the C with
+  length zero, so different values compared equal. The reference-policy tests
+  had missed it because they only ever compared nominal identities.
+- **One kernel lowered to KCore, by hand.** The quickstart kernel is lowered,
+  proved for every admitted input, emitted through KCore's printer and accepted
+  by its checker.
 
 ### What does not exist yet
 
@@ -730,17 +741,21 @@ with real cost, and should be chosen deliberately rather than assumed.
   meaning. It will be retired in favour of lowering to KCore; until that path
   produces a kernel a consumer can integrate, the alpha keeps working as it
   does.
-- **No kernel has been lowered to KCore yet.** KCore exists, with two proved
-  programs and its printer and checker; the lowering does not.
+- **There is no lowering to KCore yet.** One kernel was lowered and proved by
+  hand to test the design; the general lowering, proved once for every kernel,
+  does not exist.
 - **No customer kernel can be checked against a Lean requirement.** The program
   proof exists only for the one example it was built for.
 - **The one existing proof does not yet borrow only the kernel's trust.** It
   uses a Lean feature that relies on Lean's code generator rather than only its
   small kernel. That will be replaced.
-- **Much of the alpha's testing is not independent.** It compares generated code
-  against reference policies written by the same people who wrote the compiler.
-  It is thorough, and it has found real defects, but it is the closed loop this
-  document warns against, and it is weaker evidence than its volume suggests.
+- **The alpha's testing is only partly independent.** Most of it compares
+  generated code against reference policies written by the same people who
+  wrote the compiler, which is the closed loop this document warns against. The
+  Lean oracle breaks that loop for the kernels it runs: its expected answers
+  come from the typed core, not from anyone's reading of the source. It still
+  covers generated inputs rather than every input, and its evaluator is not yet
+  proved to match the language's definition.
 
 ---
 

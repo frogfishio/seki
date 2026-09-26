@@ -1,0 +1,69 @@
+module oracle::coverage @ 1
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: totality.
+
+export nominal PackId := Digest[sha256, 32].
+export type Serial := U64.
+export variant Channel [ Stable @ 1. Beta @ 2. Nightly @ 3. ].
+
+export record Window { low: U32, high: U32 }.
+
+export record Claim {
+  pack: PackId,
+  expected: PackId,
+  serial: Serial,
+  floor: Serial,
+  window: Window,
+  low: U32,
+  high: U32,
+  build: U32,
+  channel: Channel,
+  salt: Bytes[4],
+  pepper: Bytes[4],
+  weight: U16,
+  flags: U8
+}.
+
+export record Grant { pack: PackId, window: Window, weight: U16 }.
+
+export variant Refusal [
+  WrongPack @ 1.
+  Replayed(serial: U64, floor: U64) @ 2.
+  OutOfWindow(build: U32) @ 4.
+  Salted @ 6.
+  Heavy(limit: U16, weight: U16) @ 9.
+].
+
+export kernel review claim: Claim
+-> Decision[Grant, Refusal]
+arithmetic: checked
+bounded steps: 1024 liveBits: 65536 controlDepth: 64 workspaceBits: 0
+rejects: Refusal::WrongPack, Refusal::Replayed, Refusal::OutOfWindow,
+  Refusal::Salted, Refusal::Heavy
+publication: none [
+  pack := claim pack.
+  window := claim window.
+  require pack == (claim expected) else: Refusal::WrongPack.
+  require (claim serial) > (claim floor)
+    else: Refusal::Replayed(serial: (claim serial), floor: (claim floor)).
+  require (claim build) >= (claim low) && (claim build) <= (claim high)
+    else: Refusal::OutOfWindow(build: (claim build)).
+  (claim salt) != (claim pepper) || (claim flags) == 0
+    ifTrue: [
+      match (claim channel) [
+        Stable: [
+          require (claim weight) <= 1000
+            else: Refusal::Heavy(limit: 1000, weight: (claim weight)).
+          accept Grant { weight: (claim weight), pack: pack, window: window }
+        ].
+        Beta: [
+          require (claim weight) <= 100
+            else: Refusal::Heavy(limit: 100, weight: (claim weight)).
+          accept Grant { pack: pack, window: window, weight: (claim weight) }
+        ].
+        Nightly: [ reject Refusal::Heavy(limit: 0, weight: (claim weight)) ].
+      ]
+    ]
+    ifFalse: [ reject Refusal::Salted ]
+].

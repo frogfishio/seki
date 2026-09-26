@@ -579,6 +579,43 @@
   hand-transcribed until `Seki.eval` exists in Lean. The kernel-specific proof
   was about 110 lines; that is what the lowering theorem must remove.
 
+- **Seki's typed core has a Lean decoder and evaluator** (`formal/seki/`, ADR
+  0023 step 2, first half). Lean decodes the exact SCB-0 bytes `sekic` emits for
+  the alpha fragment, rejecting anything outside it, and `Seki.eval` evaluates
+  the kernel. Recursion is structural throughout, so the Lean kernel itself, not
+  compiled code, decodes the complete E0 module in under a second: a proof about
+  a kernel's exact bytes no longer needs `native_decide`. Admission (typing,
+  table order, reference ranges) is not yet in Lean.
+- **The evaluator is a differential oracle for the alpha** (`make
+  check-lean-oracle`, VISION.md §17 step 4). For six kernels (E0 minimum age,
+  `access_permit`, the quickstart kernel as printed, and three corpus kernels
+  in `tests/oracle/`), Lean generates 2,000 inputs each from the parameter type,
+  including the kernel's own literals and their neighbours, equal and unequal
+  octet strings, and undeclared variant tags, and emits a C program comparing
+  every defined decision field of `sekic`'s kernel with `Seki.eval`. A changed
+  literal in one generated kernel is required to be caught. The expected
+  answers come from the typed core, not from reference policies written by the
+  compiler's authors.
+- **It found a miscompilation on its first run, fixed in `sekic
+  0.0.0-alpha.7`.** A `Bytes[N]` or `Digest` value whose type was written
+  directly, not through a declared type, reached the C with length 0: two
+  different values compared equal, and copying one into an accepted record or a
+  rejection payload wrote nothing. Values of a declared type such as `nominal
+  AccountId` were unaffected, which is why tests that only compared nominal
+  identities missed it. On the corpus kernel that exercises it, the unfixed
+  compiler disagreed with the evaluator on 1,864 of 2,000 vectors. The fix
+  passes each type's own length; `check-alpha-cli` asserts it without Lean.
+- **`sekic` output limits raised.** The typed core was capped at 2 KB and the C
+  and header at 4 KB each, which a moderately sized kernel exceeds. They are now
+  64 KB and 256 KB, held in `sekic`'s static workspace rather than on the stack;
+  the core emitter writes its payload in place instead of through a second
+  buffer.
+- **One case passes `check` but fails `build`.** Projecting a field out of a
+  record value other than the kernel's parameter, such as `((claim window)
+  low)`, fails with `A0-BACKEND-0001`. `A0_SCOPE.md` previously said there were
+  no such cases; it now names this one. The backend is being retired in favour
+  of KCore, so it is documented rather than fixed.
+
 ## Active work
 
 The direction is lowering to KCore (ADR 0023). The alpha, with its own C backend,
@@ -588,7 +625,8 @@ freeze conformance.
 
 ## Next unblocked tasks
 
-1. Decode, admit and evaluate any kernel in Lean, not one example.
+1. Admission in Lean, and a kernel-checked program proof against decoded bytes
+   that replaces the one `native_decide`.
 2. Lowering theorem for a first fragment: field projection, comparison,
    `require`, `reject`, `accept`, with the octet-identity fold as a balanced
    tree.
