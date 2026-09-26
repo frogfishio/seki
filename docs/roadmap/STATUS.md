@@ -639,9 +639,9 @@
   along every path; and every `match` covers every case exactly once in tag
   order. `Seki.totality` proves that an admitted kernel, applied to an argument
   of its parameter type, always reaches a decision. The example's exact bytes
-  are admitted by `decide +kernel`, so that kernel is proved total. Eighteen
-  hostile modules, each breaking one rule, are rejected at build time, and two
-  correct variants are admitted; every corpus kernel is admitted, and the
+  are admitted by `decide +kernel`, so that kernel is proved total. Fifteen
+  hostile modules, each breaking one rule, are rejected at build time, and the
+  original and two correct variants are admitted; every corpus kernel is admitted, and the
   oracle refuses a core that is not. Not yet in admission: recomputing the
   resource bounds, and acyclicity of type declarations, which totality does not
   need. `Audit/Statements.lean` pins the theorems' exact statements.
