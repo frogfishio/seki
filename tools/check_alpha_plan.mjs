@@ -25,7 +25,7 @@ expect(alpha.language_frozen === false && alpha.encoding_frozen === false,
 expect(alpha.authority_granted === false, "A0 granted authority");
 expect(alpha.development_assurance_model === "internal-self-attestation",
   "development assurance model drift");
-expect(alpha.cli_version === "0.0.0-alpha.6", "alpha CLI version drift");
+expect(alpha.cli_version === "0.0.0-alpha.7", "alpha CLI version drift");
 expect(alpha.connected_commands.join(",") === "check,build,inspect",
   "connected alpha commands drift");
 expect(alpha.compiler_core === "alpha-decision-frontend+backend",

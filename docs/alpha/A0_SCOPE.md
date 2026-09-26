@@ -73,7 +73,7 @@ closed with a stable diagnostic identifier and nonzero status.
 The CLI spelling is provisional. Alpha bundles record its exact revision and
 invocation; scripts must not treat it as a stable public API.
 
-Revision `0.0.0-alpha.6` connects `check`, `build`, and `inspect` through an
+Revision `0.0.0-alpha.7` connects `check`, `build`, and `inspect` through an
 in-process C API. The live frontend no longer invokes the E0 source parser: it
 emits the exact E0 typed-core bytes from the alpha AST after the independent
 checker succeeds. The alpha backend independently decodes and fully validates
@@ -154,8 +154,10 @@ a module stating a different obligation set still projects to C.
 `build` additionally requires the restricted-C projection, whose slice is
 currently narrower. A module can therefore pass `check` and fail `build` with a
 stable `A0-BACKEND-*` diagnostic and no output file. At revision
-`0.0.0-alpha.6` there are no known cases: every form the frontend admits also
-projects. `inspect` reports the two
+`0.0.0-alpha.7` there is one known case: projecting a field out of a record
+value other than the kernel's parameter, such as `((claim window) low)`, checks
+but fails `build` with `A0-BACKEND-0001`. Bind the field of the parameter
+instead, or flatten the record. `inspect` reports the two
 boundaries as `frontend=alpha-decision` and `backend=alpha-decision`, and
 reports `first_literal=<value>:<type>` when the kernel has an integer literal.
 

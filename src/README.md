@@ -16,7 +16,7 @@ a minimal restricted-C AST to deterministic C11. Neither defines a frozen
 compiler architecture or conformance boundary.
 
 The `alpha/` directory contains the provisional `sekic` CLI. Revision
-`0.0.0-alpha.6` runs the general lexer/parser and the U8-decision semantic checker
+`0.0.0-alpha.7` runs the general lexer/parser and the U8-decision semantic checker
 before `alpha/seki_core.c` emits SCB-0 directly from the checked AST. The
 immutable E0 frontend is no longer linked into `sekic`; its exact 417-byte output
 remains a regression oracle. `alpha/seki_c_backend.c` independently reopens the

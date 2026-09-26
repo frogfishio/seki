@@ -46,7 +46,7 @@ try {
   assert.equal(version.status, 0);
   assert.equal(version.stderr, "");
   assert.equal(version.stdout,
-    "sekic 0.0.0-alpha.6 (provisional, authority=none)\n");
+    "sekic 0.0.0-alpha.7 (provisional, authority=none)\n");
 
   const help = run(["--help"]);
   assert.equal(help.status, 0);
@@ -1017,12 +1017,32 @@ try {
   assert.equal(overwrite.status, 74);
   assert.match(overwrite.stderr, /^A0-IO-0002:/u);
 
+  // A `Bytes[N]` or `Digest` value whose type is written directly compares and
+  // copies all its octets. Before 0.0.0-alpha.7 it reached the C as length 0,
+  // so two different values compared equal and copies wrote nothing; only
+  // octets reached through a declared type carried their length. Found by the
+  // Lean oracle (tools/check_lean_oracle.mjs).
+  const octetsCore = path.join(temporary, "octets.scb0");
+  const octetsC = path.join(temporary, "octets.c");
+  const octets = run(["build", "--core", octetsCore, "--c", octetsC,
+    "tests/oracle/octets.seki"]);
+  assert.equal(octets.status, 0, octets.stderr);
+  const octetsText = fs.readFileSync(octetsC, "utf8");
+  assert.match(octetsText,
+    /octets_equal\(seki_b0, seki_p_ticket\.seki_f_echo, UINT32_C\(6\)\)/u);
+  assert.match(octetsText,
+    /octets_copy\(result\.rejection\.mismatch\.seki_f_echo, seki_p_ticket\.seki_f_echo, UINT32_C\(6\)\)/u);
+  assert.match(octetsText,
+    /octets_copy\(result\.accepted\.seki_f_code, seki_b0, UINT32_C\(6\)\)/u);
+  assert.doesNotMatch(octetsText, /UINT32_C\(0\)\)/u,
+    "an octet operation reached the C with length 0");
+
   const bad = run(["build", canonicalSource]);
   assert.equal(bad.status, 64);
   assert.match(bad.stderr, /^usage:\n/u);
 
   console.log(
-    "seki_alpha_cli=verified version=0.0.0-alpha.6 commands=4 connected=3 " +
+    "seki_alpha_cli=verified version=0.0.0-alpha.7 commands=4 connected=3 " +
     "slice=u8-decision fields=2 rejections=2 renamed=yes overwrite=reject " +
     "operators=4 source_order=canonical table_order=name-derived " +
     "header_vectors=general nested_control=yes exhaustive=65536 " +
@@ -1031,7 +1051,7 @@ try {
     "bindings=scoped accepted=value records=constructed " +
     "aliases=expanded example=access_permit " +
     "precedence=structural tag0=reserved abi=revision-2 " +
-    "payloads=typed match=exhaustive",
+    "payloads=typed match=exhaustive bare_octets=full-length",
   );
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

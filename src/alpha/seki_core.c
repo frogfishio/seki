@@ -1021,8 +1021,10 @@ seki_emit_core(const struct seki_module_prefix *module,
     struct seki_elaboration *elaboration, unsigned char *output,
     size_t capacity, size_t *output_length, struct seki_core_error *error)
 {
-    unsigned char payload_bytes[SEKI_CORE_CAPACITY];
-    struct core_buffer payload = {payload_bytes, sizeof payload_bytes, 0U, 0};
+    /* The payload is written in place after the 13-octet envelope header,
+     * which is filled in once the payload length is known, so no second
+     * buffer is needed. */
+    struct core_buffer payload = {NULL, 0U, 0U, 0};
     struct core_buffer encoded = {output, capacity, 0U, 0};
     static const unsigned char magic[4] = {'S', 'E', 'K', 'I'};
     struct seki_layout layout;
@@ -1046,6 +1048,14 @@ seki_emit_core(const struct seki_module_prefix *module,
         return 0;
     }
 
+    if (capacity < 13U) {
+        error->code = "A0-CORE-0002";
+        error->message = "candidate typed-core output exceeds capacity";
+        return 0;
+    }
+    payload.bytes = output + 13U;
+    payload.capacity = capacity - 13U;
+
     memset(&emitter, 0, sizeof emitter);
     emitter.module = module;
     emitter.elaboration = elaboration;
@@ -1061,8 +1071,8 @@ seki_emit_core(const struct seki_module_prefix *module,
     put_u32(&encoded, 0U);
     put_u8(&encoded, 0U);
     put_u32(&encoded, (uint32_t)payload.length);
-    put_raw(&encoded, payload.bytes, payload.length);
-    if (encoded.failed) {
+    encoded.length += payload.length;
+    if (encoded.failed || payload.failed) {
         error->code = "A0-CORE-0002";
         error->message = "candidate typed-core output exceeds capacity";
         return 0;

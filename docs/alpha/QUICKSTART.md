@@ -225,8 +225,15 @@ This is a provisional alpha. The syntax and the binary encoding are not frozen.
 refinement proof is the main open work. What backs the compiler today is a
 second independent implementation that re-decodes every module it emits and
 re-derives the resource bounds from scratch, exhaustive comparison of generated
-kernels against their stated policy, and mutation fuzzing under
+kernels against their stated policy, differential execution against a Lean
+evaluator of the exact typed-core bytes, and mutation fuzzing under
 AddressSanitizer and UndefinedBehaviorSanitizer.
+
+Use `sekic 0.0.0-alpha.7` or later. Revision `0.0.0-alpha.6` compared and
+copied a `Bytes[N]` or `Digest` value whose type was written directly, rather
+than through a `nominal` or `type` declaration, as zero octets: two different
+values compared equal, and a copy wrote nothing. Values of a declared type,
+such as a `nominal AccountId`, were not affected.
 
 That is real engineering evidence. It is not a proof, and nothing here should
 be treated as carrying implementation, proof, product or production authority.

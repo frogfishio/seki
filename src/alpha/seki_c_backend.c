@@ -378,7 +378,8 @@ static void read_claimed_type(struct reader *reader,
     uint32_t *type_length, uint32_t *declared);
 
 static void resolve_representation(const struct restricted_module *module,
-    uint8_t tag, uint32_t declared, uint8_t *out_tag, uint32_t *out_length);
+    uint8_t tag, uint32_t length, uint32_t declared, uint8_t *out_tag,
+    uint32_t *out_length);
 
 static void
 decode_header(struct reader *reader, struct restricted_module *module)
@@ -1058,6 +1059,7 @@ decode_kernel(struct reader *reader, struct restricted_module *module)
         uint8_t representation = 0U;
         uint32_t ignored = 0U;
         resolve_representation(module, module->kernel.accepted_tag,
+            module->kernel.accepted_length,
             module->kernel.accepted_declaration, &representation, &ignored);
         if (representation == 11U || representation == 13U) {
             /* A bare octet array cannot be assigned in C. Wrapping it in a
@@ -1429,8 +1431,8 @@ print_expression(struct text_buffer *output,
          * two of them with a C operator would compare addresses rather than
          * contents.
          */
-        resolve_representation(module, left->type_tag, left->type_declaration,
-            &left_tag, &left_length);
+        resolve_representation(module, left->type_tag, left->type_length,
+            left->type_declaration, &left_tag, &left_length);
         if (left_tag == 11U || left_tag == 13U) {
             /* Octet arrays are not comparable with a C operator. Only
              * equality reaches here: ordered comparison on them is rejected
@@ -1514,6 +1516,7 @@ print_record_into(struct text_buffer *output,
         uint8_t representation = 0U;
         uint32_t length = 0U;
         resolve_representation(module, declaration->field_types[entry],
+            declaration->field_lengths[entry],
             declaration->field_declarations[entry], &representation, &length);
         text_put_indent(output, depth);
         if (representation == 11U || representation == 13U) {
@@ -1578,6 +1581,7 @@ print_rejection_payload(struct text_buffer *output,
         uint32_t length = 0U;
         const uint32_t value = module->kernel.record_fields[reason->b + field];
         resolve_representation(module, variant->payload_types[item][field],
+            variant->payload_lengths[item][field],
             variant->payload_declarations[item][field], &representation,
             &length);
         text_put_indent(output, depth);
@@ -1693,7 +1697,7 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
             return;
         }
         value = &module->kernel.expressions[tail->a];
-        resolve_representation(module, value->type_tag,
+        resolve_representation(module, value->type_tag, value->type_length,
             value->type_declaration, &representation, &ignored);
         text_put_indent(output, depth);
         if (representation == 11U || representation == 13U) {
@@ -1768,11 +1772,13 @@ print_tail(struct text_buffer *output, const struct restricted_module *module,
  */
 static void
 resolve_representation(const struct restricted_module *module, uint8_t tag,
-    uint32_t declared, uint8_t *out_tag, uint32_t *out_length)
+    uint32_t length, uint32_t declared, uint8_t *out_tag, uint32_t *out_length)
 {
     size_t step;
+    /* A type that is already an octet array carries its own length; only a
+     * declared type takes the length of the representation it resolves to. */
     *out_tag = tag;
-    *out_length = 0U;
+    *out_length = length;
     for (step = 0U; step <= module->declaration_count; step += 1U) {
         const struct decoded_declaration *declaration;
         if (*out_tag != 21U) {
@@ -1860,6 +1866,7 @@ module_copies_octets(const struct restricted_module *module)
             uint8_t tag = 0U;
             uint32_t length = 0U;
             resolve_representation(module, declaration->field_types[entry],
+                declaration->field_lengths[entry],
                 declaration->field_declarations[entry], &tag, &length);
             if (tag == 11U || tag == 13U) {
                 return 1;
@@ -1903,7 +1910,7 @@ module_compares_octets(const struct restricted_module *module)
             const struct restricted_expression *left =
                 &module->kernel.expressions[expression->a];
             uint8_t tag; uint32_t length;
-            resolve_representation(module, left->type_tag,
+            resolve_representation(module, left->type_tag, left->type_length,
                 left->type_declaration, &tag, &length);
             if (tag == 11U || tag == 13U) {
                 return 1;

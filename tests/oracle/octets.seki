@@ -1,0 +1,31 @@
+module oracle::octets @ 1
+profile: c11_bounded @ 1
+claims: semantic_evaluation
+requires: totality.
+
+export record Ticket {
+  code: Bytes[6],
+  echo: Bytes[6],
+  seal: Digest[sha256, 32],
+  count: U8
+}.
+
+export record Receipt { code: Bytes[6], seal: Digest[sha256, 32], count: U8 }.
+
+export variant Refusal [
+  Mismatch(code: Bytes[6], echo: Bytes[6]) @ 1.
+  Empty @ 2.
+].
+
+export kernel redeem ticket: Ticket
+-> Decision[Receipt, Refusal]
+arithmetic: checked
+bounded steps: 512 liveBits: 16384 controlDepth: 64 workspaceBits: 0
+rejects: Refusal::Mismatch, Refusal::Empty
+publication: none [
+  code := ticket code.
+  require code == (ticket echo)
+    else: Refusal::Mismatch(code: code, echo: (ticket echo)).
+  require (ticket count) > 0 else: Refusal::Empty.
+  accept Receipt { seal: (ticket seal), count: (ticket count), code: code }
+].

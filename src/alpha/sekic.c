@@ -15,18 +15,21 @@
 #include "seki_core.h"
 #include "seki_parser.h"
 
-#define SEKI_A0_VERSION "0.0.0-alpha.6"
+#define SEKI_A0_VERSION "0.0.0-alpha.7"
 #define SEKI_A0_SOURCE_CAPACITY 65536U
 
 /*
- * The parsed module and its elaboration are large fixed-capacity workspaces.
- * The host owns one instance for the whole process and lends it to the
- * compiler core, so no component below `main` carries them on its own frame
- * and the core imposes no allocation policy of its own.
+ * The parsed module, its elaboration and the output buffers are large
+ * fixed-capacity workspaces. The host owns one instance for the whole process
+ * and lends it to the compiler core, so no component below `main` carries them
+ * on its own frame and the core imposes no allocation policy of its own.
  */
 struct seki_workspace {
     struct seki_module_prefix module;
     struct seki_elaboration elaboration;
+    unsigned char core[SEKI_CORE_CAPACITY];
+    char c_source[SEKI_C_SOURCE_CAPACITY];
+    char header[SEKI_C_SOURCE_CAPACITY];
 };
 
 enum exit_status {
@@ -161,19 +164,19 @@ compile_source(struct seki_workspace *workspace, const char *path,
 static int
 check_command(struct seki_workspace *workspace, const char *input_path)
 {
-    unsigned char core[SEKI_CORE_CAPACITY];
     size_t core_length = 0U;
 
-    return compile_source(workspace, input_path, core, &core_length);
+    return compile_source(workspace, input_path, workspace->core,
+        &core_length);
 }
 
 static int
 build_command(struct seki_workspace *workspace, const char *input_path,
     const char *core_path, const char *c_path, const char *header_path)
 {
-    unsigned char core[SEKI_CORE_CAPACITY];
-    char c_source[SEKI_C_SOURCE_CAPACITY];
-    char header[SEKI_C_SOURCE_CAPACITY];
+    unsigned char *const core = workspace->core;
+    char *const c_source = workspace->c_source;
+    char *const header = workspace->header;
     size_t core_length = 0U;
     size_t c_length = 0U;
     size_t header_length = 0U;
@@ -197,11 +200,11 @@ build_command(struct seki_workspace *workspace, const char *input_path,
         return status;
     }
     if (header_path != NULL && !seki_core_to_header(core, core_length, header,
-        sizeof header, &header_length, &backend_error)) {
+        SEKI_C_SOURCE_CAPACITY, &header_length, &backend_error)) {
         print_backend_error(input_path, &backend_error);
         return EXIT_DATA;
     }
-    if (!seki_core_to_c(core, core_length, c_source, sizeof c_source,
+    if (!seki_core_to_c(core, core_length, c_source, SEKI_C_SOURCE_CAPACITY,
         &c_length, header_path != NULL, &backend_error)) {
         print_backend_error(input_path, &backend_error);
         return strcmp(backend_error.code, "A0-BACKEND-0002") == 0 ?
@@ -230,17 +233,17 @@ build_command(struct seki_workspace *workspace, const char *input_path,
 }
 
 static int
-inspect_command(const char *input_path)
+inspect_command(struct seki_workspace *workspace, const char *input_path)
 {
-    unsigned char core[SEKI_CORE_CAPACITY];
+    unsigned char *const core = workspace->core;
     size_t core_length = 0U;
     struct seki_backend_error backend_error;
     struct seki_core_inspection inspection;
 
-    if (!read_bounded(input_path, core, sizeof core, &core_length)) {
+    if (!read_bounded(input_path, core, SEKI_CORE_CAPACITY, &core_length)) {
         (void)fprintf(stderr,
             "A0-IO-0001:%s: cannot read core within %u-byte limit\n",
-            input_path, (unsigned)sizeof core);
+            input_path, (unsigned)SEKI_CORE_CAPACITY);
         return EXIT_IO;
     }
     if (!seki_inspect_core(core, core_length, &inspection, &backend_error)) {
@@ -310,7 +313,7 @@ main(int argc, char **argv)
         return build_command(workspace, argv[8], argv[3], argv[5], argv[7]);
     }
     if (argc == 3 && command_is(argv[1], "inspect")) {
-        return inspect_command(argv[2]);
+        return inspect_command(workspace, argv[2]);
     }
     print_usage(stderr);
     return EXIT_USAGE;

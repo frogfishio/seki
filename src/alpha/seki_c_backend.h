@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SEKI_C_SOURCE_CAPACITY 4096U
+#define SEKI_C_SOURCE_CAPACITY 262144U
 
 struct seki_backend_error {
     const char *code;

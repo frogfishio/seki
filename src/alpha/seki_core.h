@@ -6,7 +6,7 @@
 #include "seki_checker.h"
 #include "seki_parser.h"
 
-#define SEKI_CORE_CAPACITY 2048U
+#define SEKI_CORE_CAPACITY 65536U
 
 struct seki_core_error {
     const char *code;

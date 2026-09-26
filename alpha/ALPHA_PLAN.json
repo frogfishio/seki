@@ -10,7 +10,7 @@
   "encoding_frozen": false,
   "authority_granted": false,
   "development_assurance_model": "internal-self-attestation",
-  "cli_version": "0.0.0-alpha.6",
+  "cli_version": "0.0.0-alpha.7",
   "connected_commands": [
     "check",
     "build",
