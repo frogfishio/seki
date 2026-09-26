@@ -120,9 +120,9 @@ stated over a pure evaluator with no heap and no pointers.
 
 ## Costs and constraints accepted
 
-- **Dependency.** The C boundary belongs to Krisis. Seki pins an exact KCore
-  revision and follows Krisis's review of it. KCore changes when SAK needs it
-  to.
+- **Dependency.** The C boundary is shared with Krisis. Seki pins an exact
+  KCore revision and adapts when it moves, until KCore is a product of its own
+  (see *How KCore is obtained*).
 - **Targets.** KCore asserts 8-bit bytes, a 64-bit `size_t` and a 32-bit `int`.
   Targets outside that need a KCore target layout for them.
 - **Encodings.** KCore structs hold scalars only and it has no unions and no
@@ -135,13 +135,25 @@ stated over a pure evaluator with no heap and no pointers.
 - **Retirement.** `src/alpha/seki_c_backend.c` is retired once the KCore path
   reproduces what consumers integrate against.
 
-## Prerequisites
+## How KCore is obtained
 
-- **Agreement with Krisis** that Seki may depend on KCore, and how: a pinned
-  path or package dependency on the KCore core alone, without Krisis's
-  SAK-specific programs and the frozen SAK reference they require.
-- **A licence on KCore** compatible with Seki's `GPL-3.0-or-later`. Krisis
-  currently carries no licence file.
+Both projects have the same copyright holder and are released under
+`GPL-3.0-or-later`, so depending on KCore needs no agreement beyond this
+decision. It happens in three stages:
+
+1. **Vendor now.** The KCore core is copied into `vendor/kcore/`, pinned to one
+   Krisis commit by per-file digests in `vendor/kcore/UPSTREAM.json`. Only the
+   language core is taken: Krisis's own verified programs, and the frozen SAK
+   reference they depend on, stay behind. The copy is read-only; any change
+   Seki needs is a numbered patch recorded in `vendor/kcore/PATCHES.md` and
+   committed on its own. `make check-kcore-vendor` enforces the pin, applies
+   KCore's source policy, builds the core and runs its axiom audit.
+2. **Sync once Seki's end works.** Krisis is working towards SAK v0.3, which
+   may change KCore. When the lowering works, diff upstream's core at its new
+   commit against the pin, reapply the patches, and let the Lean build show
+   which of Seki's proofs depend on anything that changed.
+3. **Spin KCore off.** KCore becomes a separately versioned `GPL-3.0-or-later`
+   product, and Krisis and Seki both depend on a pinned released version.
 
 ## Order of work
 
@@ -166,7 +178,7 @@ stated over a pure evaluator with no heap and no pointers.
 
 The direction is decided; the lowering proof is not yet shown to be
 affordable. The test is stated now, so that any later change is a finding and
-not a wobble:
+not a wobble. There is one trigger:
 
 - **The direction holds** if, for the step 3 fragment, the lowering theorem is
   proved once and a new kernel written in that fragment needs no KCore proof
@@ -174,6 +186,5 @@ not a wobble:
 - **The direction is revisited** if the lowering theorem needs per-kernel help
   (invariants, measures or glue written per kernel), because that is KCore's
   per-program cost in disguise and removes the reason for lowering at all.
-- **The direction is revisited** if Krisis declines the dependency, in which
-  case the same design with a Seki-owned copy of the KCore core is the first
-  alternative to weigh, not a return to our own C backend.
+- **A KCore change in the v0.3 sync is not a revisit trigger.** It is ordinary
+  adaptation, found mechanically by the Lean build.

@@ -14,6 +14,11 @@ its provenance. Gnosis and Kiku jointly specified that seed as founding
 customers. They do not govern this independent project and receive no special
 authority over its language or implementation.
 
+The files under vendor/kcore are a pinned copy of the KCore core from the
+Krisis project, which has the same copyright holder and is likewise licensed
+under the GNU General Public License, version 3 or any later version. Their
+origin and exact upstream commit are recorded in vendor/kcore/UPSTREAM.json.
+
 Lean, Rocq, and CompCert are separate third-party projects. They are not
 included or licensed by this repository. Their exact sources and licenses must
 be qualified before use in a release.

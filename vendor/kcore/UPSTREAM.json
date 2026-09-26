@@ -1,0 +1,44 @@
+{
+  "schema": "io.frogfish.seki/vendored-kcore-lock@1",
+  "component": "KCore core",
+  "upstream": {
+    "project": "Krisis",
+    "repository_hint": "../krisis",
+    "commit": "6faed24a04437f08107c529a7ef640822f832638",
+    "commit_date": "2026-09-25",
+    "claim_ceiling": "KCore refinement, safety and progress proved; emitted C qualified by the independent checker and tests; printer, C compiler and libc trusted (KCORE_C11_SUBSET.md section 7)"
+  },
+  "lean_toolchain": "leanprover/lean4:v4.30.0",
+  "licence": "GPL-3.0-or-later, vendored by the copyright holder of both projects",
+  "upstream_files": {
+    "docs/engineering/KCORE_C11_SUBSET.md": "18392bed183f8a0de60f68cf4a006c8d0bd444e108a037c560bf199df183afcd",
+    "docs/engineering/KCORE_SEMANTICS.md": "97fb91c6c945755ce9441a2bbfb2cdbb98be4d9710ec78604069e26a3ba7350a",
+    "formal/kcore/KCore/BigStep.lean": "84fb0b4310a4f16d61d300658a954f4eb11bbb51c1c7a5eb4a97459669c51d16",
+    "formal/kcore/KCore/C11/Ast.lean": "9a1086059e5d737b06c900ebd59d6996d9d65afe670e21bac996c8b36d3f958a",
+    "formal/kcore/KCore/C11/Check.lean": "1fbececd29a41e5e77686c160aaa27a7f36996baeca27c15d22ac14f50dd9741",
+    "formal/kcore/KCore/C11/Print.lean": "00033f7943d2cf07d63754e3d3a3127e33bce961f56fde46c2de5c53715503fe",
+    "formal/kcore/KCore/Encode.lean": "274efc0286e056011f69e58674e11f1b92e344f874207c82d5a0981b59ba1ed1",
+    "formal/kcore/KCore/Examples.lean": "078830a1714f0a614c579367ce0b4ae808e3a5972882188d8ca74ed5d73f09ba",
+    "formal/kcore/KCore/Fuel.lean": "fa69ff967bdf8d821427953863aec762a02dd178fba5548be99f3201abe295cf",
+    "formal/kcore/KCore/Kit.lean": "cb5203465678baa03210dfcb7b9bb11358e6868bb930daf245bb131a83b423dc",
+    "formal/kcore/KCore/LayoutFacts.lean": "8fa2c4d834d8ef9dd189bd76263ec5b542d9ef9a3103f32f54804e68436b38b2",
+    "formal/kcore/KCore/Logic.lean": "fce27f8d7a6d6336d6853b92ae087ea87110000a5e46094cac565f942049f437",
+    "formal/kcore/KCore/Semantics.lean": "c958b0c072a3152dd1e39decf8f79bac98ced12dd6160c4a3844935fc00febab",
+    "formal/kcore/KCore/Syntax.lean": "664cc4723f8e230ae952bbc423aca8276636edfa75bf484525e8b72eadbeed6f",
+    "formal/kcore/KCore/Theorems.lean": "44136c3c1f29a150e72f48b0011afaeac3e58ce592987efd6050c31d5bfeb7b5",
+    "formal/kcore/KCore/TypeSoundness.lean": "12c3d0ae3b76cc5ea37874a81b518493c721cb54bfc7f222baa88cf46e129a9c",
+    "formal/kcore/KCore/WellFormed.lean": "7ec573a05349a32f0f7b2450679c2b3153d35f2c71effeee93622b783d98a518",
+    "formal/kcore/lean-toolchain": "54727eec5cba149c18842e6deb5c41b369d66455c93ce135d7d5347c782b2325",
+    "implementation/kcore-c/kc_rt.c": "3984624d3fffb2ea0f40b25b3523b2e3eb2637bab8c2281a96cca0aeb2c11388",
+    "implementation/kcore-c/kc_rt.h": "26af12e637d67ff9ce1257ec70def51ba0748061d663a23f949dc7850b771896"
+  },
+  "local_files": [
+    "PATCHES.md",
+    "README.md",
+    "UPSTREAM.json",
+    "formal/kcore/Audit/Axioms.lean",
+    "formal/kcore/lake-manifest.json",
+    "formal/kcore/lakefile.toml"
+  ],
+  "patches": []
+}

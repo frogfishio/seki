@@ -1,0 +1,11 @@
+# Seki build glue for the vendored KCore core; not an upstream file.
+# Upstream's lakefile requires the frozen SAK reference for Krisis's own
+# verified programs. The core does not, so this builds every vendored module
+# under KCore/ and nothing else.
+name = "kcore"
+version = "0.0.0-m1"
+defaultTargets = ["KCore"]
+
+[[lean_lib]]
+name = "KCore"
+globs = ["KCore.+"]

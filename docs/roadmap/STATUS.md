@@ -545,9 +545,20 @@
   single proof that lowering preserves Seki semantics can supply that proof for
   every kernel. Seki therefore stops planning a C semantics and C backend of its
   own, and shares KCore's C boundary. `VISION.md` §§3, 8, 9, 15–18 are updated to
-  match. ADR 0023 states in advance what would make the direction be revisited:
-  a lowering theorem that needs per-kernel help, or Krisis declining the
-  dependency.
+  match. ADR 0023 states in advance the one finding that would revisit it: a
+  lowering theorem that needs per-kernel help.
+- **KCore is vendored.** Both projects have the same copyright holder and the
+  same licence, `GPL-3.0-or-later`. The KCore core (15 Lean modules, the C
+  support component and its two reference documents) is copied into
+  `vendor/kcore/`, pinned to Krisis commit `6faed24` by per-file digests.
+  Krisis's own verified programs and the frozen SAK reference stay behind. The
+  copy is read-only; changes Seki needs are numbered patches. It builds on its
+  own in about 15 seconds and its axiom audit passes over 2,265 `KCore`
+  constants. `make check-kcore-vendor` enforces the pin, rejects undeclared
+  files, applies KCore's source policy, compares each file with the pinned
+  commit when a Krisis checkout is present, and builds and audits the core
+  when Lean is installed. KCore is spun off as its own product once both
+  projects run on it.
 
 ## Active work
 
@@ -578,8 +589,7 @@ freeze conformance.
 | Locked foundation sources not clean-room built | Formal results cannot qualify. |
 | Several surface forms remain provisional | Parser work may experiment but cannot freeze conformance. |
 | E0 has no Clight refinement | Its Lean proof does not prove generated C or native behavior. |
-| No agreement yet with Krisis on depending on KCore | The spike can use KCore in place; a pinned dependency cannot be adopted. |
-| KCore carries no licence file | Seki cannot depend on or ship KCore-derived output until KCore has a licence compatible with GPL-3.0-or-later. |
+| Vendored KCore may move under SAK v0.3 | Seki builds against the pinned copy; one sync is planned once the lowering works (ADR 0023). |
 
 ## Verification commands
 
