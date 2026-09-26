@@ -616,6 +616,20 @@
   no such cases; it now names this one. The backend is being retired in favour
   of KCore, so it is documented rather than fixed.
 
+- **The program proof no longer trusts compiled code.** `formal/seki/Seki/Proofs/
+  MinimumAge.lean` states the minimum-age requirement without reference to Seki
+  and proves it of the example kernel's exact typed-core bytes by
+  `decide +kernel`: Lean's kernel decodes the bytes with the general decoder and
+  evaluates the kernel for all 256 ages, in about a second. The bytes are a list
+  literal generated from `experiments/e0-vs1/minimum_age.scb0.hex`, because the
+  kernel reduces numerals quickly and strings very slowly; `check-lean-proof`
+  regenerates it and requires it to be identical. The check also applies a
+  source policy (no `sorry`, user axioms, `partial` or `unsafe` definitions,
+  compiled-code decisions or FFI attributes), audits the axioms of all 662
+  `Seki` constants, and requires the proof to fail over the same bytes with the
+  threshold changed to 19. E0's own proof keeps its one `native_decide` as the
+  frozen record of that experiment; it is no longer the project's proof.
+
 ## Active work
 
 The direction is lowering to KCore (ADR 0023). The alpha, with its own C backend,
@@ -625,8 +639,8 @@ freeze conformance.
 
 ## Next unblocked tasks
 
-1. Admission in Lean, and a kernel-checked program proof against decoded bytes
-   that replaces the one `native_decide`.
+1. Admission in Lean: typing, table order and reference ranges, so that an
+   admitted kernel on an admitted input always has a decision.
 2. Lowering theorem for a first fragment: field projection, comparison,
    `require`, `reject`, `accept`, with the octet-identity fold as a balanced
    tree.

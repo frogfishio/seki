@@ -719,9 +719,11 @@ with real cost, and should be chosen deliberately rather than assumed.
   generated C, header, tag dictionary and contract, bound by digest. The bundle
   rebuilds the compiler from the sources it carries and confirms it reproduces
   every artifact byte for byte.
-- **One machine-checked Lean proof**, checked against a pinned toolchain by the
-  project's verification suite, that a single example program satisfies its
-  requirement.
+- **A program proof over exact bytes, trusting only Lean's kernel.** A
+  minimum-age requirement, stated without reference to Seki, is proved of the
+  example kernel's exact typed-core bytes: Lean's kernel itself decodes them and
+  evaluates the kernel for every one of the 256 ages. Nothing is decided by
+  compiled code. The same bytes with the threshold changed to 19 fail the proof.
 - **A Lean evaluator of the typed core, used as an oracle.** Lean decodes the
   exact typed-core bytes the compiler emits and evaluates the kernel. Every
   generated kernel in the verification suite is run against it on generated
@@ -744,11 +746,12 @@ with real cost, and should be chosen deliberately rather than assumed.
 - **There is no lowering to KCore yet.** One kernel was lowered and proved by
   hand to test the design; the general lowering, proved once for every kernel,
   does not exist.
-- **No customer kernel can be checked against a Lean requirement.** The program
-  proof exists only for the one example it was built for.
-- **The one existing proof does not yet borrow only the kernel's trust.** It
-  uses a Lean feature that relies on Lean's code generator rather than only its
-  small kernel. That will be replaced.
+- **No customer kernel has been checked against a Lean requirement.** The
+  decoder and evaluator are general, so it can now be done the same way as the
+  example, but only the example has been, and doing it takes a Lean author.
+- **Admission is not yet in Lean.** The evaluator gives an answer for inputs a
+  kernel's types would not admit, so a requirement has to restrict itself to
+  admitted inputs, as the example's does.
 - **The alpha's testing is only partly independent.** Most of it compares
   generated code against reference policies written by the same people who
   wrote the compiler, which is the closed loop this document warns against. The
