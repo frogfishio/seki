@@ -719,6 +719,11 @@ with real cost, and should be chosen deliberately rather than assumed.
   generated C, header, tag dictionary and contract, bound by digest. The bundle
   rebuilds the compiler from the sources it carries and confirms it reproduces
   every artifact byte for byte.
+- **Admission and totality in Lean.** Lean admits or rejects a decoded kernel
+  by its own rules, never believing the compiler's claims, and it is proved
+  that an admitted kernel, given an argument of its parameter type, always
+  reaches a decision. A Seki kernel has no failure mode of its own; that is the
+  property the lowering to KCore relies on.
 - **A program proof over exact bytes, trusting only Lean's kernel.** A
   minimum-age requirement, stated without reference to Seki, is proved of the
   example kernel's exact typed-core bytes: Lean's kernel itself decodes them and
@@ -749,9 +754,10 @@ with real cost, and should be chosen deliberately rather than assumed.
 - **No customer kernel has been checked against a Lean requirement.** The
   decoder and evaluator are general, so it can now be done the same way as the
   example, but only the example has been, and doing it takes a Lean author.
-- **Admission is not yet in Lean.** The evaluator gives an answer for inputs a
-  kernel's types would not admit, so a requirement has to restrict itself to
-  admitted inputs, as the example's does.
+- **Admission does not yet recompute resource bounds.** Lean admits a decoded
+  kernel by reopening every claimed type, reference, order, precedence and
+  match, but it takes the exact cost the compiler recorded without deriving it
+  again.
 - **The alpha's testing is only partly independent.** Most of it compares
   generated code against reference policies written by the same people who
   wrote the compiler, which is the closed loop this document warns against. The

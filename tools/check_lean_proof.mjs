@@ -108,6 +108,10 @@ const audit = execFileSync("lake", ["env", "lean", "Audit/Axioms.lean"],
   { cwd: seki, encoding: "utf8" });
 const audited = /seki_axiom_audit=verified constants=(\d+)/u.exec(audit);
 assert.ok(audited !== null, `axiom audit did not verify: ${audit}`);
+// The theorems prove exactly the statements written out in Audit/Statements.
+const statements = execFileSync("lake", ["env", "lean", "Audit/Statements.lean"],
+  { cwd: seki, encoding: "utf8" });
+assert.match(statements, /seki_statements=verified totality=pinned minimum_age=pinned/u);
 
 // Negative control: the same proof over bytes whose threshold is 19 must fail.
 const control = fs.mkdtempSync(path.join(os.tmpdir(), "seki-proof-control-"));
@@ -135,4 +139,4 @@ console.log(
   `lean_proof=verified lean=${lean.version}@${lean.commit.slice(0, 12)} ` +
   `e0_record_theorems=${theorems} e0_record_native_decide=${nativeDecides} ` +
   `seki_constants=${audited[1]} seki_native_decide=0 exact_bytes=bound ` +
-  "negative_control=refuted");
+  "admission=kernel-checked totality=proved negative_control=refuted");

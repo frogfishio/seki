@@ -3,9 +3,11 @@ The Lean evaluator as a differential oracle for sekic's generated C
 (VISION.md §17, step 4).
 
     oracle show <core.scb0>
+    oracle admission <core.scb0>
     oracle harness <core.scb0> <count> <out.c>
 
-`harness` decodes the exact typed-core bytes, generates `count` inputs from the
+`admission` decodes and admits the typed core (`Seki.Admit.module`). `harness`
+requires admission, then decodes the exact typed-core bytes, generates `count` inputs from the
 kernel's parameter type, evaluates every one with `Seki.eval`, and writes a C
 program that feeds the same inputs to the generated kernel and compares every
 defined decision field with the evaluator's answer. The expected decisions come
@@ -20,6 +22,7 @@ produce disposition 0 if the kernel inspects it.
 -/
 import Seki.Decode
 import Seki.Eval
+import Seki.Admit
 
 open Seki
 
@@ -276,9 +279,16 @@ def main (args : List String) : IO UInt32 := do
       for k in m.kernels do
         IO.println s!"  kernel {k.name} params={k.params.length} rejects={k.rejects.length} exact={k.exact.steps},{k.exact.liveBits},{k.exact.controlDepth},{k.exact.workspaceBits}"
       pure 0
+  | ["admission", path] =>
+      let m ← readCore path
+      if Admit.module m then IO.println "admission=admitted"; pure 0
+      else IO.println "admission=rejected"; pure 1
   | ["harness", path, count, outPath] =>
       let m ← readCore path
+      unless Admit.module m do
+        IO.eprintln s!"oracle: {path}: the typed core is not admitted"
+        return 1
       match harness m count.toNat! with
       | .ok (text, _, _, _) => IO.FS.writeFile outPath text; pure 0
       | .error e => IO.eprintln s!"oracle: {e}"; pure 1
-  | _ => IO.eprintln "usage: oracle show <core> | oracle harness <core> <count> <out.c>"; pure 2
+  | _ => IO.eprintln "usage: oracle show <core> | oracle admission <core> | oracle harness <core> <count> <out.c>"; pure 2

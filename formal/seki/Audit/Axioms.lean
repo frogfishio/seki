@@ -7,6 +7,9 @@ compiled code introduces, which would make Lean's compiler part of the proof.
 import Seki.Core
 import Seki.Decode
 import Seki.Eval
+import Seki.Admit
+import Seki.Totality
+import Seki.Tests.Admission
 import Seki.Proofs.MinimumAge
 import Lean
 

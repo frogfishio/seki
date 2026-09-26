@@ -630,6 +630,22 @@
   threshold changed to 19. E0's own proof keeps its one `native_decide` as the
   frozen record of that experiment; it is no longer the project's proof.
 
+- **Admission is in Lean, and totality is proved** (`formal/seki/Seki/Admit.lean`,
+  `Totality.lean`). Lean admits a decoded module only if every claimed
+  expression type recomputes exactly; declaration tables are in canonical
+  order with references in range and well-formed records, variants and
+  payloads; the kernel's rejection order names every case exactly once; every
+  rejection site's precedence is its case's position and strictly increases
+  along every path; and every `match` covers every case exactly once in tag
+  order. `Seki.totality` proves that an admitted kernel, applied to an argument
+  of its parameter type, always reaches a decision. The example's exact bytes
+  are admitted by `decide +kernel`, so that kernel is proved total. Eighteen
+  hostile modules, each breaking one rule, are rejected at build time, and two
+  correct variants are admitted; every corpus kernel is admitted, and the
+  oracle refuses a core that is not. Not yet in admission: recomputing the
+  resource bounds, and acyclicity of type declarations, which totality does not
+  need. `Audit/Statements.lean` pins the theorems' exact statements.
+
 ## Active work
 
 The direction is lowering to KCore (ADR 0023). The alpha, with its own C backend,
@@ -639,13 +655,11 @@ freeze conformance.
 
 ## Next unblocked tasks
 
-1. Admission in Lean: typing, table order and reference ranges, so that an
-   admitted kernel on an admitted input always has a decision.
-2. Lowering theorem for a first fragment: field projection, comparison,
+1. Lowering theorem for a first fragment: field projection, comparison,
    `require`, `reject`, `accept`, with the octet-identity fold as a balanced
    tree.
-3. Axiom policy gate for Seki's Lean, and removal of the one `native_decide`.
-4. Grit applies the alpha to a real shadow kernel and reports back.
+2. Resource-bound derivation in Lean admission.
+3. Grit applies the alpha to a real shadow kernel and reports back.
 
 ## Open decisions and blockers
 
