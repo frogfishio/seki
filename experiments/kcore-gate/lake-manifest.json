@@ -1,0 +1,13 @@
+{"version": "1.2.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"type": "path",
+   "scope": "",
+   "name": "kcore",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../../vendor/kcore/formal/kcore",
+   "configFile": "lakefile.toml"}],
+ "name": "sekispike",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

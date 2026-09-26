@@ -1,0 +1,15 @@
+name = "sekispike"
+version = "0.0.0"
+defaultTargets = ["SekiSpike"]
+
+[[lean_lib]]
+name = "SekiSpike"
+globs = ["SekiSpike.+"]
+
+[[lean_exe]]
+name = "emit"
+root = "Emit"
+
+[[require]]
+name = "kcore"
+path = "../../vendor/kcore/formal/kcore"

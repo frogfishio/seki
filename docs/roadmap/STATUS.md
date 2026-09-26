@@ -560,6 +560,25 @@
   when Lean is installed. KCore is spun off as its own product once both
   projects run on it.
 
+- **Spike: the quickstart `gate` kernel lowered to KCore**
+  (`experiments/kcore-gate/`, ADR 0023 step 1). Proved in Lean for every
+  admitted request and every KCore environment: the run returns exactly the
+  encoded Seki decision, with no event, no allocation and nothing owned, so no
+  environment can make it fail. Lean's three standard axioms only. The C
+  emitted by KCore's printer is reproducible and accepted by KCore's
+  independent checker; 4,241 vectors whose expected decisions come from the
+  Lean statement pass plain and under ASan and UBSan; a one-character change to
+  the emitted kernel is rejected by the checker, and one to the adapter by the
+  differential test. The decision is union-free with asserted absence of
+  padding (ABI revision 3), so byte comparison is sound. Findings recorded in
+  the spike's README: the octet-identity fold must be a balanced tree (the left
+  fold nests parentheses 102 deep, past C11's guaranteed 63); the Seki-facing
+  adapter is trusted glue KCore's checker does not cover; an event-free unit
+  still links KCore's runtime and so the C library; kernels with variant
+  inputs need admission checks in the adapter; and the Seki meaning is still
+  hand-transcribed until `Seki.eval` exists in Lean. The kernel-specific proof
+  was about 110 lines; that is what the lowering theorem must remove.
+
 ## Active work
 
 The direction is lowering to KCore (ADR 0023). The alpha, with its own C backend,
@@ -569,14 +588,12 @@ freeze conformance.
 
 ## Next unblocked tasks
 
-1. Hand spike: lower the quickstart `gate` kernel to KCore, prove it with KCore's
-   proof kit, emit it through KCore's printer and checker, and call it through a
-   Seki decision header.
-2. Decode, admit and evaluate any kernel in Lean, not one example.
-3. Lowering theorem for a first fragment: field projection, comparison,
-   `require`, `reject`, `accept`.
-4. Axiom policy gate for Seki's Lean, and removal of the one `native_decide`.
-5. Grit applies the alpha to a real shadow kernel and reports back.
+1. Decode, admit and evaluate any kernel in Lean, not one example.
+2. Lowering theorem for a first fragment: field projection, comparison,
+   `require`, `reject`, `accept`, with the octet-identity fold as a balanced
+   tree.
+3. Axiom policy gate for Seki's Lean, and removal of the one `native_decide`.
+4. Grit applies the alpha to a real shadow kernel and reports back.
 
 ## Open decisions and blockers
 
